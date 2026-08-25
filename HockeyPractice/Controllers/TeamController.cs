@@ -103,7 +103,10 @@ public class TeamController : TeamScopedController
         if (granted >= TeamAccessLevel.Manager)
         {
             if (TryReturnUrlRedirect(returnUrl, out var managerBack)) return managerBack;
-            return RedirectToAction("Index", "Coach", new { slug });
+
+            // Managers land on the plans, same as everyone else. Seeing what the team sees is
+            // the more common reason to open the site; adding a plan is one tap from there.
+            return RedirectToAction(nameof(Plans), new { slug });
         }
 
         // Players pick their name once, so the coach can see who has read a plan. This is
