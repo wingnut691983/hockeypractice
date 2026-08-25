@@ -54,4 +54,10 @@ public class PlanLink
 
     /// <summary>Coach can hide a link extraction picked up from a footer or boilerplate.</summary>
     public bool IsHidden { get; set; }
+
+    /// <summary>
+    /// The coach renamed or re-hid this link by hand. Re-extraction preserves those choices —
+    /// improving the automatic naming must never undo a correction someone already made.
+    /// </summary>
+    public bool WasEditedByCoach { get; set; }
 }

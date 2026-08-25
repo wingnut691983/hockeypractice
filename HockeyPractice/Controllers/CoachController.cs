@@ -208,14 +208,71 @@ public class CoachController : TeamScopedController
                 if (link is null) continue;
 
                 if (linkLabel is not null && i < linkLabel.Length && !string.IsNullOrWhiteSpace(linkLabel[i]))
-                    link.Label = linkLabel[i].Trim();
+                {
+                    var typed = linkLabel[i].Trim();
+                    // Only count it as a coach edit if they actually changed something.
+                    if (!string.Equals(typed, link.Label, StringComparison.Ordinal))
+                        link.WasEditedByCoach = true;
+                    link.Label = typed;
+                }
 
+                if (link.IsHidden != hidden.Contains(link.Id))
+                    link.WasEditedByCoach = true;
                 link.IsHidden = hidden.Contains(link.Id);
                 link.SortOrder = i;
             }
         }
 
         await Db.SaveChangesAsync();
+        return RedirectToAction(nameof(EditPlan), new { slug, id });
+    }
+
+    /// <summary>
+    /// Re-runs extraction over the stored PDF. Names are worked out at upload time, so a plan
+    /// uploaded before an improvement keeps its old labels until this is run. Any label the
+    /// coach edited by hand is preserved — re-extracting must not undo their corrections.
+    /// </summary>
+    [HttpPost("plans/{id:int}/reextract")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReExtract(string slug, int id)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.Include(p => p.Links)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+
+        if (!_storage.Exists(ctx!.Team.Id, plan.Id))
+            return RedirectToAction(nameof(EditPlan), new { slug, id });
+
+        // Remember the coach's own wording and visibility choices, keyed by URL.
+        var edited = plan.Links
+            .Where(l => l.WasEditedByCoach)
+            .ToDictionary(l => l.Url, l => (l.Label, l.IsHidden), StringComparer.OrdinalIgnoreCase);
+
+        var fresh = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
+        await _videoTitles.PopulateTitlesAsync(fresh);
+        LinkExtractionService.ApplyVideoTitles(fresh);
+
+        foreach (var link in fresh)
+        {
+            if (!edited.TryGetValue(link.Url, out var keep)) continue;
+            link.Label = keep.Label;
+            link.IsHidden = keep.IsHidden;
+            link.WasEditedByCoach = true;
+        }
+
+        Db.PlanLinks.RemoveRange(plan.Links);
+        foreach (var link in fresh)
+        {
+            link.PracticePlanId = plan.Id;
+            Db.PlanLinks.Add(link);
+        }
+
+        await Db.SaveChangesAsync();
+        _log.LogInformation("Re-extracted {Count} links for plan {PlanId}", fresh.Count, plan.Id);
+
         return RedirectToAction(nameof(EditPlan), new { slug, id });
     }
 

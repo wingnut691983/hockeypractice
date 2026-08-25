@@ -30,7 +30,10 @@ public partial class LinkExtractionService
     private static partial Regex VimeoPattern();
 
     /// <summary>A URL as found, with whatever the document says about it.</summary>
-    private sealed record Found(string Url, string? Anchor, string? Section);
+    /// <param name="NearFooter">
+    /// Sitting in the bottom strip of the page. Club boilerplate lives there; drill links don't.
+    /// </param>
+    private sealed record Found(string Url, string? Anchor, string? Section, bool NearFooter);
 
     public List<PlanLink> Extract(string pdfPath)
     {
@@ -81,17 +84,22 @@ public partial class LinkExtractionService
                     continue;
 
                 var rect = annotation.Rectangle;
+                var lineIndex = map.IndexOfLineAt(rect.Top, rect.Bottom);
+
                 var anchor = map.TextWithin(rect, page);
 
-                // When the visible text is the URL itself there is no anchor worth keeping;
-                // fall through to the line it sits on.
+                // When the visible text is the URL itself there is nothing worth keeping.
                 if (anchor is not null && LooksLikeUrl(anchor))
                     anchor = null;
 
-                var lineIndex = map.IndexOfLineAt(rect.Top, rect.Bottom);
-                anchor ??= StripUrls(map.TextOfLine(lineIndex));
+                // Tidy BEFORE deciding whether the anchor is usable. A table with a "VIDEO"
+                // column has anchor text of just "watch", which tidies away to nothing — the
+                // drill description is on the row, and that's the label worth having.
+                var label = PdfTextMap.Tidy(anchor)
+                            ?? PdfTextMap.Tidy(StripUrls(map.TextOfLine(lineIndex)));
 
-                found.Add(new Found(uri.Uri, PdfTextMap.Tidy(anchor), map.SectionFor(lineIndex)));
+                found.Add(new Found(uri.Uri, label, map.SectionFor(lineIndex),
+                    IsNearFooter(rect.Bottom, page)));
             }
         }
         catch (Exception ex)
@@ -115,10 +123,16 @@ public partial class LinkExtractionService
                 found.Add(new Found(
                     m.Value,
                     PdfTextMap.Tidy(StripUrls(line.Text)),
-                    map.SectionFor(index)));
+                    map.SectionFor(index),
+                    IsNearFooter(line.Bottom, page)));
             }
         }
     }
+
+    // Bottom eighth of the page. Deliberately narrow: the point is to catch a club URL in the
+    // page furniture, not a drill that happens to be the last row of a table.
+    private static bool IsNearFooter(double bottom, Page page) =>
+        bottom < page.Height * 0.12;
 
     private static string? StripUrls(string? text) =>
         text is null ? null : UrlPattern().Replace(text, " ").Trim();
@@ -146,9 +160,13 @@ public partial class LinkExtractionService
             if (videoId is not null)
                 url = Canonical(kind, videoId);
 
-            // Dedupe on the video where we recognise one, so the same clip linked as youtu.be
-            // and youtube.com/watch collapses into a single card.
-            var key = videoId is null ? url : $"{kind}:{videoId}";
+            // Dedupe on the video AND what the document calls it. One clip legitimately covers
+            // several drills — a warm-up video demonstrating lateral shuffle, carioca and
+            // A-skip is linked from all three rows — and each of those is a card a player
+            // goes looking for by name. Only collapse when it's genuinely the same reference
+            // (the annotation pass and the text pass finding the same link on the same line).
+            var identity = videoId is null ? url : $"{kind}:{videoId}";
+            var key = $"{identity}|{candidate.Anchor?.ToLowerInvariant() ?? string.Empty}";
 
             if (seen.TryGetValue(key, out var existing))
             {
@@ -173,18 +191,31 @@ public partial class LinkExtractionService
                 LabelFromDocument = !string.IsNullOrWhiteSpace(candidate.Anchor),
                 Section = candidate.Section,
                 SortOrder = links.Count,
-                // Videos lead; everything else is still listed but starts hidden so a link
-                // from a document footer doesn't take up a card.
-                IsHidden = kind == LinkKind.Other
+                // Hide page furniture, not non-YouTube drills. A link in a table row next to a
+                // drill description is exactly what a player needs, whatever site it's on;
+                // hiding it purely for not being YouTube loses real content.
+                IsHidden = candidate.NearFooter
             };
 
             seen[key] = link;
             links.Add(link);
         }
 
-        // Recognised videos first, preserving document order within each group.
+        // The same link can be picked up by both passes, one of which found no context.
+        // Drop the contextless copy rather than showing a bare duplicate card.
+        var described = links
+            .Where(l => l.LabelFromDocument && l.VideoId is not null)
+            .Select(l => $"{l.Kind}:{l.VideoId}")
+            .ToHashSet();
+
+        links.RemoveAll(l => !l.LabelFromDocument
+                             && l.VideoId is not null
+                             && described.Contains($"{l.Kind}:{l.VideoId}"));
+
+        // Document order, with page furniture pushed to the end. Ordering by provider would
+        // scatter a drill list that the plan deliberately put in sequence.
         var ordered = links
-            .OrderBy(l => l.Kind == LinkKind.Other ? 1 : 0)
+            .OrderBy(l => l.IsHidden ? 1 : 0)
             .ThenBy(l => l.SortOrder)
             .ToList();
 

@@ -117,6 +117,19 @@
                 </ul>
                 <p class="hp-muted" style="margin-bottom:0;">Ticked = hidden from players.</p>
             </div>
+
+            <div class="hp-panel" style="margin:0;">
+                <p class="hp-muted" style="margin-top:0;">
+                    Names are worked out when a plan is uploaded, so a plan uploaded a while ago
+                    keeps its original names. Re-reading the PDF picks up any later improvements.
+                    Anything you renamed or hid by hand is kept.
+                </p>
+                <button type="submit" class="hp-btn hp-btn-quiet"
+                        formaction="@Url.Action("ReExtract", "Coach", new { slug, id = Model.Plan?.Id })"
+                        formmethod="post">
+                    Re-read video names from the PDF
+                </button>
+            </div>
         }
         else if (!Model.IsNew)
         {

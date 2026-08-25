@@ -86,17 +86,45 @@ public sealed partial class PdfTextMap
             if (words > 12 || line.Text.Length > 90) continue;
 
             var bigger = bodySize > 0 && line.FontSize > bodySize * 1.12;
-            var numbered = NumberedItem().IsMatch(line.Text);
+
+            // A table's header row is short and often capitalised, but it is set SMALLER than
+            // the body, not larger — that's what separates "CLOCK MINS BLOCK" from a real
+            // section heading. Without this, every table header becomes a section and the rows
+            // beneath it get labelled with the column names.
+            var notSmallerThanBody = bodySize <= 0 || line.FontSize >= bodySize * 0.98;
+
+            // "3. Walking hamstring scoop." looks like a heading in isolation, but in a run of
+            // numbered drills it is a list item — and treating it as a heading makes every
+            // drill the "section" of the one after it. A numbered line only counts as a
+            // heading when its neighbours aren't numbered too.
+            var numbered = NumberedItem().IsMatch(line.Text) && !InNumberedRun(lines, i);
             var endsWithColon = line.Text.EndsWith(':') && words <= 8;
             var shouty = line.Text.Length <= 45 &&
                          line.Text.Any(char.IsLetter) &&
                          line.Text.Where(char.IsLetter).All(char.IsUpper);
 
-            if (bigger || numbered || endsWithColon || shouty)
+            if (bigger || (notSmallerThanBody && (numbered || endsWithColon || shouty)))
                 headings.Add(i);
         }
 
         return headings;
+    }
+
+    /// <summary>True when an adjacent line is also a numbered item of similar size.</summary>
+    private static bool InNumberedRun(List<Line> lines, int index)
+    {
+        foreach (var neighbour in new[] { index - 1, index + 1 })
+        {
+            if (neighbour < 0 || neighbour >= lines.Count) continue;
+            if (!NumberedItem().IsMatch(lines[neighbour].Text)) continue;
+
+            // Similar size means the same list. A numbered heading above a numbered sub-item
+            // set noticeably smaller is still a heading.
+            var a = lines[index].FontSize;
+            var b = lines[neighbour].FontSize;
+            if (a <= 0 || b <= 0 || Math.Abs(a - b) <= a * 0.1) return true;
+        }
+        return false;
     }
 
     /// <summary>The line containing a point, or the one a rectangle sits on.</summary>
@@ -171,7 +199,13 @@ public sealed partial class PdfTextMap
         text = Regex.Replace(text, @"^\s*(\d+[\.\)]|[A-Z][\.\)]|[IVXLC]+[\.\)])\s+", "");
         text = Regex.Replace(text, @"^(?:watch|see|video|link|reference|ref)\b[:\-–—\s]*", "",
                              RegexOptions.IgnoreCase);
-        text = text.Trim(' ', ':', '-', '–', '—', '·', '•', '•', ',', ';', '.');
+
+        // And the same words trailing. A table with a "VIDEO" column puts the link text at the
+        // end of the row, so the line reads "... overhead reach. watch".
+        text = Regex.Replace(text, @"[\s:\-–—·•]*\b(?:watch(?:\s+here)?|video|link|demo)\b[\s.:!]*$", "",
+                             RegexOptions.IgnoreCase);
+
+        text = text.Trim(' ', ':', '-', '–', '—', '·', '•', ',', ';', '.');
 
         if (text.Length < 3) return null;
         return text.Length > 140 ? text[..140].TrimEnd() : text;
