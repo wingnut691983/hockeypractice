@@ -1,8 +1,8 @@
 @{
     var team = ViewBag.Team as Team;
     var title = ViewBag.Title as string ?? "Practice Plans";
-    var primary = team?.PrimaryColor ?? "#0B4EA2";
-    var accent  = team?.AccentColor  ?? "#F0562D";
+    var primary = team?.SafePrimary ?? Team.DefaultPrimary;
+    var accent  = team?.SafeAccent  ?? Team.DefaultAccent;
 }
 <!DOCTYPE html>
 @* Team colours ride on the root element so one stylesheet serves every team. *@

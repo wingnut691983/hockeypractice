@@ -698,14 +698,25 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
    page where that choice is presented, so it is stated rather than hidden behind a menu. */
 
 .hp-teamcard {
+  position: relative;
   background: var(--hp-surface);
   border: 1px solid var(--hp-border);
   border-radius: var(--hp-radius);
   box-shadow: var(--hp-shadow);
   padding: 1rem;
   margin-bottom: .85rem;
+  overflow: hidden;
 }
-.hp-teamcard-head { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+
+/* The team's colours along the top edge, so teams are distinguishable at a glance
+   before you've read a single word. */
+.hp-teamcard-rail {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--hp-primary) 0%, var(--hp-accent) 100%);
+}
+.hp-teamcard-head { display: flex; align-items: center; gap: .75rem; min-width: 0; margin-top: .35rem; }
 .hp-teamcard-name {
   font-size: 1.15rem;
   font-weight: 750;

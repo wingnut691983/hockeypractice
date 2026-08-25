@@ -22,10 +22,13 @@
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Take(2).Select(w => char.ToUpperInvariant(w[0])));
 
-            <div class="hp-teamcard">
+            @* Each card carries its own team's colours, so everything inside it — the badge,
+               the rail, the primary button — picks them up. The page itself can't be themed:
+               with more than one team there is no single palette to apply. *@
+            <div class="hp-teamcard" style="--hp-primary:@team.SafePrimary; --hp-accent:@team.SafeAccent;">
+                <div class="hp-teamcard-rail"></div>
                 <div class="hp-teamcard-head">
-                    <div class="hp-topbar-fallback" aria-hidden="true"
-                         style="background:@team.PrimaryColor;">@initials</div>
+                    <div class="hp-topbar-fallback" aria-hidden="true">@initials</div>
                     <div style="min-width:0;">
                         <div class="hp-teamcard-name">@team.Name</div>
                         @if (level == TeamAccessLevel.Manager)
