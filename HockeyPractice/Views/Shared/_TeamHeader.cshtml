@@ -1,0 +1,134 @@
+@model TeamContext
+@{
+    var initials = string.Join("", Model.Team.Name
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2).Select(w => char.ToUpperInvariant(w[0])));
+    var slug = Model.Team.Slug;
+
+    // Which tab is current, so the bar reflects where you actually are.
+    var section = (ViewBag.NavSection as string) ?? "plans";
+    var showTabs = Model.RealLevel >= TeamAccessLevel.Coach;
+}
+<header class="hp-topbar">
+    <div class="hp-topbar-inner">
+        <a class="hp-topbar-id" asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">
+            @if (Model.LogoUrl is not null)
+            {
+                <img class="hp-topbar-logo" src="@Model.LogoUrl" alt="" />
+            }
+            else
+            {
+                <div class="hp-topbar-fallback" aria-hidden="true">@initials</div>
+            }
+            <span class="hp-topbar-text">
+                <span class="hp-topbar-name">@Model.Team.Name</span>
+                <span class="hp-topbar-sub">
+                    @if (Model.PreviewingAsPlayer)
+                    {
+                        <text>Player view</text>
+                    }
+                    else if (Model.IsCoach)
+                    {
+                        <text>Coach</text>
+                    }
+                    else if (Model.Me is not null)
+                    {
+                        @Model.Me.Name
+                    }
+                    else
+                    {
+                        <text>Practice plans</text>
+                    }
+                </span>
+            </span>
+        </a>
+
+        <div class="hp-topbar-spacer"></div>
+
+        @* One menu instead of competing buttons — there is no room for more on a phone. *@
+        <details class="hp-menu">
+            <summary class="hp-menu-trigger" aria-label="Menu" title="Menu">
+                <span aria-hidden="true">☰</span>
+            </summary>
+            <div class="hp-menu-panel">
+                @if (!Model.IsCoach)
+                {
+                    <a class="hp-menu-item" asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug">
+                        @(Model.Me is null ? "Pick your name" : "Change name (" + Model.Me.Name + ")")
+                    </a>
+                }
+
+                @if (Model.RealLevel >= TeamAccessLevel.Coach)
+                {
+                    <a class="hp-menu-item" asp-controller="Coach" asp-action="Index" asp-route-slug="@slug">
+                        Manage team
+                    </a>
+
+                    @* Lets a coach see exactly what players see — the way to catch a plan that
+                       reads wrong before publishing it. *@
+                    <form method="post" asp-controller="Team" asp-action="TogglePreview" asp-route-slug="@slug">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="returnUrl" value="@Context.Request.PathBase@Context.Request.Path@Context.Request.QueryString" />
+                        <button type="submit" class="hp-menu-item hp-menu-button">
+                            @(Model.PreviewingAsPlayer ? "Back to coach view" : "View as a player")
+                        </button>
+                    </form>
+                }
+
+                @if (Model.OtherTeams.Count > 0)
+                {
+                    <div class="hp-menu-heading">Switch team</div>
+                    @foreach (var other in Model.OtherTeams)
+                    {
+                        <a class="hp-menu-item" asp-controller="Team" asp-action="Index"
+                           asp-route-slug="@other.Slug">@other.Name</a>
+                    }
+                }
+
+                @* Gated on the real site-admin claim, not hidden by CSS — a player or parent
+                   never receives this markup at all. *@
+                @if (Model.IsSiteAdmin)
+                {
+                    <div class="hp-menu-heading">Site</div>
+                    <a class="hp-menu-item" asp-controller="SiteAdmin" asp-action="Index">All teams &amp; admin</a>
+                }
+
+                <div class="hp-menu-sep"></div>
+                <form method="post" asp-controller="Team" asp-action="SignOutOfTeam" asp-route-slug="@slug">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-menu-item hp-menu-button hp-menu-quiet">Sign out of this team</button>
+                </form>
+            </div>
+        </details>
+    </div>
+</header>
+<div class="hp-rail"></div>
+
+@if (Model.PreviewingAsPlayer)
+{
+    <div class="hp-previewbar">
+        <span>You're seeing the player view.</span>
+        <form method="post" asp-controller="Team" asp-action="TogglePreview" asp-route-slug="@slug">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@Context.Request.PathBase@Context.Request.Path@Context.Request.QueryString" />
+            <button type="submit">Back to coach view</button>
+        </form>
+    </div>
+}
+
+@if (showTabs)
+{
+    @* Thumb-reachable on a phone; moves up beside the header on wide screens. *@
+    <nav class="hp-tabs" aria-label="Team sections">
+        <a class="hp-tab @(section == "plans" ? "active" : "")"
+           asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">
+            <span class="hp-tab-icon" aria-hidden="true">▤</span>
+            <span>Plans</span>
+        </a>
+        <a class="hp-tab @(section == "manage" ? "active" : "")"
+           asp-controller="Coach" asp-action="Index" asp-route-slug="@slug">
+            <span class="hp-tab-icon" aria-hidden="true">⚙</span>
+            <span>Manage</span>
+        </a>
+    </nav>
+}

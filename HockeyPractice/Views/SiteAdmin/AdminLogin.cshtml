@@ -1,0 +1,26 @@
+@model AdminViewModel
+@{ ViewBag.Title = "Site admin"; }
+<div class="hp-rail"></div>
+<div class="hp-shell" style="max-width:24rem;">
+    <h1 class="hp-title">Site admin</h1>
+
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+    @if (!Model.Configured)
+    {
+        <div class="hp-notice">
+            <code>SITE_ADMIN_CODE</code> isn't set, so admin is closed. Set it and restart the app.
+        </div>
+    }
+
+    <form method="post" asp-action="Login" class="hp-form" style="margin-top:1rem;">
+        @Html.AntiForgeryToken()
+        <div class="hp-field">
+            <label class="hp-label" for="adminCode">Admin code</label>
+            <input class="hp-input" type="password" id="adminCode" name="adminCode" required autofocus />
+        </div>
+        <button type="submit" class="hp-btn hp-btn-block">Sign in</button>
+    </form>
+</div>

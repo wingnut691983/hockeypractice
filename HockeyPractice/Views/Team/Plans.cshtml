@@ -1,0 +1,72 @@
+@model PlanListViewModel
+@{
+    var sub = Context.Request.Query["sub"].ToString();
+    ViewBag.Title = Model.Ctx.Team.Name + " – Practice Plans";
+    ViewBag.Team = Model.Ctx.Team;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    @if (!Model.HasAny)
+    {
+        <h1 class="hp-title">Practice plans</h1>
+        <div class="hp-empty">
+            Nothing posted yet.<br />
+            <span class="hp-muted">Your coach will put the next practice plan here.</span>
+        </div>
+    }
+    else
+    {
+        @if (Model.Next is not null)
+        {
+            <div class="hp-section" style="margin-top:1.4rem;">Next practice</div>
+            @await Html.PartialAsync("_PlanCard", Model.Next, new ViewDataDictionary(ViewData) { ["Next"] = true })
+        }
+
+        @if (Model.Upcoming.Count > 0)
+        {
+            <div class="hp-section">Coming up</div>
+            @foreach (var card in Model.Upcoming)
+            {
+                @await Html.PartialAsync("_PlanCard", card)
+            }
+        }
+
+        @if (Model.Past.Count > 0)
+        {
+            <div class="hp-section">Earlier</div>
+            @foreach (var card in Model.Past)
+            {
+                @await Html.PartialAsync("_PlanCard", card)
+            }
+        }
+    }
+
+    <div class="hp-section">Get a heads-up</div>
+    <div class="hp-panel">
+        @if (sub == "check")
+        {
+            <div class="hp-notice">Check your email for a confirmation link.</div>
+        }
+        else if (sub == "already")
+        {
+            <div class="hp-notice">That address is already signed up.</div>
+        }
+        else if (sub == "invalid")
+        {
+            <div class="hp-error">That doesn't look like an email address.</div>
+        }
+
+        <p class="hp-muted" style="margin-top:0;">
+            Parents: get an email whenever a new practice plan is posted.
+        </p>
+        <form method="post" asp-controller="Subscription" asp-action="Subscribe"
+              asp-route-slug="@Model.Ctx.Team.Slug" class="hp-row">
+            @Html.AntiForgeryToken()
+            <input class="hp-input" type="email" name="email" required
+                   placeholder="you@example.com" autocomplete="email"
+                   style="flex:1;min-width:12rem;" />
+            <button type="submit" class="hp-btn">Notify me</button>
+        </form>
+    </div>
+</div>

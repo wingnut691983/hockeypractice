@@ -1,0 +1,40 @@
+@{
+    var team = ViewBag.Team as Team;
+    var title = ViewBag.Title as string ?? "Practice Plans";
+    var primary = team?.PrimaryColor ?? "#0B4EA2";
+    var accent  = team?.AccentColor  ?? "#F0562D";
+}
+<!DOCTYPE html>
+@* Team colours ride on the root element so one stylesheet serves every team. *@
+<html lang="en" style="--hp-primary:@primary; --hp-accent:@accent;">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="@primary" />
+    <title>@title</title>
+    <link rel="stylesheet" href="~/css/hockeypractice.css" asp-append-version="true" />
+    <link rel="manifest" href="@Url.Action("Manifest", "Home")" />
+    <link rel="icon" href="~/favicon.ico" />
+</head>
+<body>
+    @RenderBody()
+<script>
+(function () {
+    // A <details> menu stays open until it's told otherwise; close it on an outside tap or
+    // Escape so it behaves like a menu rather than a stuck panel.
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('details.hp-menu[open]').forEach(function (menu) {
+            if (!menu.contains(e.target)) menu.open = false;
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('details.hp-menu[open]').forEach(function (menu) {
+            menu.open = false;
+        });
+    });
+})();
+</script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

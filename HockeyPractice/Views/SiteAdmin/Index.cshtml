@@ -1,0 +1,93 @@
+@using HockeyPractice.Services
+@model AdminViewModel
+@{ ViewBag.Title = "Site admin"; }
+<div class="hp-rail"></div>
+<div class="hp-shell">
+    <div class="hp-row" style="margin-top:1rem;justify-content:space-between;">
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" asp-controller="Home" asp-action="Index">← Back to the site</a>
+        <form method="post" asp-action="Logout">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">Sign out of admin</button>
+        </form>
+    </div>
+    <h1 class="hp-title">Site admin</h1>
+
+    @if (Model.Notice is not null)
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+
+    <div class="hp-section">Teams</div>
+    @if (Model.Teams.Count == 0)
+    {
+        <div class="hp-empty">No teams yet. Create the first one below.</div>
+    }
+    else
+    {
+        <div class="hp-panel">
+            <ul class="hp-list">
+                @foreach (var summary in Model.Teams)
+                {
+                    <li style="flex-wrap:wrap;">
+                        <div class="grow">
+                            <div style="font-weight:650;">@summary.Team.Name</div>
+                            <div class="hp-muted hp-mono">/t/@summary.Team.Slug</div>
+                            <div class="hp-muted">@summary.PlanCount plans · @summary.PlayerCount players</div>
+                        </div>
+                        <a class="hp-btn hp-btn-quiet hp-btn-sm"
+                           asp-controller="Team" asp-action="Index" asp-route-slug="@summary.Team.Slug">Open</a>
+                        <details style="flex-basis:100%;margin-top:.4rem;">
+                            <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">Delete team</summary>
+                            <form method="post" asp-action="DeleteTeam" asp-route-teamId="@summary.Team.Id"
+                                  class="hp-row" style="margin-top:.5rem;">
+                                @Html.AntiForgeryToken()
+                                <input class="hp-input" name="confirmName" required
+                                       placeholder="Type &quot;@summary.Team.Name&quot; to confirm"
+                                       style="flex:1;min-width:12rem;" />
+                                <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">
+                                    Delete permanently
+                                </button>
+                            </form>
+                            <div class="hp-muted" style="font-size:.78rem;margin-top:.3rem;">
+                                Removes @summary.PlanCount plan@(summary.PlanCount == 1 ? "" : "s"),
+                                the roster, all view history, and every uploaded PDF. Cannot be undone.
+                            </div>
+                        </details>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="hp-section">New team</div>
+    <div class="hp-panel">
+        <form method="post" asp-action="CreateTeam" class="hp-form">
+            @Html.AntiForgeryToken()
+            <div class="hp-field">
+                <label class="hp-label" for="name">Team name</label>
+                <input class="hp-input" id="name" name="name" required maxlength="100" />
+            </div>
+            <div class="hp-field">
+                <label class="hp-label" for="slug">URL slug (optional)</label>
+                <input class="hp-input" id="slug" name="slug" maxlength="60" placeholder="derived from the name" />
+            </div>
+            <div class="hp-field">
+                <label class="hp-label" for="timeZoneId">Time zone</label>
+                <input class="hp-input" id="timeZoneId" name="timeZoneId" value="America/Chicago" />
+            </div>
+            <button type="submit" class="hp-btn">Create team</button>
+            <span class="hp-muted">
+                The team code and coach code are shown once, right after creation. Only their hashes are stored.
+            </span>
+        </form>
+    </div>
+
+    <div class="hp-section">Storage</div>
+    <div class="hp-panel hp-muted">
+        @PlanStorageService.Human(Model.UsedBytes) of @PlanStorageService.Human(Model.QuotaBytes) used
+    </div>
+</div>

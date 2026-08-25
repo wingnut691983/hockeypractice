@@ -1,0 +1,47 @@
+@model List<Team>
+@inject HockeyPractice.Services.TeamAccessService Access
+@{
+    ViewBag.Title = "Practice Plans";
+    var isSiteAdmin = Access.IsSiteAdmin(User);
+}
+<div class="hp-rail"></div>
+<div class="hp-shell">
+    <h1 class="hp-title">Practice Plans</h1>
+
+    @if (Model.Count == 0)
+    {
+        <div class="hp-empty">
+            No teams yet.<br />
+            <span class="hp-muted">
+                @if (isSiteAdmin)
+                {
+                    <a asp-controller="SiteAdmin" asp-action="Index">Create the first one</a>
+                }
+                else
+                {
+                    <text>A site admin sets these up.</text>
+                }
+            </span>
+        </div>
+    }
+    else
+    {
+        <p class="hp-muted" style="margin-top:0;">Pick your team.</p>
+        @foreach (var team in Model)
+        {
+            <a class="hp-card" asp-controller="Team" asp-action="Index" asp-route-slug="@team.Slug">
+                <div class="hp-card-title" style="margin:0;">@team.Name</div>
+            </a>
+        }
+    }
+
+    @* Only rendered when the site-admin claim is actually held — a player or parent never
+       receives this markup, so admin isn't a URL you stumble onto. *@
+    @if (isSiteAdmin)
+    {
+        <div class="hp-section">Site</div>
+        <a class="hp-btn hp-btn-quiet" asp-controller="SiteAdmin" asp-action="Index">
+            Manage teams &amp; admin
+        </a>
+    }
+</div>

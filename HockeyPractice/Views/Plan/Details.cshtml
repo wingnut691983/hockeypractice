@@ -1,0 +1,341 @@
+@using HockeyPractice.Services
+@model PlanDetailViewModel
+@{
+    ViewBag.Title = Model.Plan.Title + " – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+
+    var fileUrl = Url.Action("File", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var downloadUrl = Url.Action("File", "Plan",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id, download = true })!;
+    var beaconUrl = Url.Action("Viewed", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    // pdf.js reads the document from ?file=; page-width is the only sane default on a phone.
+    var viewerUrl = Url.Content("~/lib/pdfjs/web/viewer.html")
+        + "?file=" + Uri.EscapeDataString(fileUrl) + "#zoom=page-width";
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <div class="hp-card-when" style="margin-top:1.3rem;">@Model.WhenLabel</div>
+    <h1 class="hp-title" style="margin-top:.15rem;">@Model.Plan.Title</h1>
+
+    <div class="hp-card-meta" style="margin-bottom:.6rem;">
+        @if (!string.IsNullOrWhiteSpace(Model.Plan.Location))
+        {
+            <span>@Model.Plan.Location</span>
+        }
+        @if (Model.Plan.Status == PlanStatus.Draft)
+        {
+            <span class="hp-pill hp-pill-draft">Draft</span>
+        }
+        @if (Model.ViewedByMe && Model.Ctx.Me is not null)
+        {
+            <span class="hp-pill hp-pill-viewed">✓ You've viewed this</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Plan.CoachNotes))
+    {
+        <div class="hp-panel" style="border-left:4px solid var(--hp-accent);">
+            @Model.Plan.CoachNotes
+        </div>
+    }
+
+    @if (Model.Videos.Count > 0)
+    {
+        <div class="hp-section" style="margin-top:1.2rem;">Watch before practice</div>
+        <div class="hp-videos">
+            @for (var i = 0; i < Model.Videos.Count; i++)
+            {
+                var link = Model.Videos[i];
+                var thumb = LinkExtractionService.ThumbnailUrl(link);
+                var embed = LinkExtractionService.EmbedUrl(link);
+                var host = Uri.TryCreate(link.Url, UriKind.Absolute, out var u) ? u.Host.Replace("www.", "") : "link";
+                @* Embeddable videos play in place. Anything we can't frame keeps the plain
+                   new-tab behaviour rather than opening a player that would never load. *@
+                <a class="hp-video" href="@link.Url"
+                   data-embed="@embed" data-label="@link.Label" data-section="@link.Section" data-vid="@(link.VideoId is null ? "" : (link.Kind == LinkKind.YouTube ? "yt:" : "vm:") + link.VideoId)" data-index="@i"
+                   target="_blank" rel="noopener noreferrer">
+                    <div class="hp-video-thumb">
+                        @if (thumb is not null)
+                        {
+                            <img src="@thumb" alt="" loading="lazy" />
+                        }
+                        <span class="hp-video-play"><span>▶</span></span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(link.Section))
+                    {
+                        <div class="hp-video-section">@link.Section</div>
+                    }
+                    <div class="hp-video-label">@link.Label</div>
+                    <div class="hp-video-host">@host</div>
+                </a>
+            }
+        </div>
+    }
+
+    <div class="hp-section">The plan</div>
+    <div class="hp-viewer">
+        <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
+    </div>
+
+    <div class="hp-row" style="margin-top:.8rem;">
+        <a class="hp-btn hp-btn-quiet" href="@downloadUrl">Download PDF</a>
+        <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
+                hidden data-title="@Model.Plan.Title">Share</button>
+    </div>
+
+    @if (Model.Ctx.IsCoach)
+    {
+        var total = Model.Viewed.Count + Model.NotViewed.Count;
+        <div class="hp-section">Who's seen it</div>
+        <div class="hp-panel">
+            <strong>@Model.Viewed.Count of @total</strong> on the roster have opened this plan.
+            @if (Model.AnonymousViews > 0)
+            {
+                <span class="hp-muted">
+                    Plus @Model.AnonymousViews view@(Model.AnonymousViews == 1 ? "" : "s")
+                    from someone who hasn't picked a name (likely a parent).
+                </span>
+            }
+
+            @if (total > 0)
+            {
+                <div class="hp-tracking">
+                    @foreach (var p in Model.Viewed)
+                    {
+                        <span class="done">✓ @p.Name</span>
+                    }
+                    @foreach (var p in Model.NotViewed)
+                    {
+                        <span>@p.Name</span>
+                    }
+                </div>
+            }
+        </div>
+
+        <a class="hp-btn hp-btn-quiet" asp-controller="Coach" asp-action="EditPlan"
+           asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
+    }
+</div>
+
+<div class="hp-player" id="hp-player" hidden aria-modal="true" role="dialog" aria-label="Drill video">
+    <div class="hp-player-backdrop" data-close></div>
+    <div class="hp-player-box">
+        <div class="hp-player-bar">
+            <span class="hp-player-title">
+                <span id="hp-player-section" class="hp-player-section"></span>
+                <span id="hp-player-title"></span>
+            </span>
+            <button type="button" class="hp-player-btn" id="hp-player-close"
+                    data-close aria-label="Close video">✕</button>
+        </div>
+        <div class="hp-player-frame"><iframe id="hp-player-frame" title="Drill video"
+             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+             allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+        <div class="hp-player-nav">
+            <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-player-prev">← Previous</button>
+            <span class="hp-player-count" id="hp-player-count"></span>
+            <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-player-next">Next →</button>
+        </div>
+        <a class="hp-player-out" id="hp-player-out" target="_blank" rel="noopener noreferrer">Open in YouTube instead</a>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // Record the view only once the document has actually rendered — a bounce is not a view,
+    // and the coach's "12 of 17" is only worth anything if it means people really looked.
+    var pdfFrame = document.getElementById('hp-pdf');
+    var sent = false;
+
+    function record() {
+        if (sent) return;
+        sent = true;
+        fetch(@Html.Raw(Json.Serialize(beaconUrl)), {
+            method: 'POST',
+            credentials: 'same-origin',
+            keepalive: true
+        }).catch(function () { /* tracking must never break the page */ });
+    }
+
+    // The viewer is same-origin, so its load event is a real signal that the PDF opened.
+    if (pdfFrame) {
+        pdfFrame.addEventListener('load', function () { setTimeout(record, 1500); });
+    }
+
+    // ── In-page video player ────────────────────────────────────────────
+    // Videos play over the plan instead of navigating away. With several drills to watch,
+    // a new tab per video leaves a 15-year-old stranded in a stack of tabs and they stop
+    // coming back to the plan.
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.hp-video[data-embed]'))
+        .filter(function (c) { return c.dataset.embed; });
+
+    var modal = document.getElementById('hp-player');
+    var frame = document.getElementById('hp-player-frame');
+    var titleEl = document.getElementById('hp-player-title');
+    var sectionEl = document.getElementById('hp-player-section');
+    var countEl = document.getElementById('hp-player-count');
+    var outEl = document.getElementById('hp-player-out');
+    var prevBtn = document.getElementById('hp-player-prev');
+    var nextBtn = document.getElementById('hp-player-next');
+    var current = -1;
+    var opened = false;
+
+    function show(index) {
+        if (index < 0 || index >= cards.length) return;
+        var card = cards[index];
+        current = index;
+        open_(card.dataset.embed, card.dataset.label, card.dataset.section, card.href, true);
+    }
+
+    // Plays a video that isn't one of the cards — a link inside the PDF the coach hid, or one
+    // extraction missed. Prev/Next are meaningless here, so they're hidden.
+    function showAdHoc(embed, label, href) {
+        current = -1;
+        open_(embed, label, '', href, false);
+    }
+
+    function open_(embed, label, section, href, inList) {
+        frame.src = embed;
+        titleEl.textContent = label || 'Video';
+        sectionEl.textContent = section || '';
+        sectionEl.hidden = !section;
+        outEl.href = href;
+
+        var index = current;
+        countEl.textContent = inList ? (index + 1) + ' of ' + cards.length : '';
+        prevBtn.disabled = !inList || index === 0;
+        nextBtn.disabled = !inList || index === cards.length - 1;
+        var showNav = inList && cards.length > 1;
+        prevBtn.style.visibility = showNav ? '' : 'hidden';
+        nextBtn.style.visibility = showNav ? '' : 'hidden';
+
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+
+        if (!opened) {
+            opened = true;
+            // A history entry so the phone's Back gesture closes the video rather than
+            // leaving the practice plan altogether.
+            try { history.pushState({ hpPlayer: true }, ''); } catch (e) { /* ignore */ }
+        }
+        document.getElementById('hp-player-close').focus();
+    }
+
+    function close(fromPop) {
+        if (modal.hidden) return;
+        modal.hidden = true;
+        frame.src = 'about:blank';   // stops playback and its audio
+        document.body.style.overflow = '';
+        if (opened && !fromPop) {
+            opened = false;
+            try { history.back(); } catch (e) { /* ignore */ }
+        }
+        opened = false;
+        if (current >= 0 && cards[current]) cards[current].focus();
+    }
+
+    cards.forEach(function (card, index) {
+        card.addEventListener('click', function (e) {
+            // Let modified clicks and middle-clicks behave normally.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            show(index);
+        });
+    });
+
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target.hasAttribute('data-close')) close(false);
+        });
+        prevBtn.addEventListener('click', function () { show(current - 1); });
+        nextBtn.addEventListener('click', function () { show(current + 1); });
+        document.addEventListener('keydown', function (e) {
+            if (modal.hidden) return;
+            if (e.key === 'Escape') close(false);
+            if (e.key === 'ArrowRight') show(current + 1);
+            if (e.key === 'ArrowLeft') show(current - 1);
+        });
+        window.addEventListener('popstate', function () { close(true); });
+    }
+
+    // ── Links inside the PDF itself ─────────────────────────────────────
+    // pdf.js renders link annotations as real anchors, and by default they navigate the
+    // current tab — which throws the player out of the plan entirely and leaves them
+    // hitting Back. The viewer is same-origin, so we can catch those clicks and route
+    // them into the same in-page player the cards use.
+
+    function providerId(url) {
+        var yt = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+        if (yt) { return 'yt:' + yt[1]; }
+        var vm = url.match(/vimeo\.com\/(?:video\/)?(\d{6,})/i);
+        if (vm) { return 'vm:' + vm[1]; }
+        return null;
+    }
+
+    function embedFor(id) {
+        var parts = id.split(':');
+        if (parts[0] === 'yt') {
+            return 'https://www.youtube-nocookie.com/embed/' + parts[1] +
+                   '?autoplay=1&rel=0&playsinline=1&modestbranding=1';
+        }
+        return 'https://player.vimeo.com/video/' + parts[1] + '?autoplay=1&playsinline=1';
+    }
+
+    function interceptPdfLinks() {
+        var doc;
+        try {
+            doc = pdfFrame.contentDocument;
+        } catch (e) {
+            return;   // cross-origin for some reason; leave the viewer's own behaviour alone
+        }
+        if (!doc || doc.__hpBound) return;
+        doc.__hpBound = true;
+
+        doc.addEventListener('click', function (e) {
+            var anchor = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!anchor) return;
+
+            // Internal navigation (page jumps, the outline) resolves to our own origin —
+            // leave those to the viewer.
+            var href = anchor.href;
+            if (!/^https?:/i.test(href)) return;
+            if (href.indexOf(window.location.origin) === 0) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            var id = providerId(href);
+            if (id) {
+                for (var i = 0; i < cards.length; i++) {
+                    if (cards[i].dataset.vid === id) { show(i); return; }
+                }
+                showAdHoc(embedFor(id), anchor.textContent || 'Video', href);
+                return;
+            }
+
+            // Not a video we can embed — open it away from the plan rather than replacing it.
+            window.open(href, '_blank', 'noopener');
+        }, true);
+    }
+
+    if (pdfFrame) {
+        // Delegated on the iframe's document, so it survives the viewer re-rendering its
+        // annotation layer on scroll or zoom — no polling needed.
+        pdfFrame.addEventListener('load', interceptPdfLinks);
+        interceptPdfLinks();   // in case the frame finished before this script ran
+    }
+
+    // Native share sheet, for pasting into the team group chat. Hidden where unsupported.
+    var share = document.getElementById('hp-share');
+    if (share && navigator.share) {
+        share.hidden = false;
+        share.addEventListener('click', function () {
+            navigator.share({ title: share.dataset.title, url: window.location.href })
+                .catch(function () { /* user dismissed */ });
+        });
+    }
+})();
+</script>
+}

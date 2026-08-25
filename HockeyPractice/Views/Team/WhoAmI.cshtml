@@ -1,0 +1,42 @@
+@model RosterPickViewModel
+@{
+    ViewBag.Title = "Who are you? – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">Who's watching?</h1>
+    <p class="hp-muted" style="margin-top:0;">
+        Tap your name so your coach knows you've seen the plan. You can change this any time.
+    </p>
+
+    @if (Model.Players.Count == 0)
+    {
+        <div class="hp-empty">Your coach hasn't added the roster yet.</div>
+    }
+    else
+    {
+        <form method="post" class="hp-roster">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            @foreach (var player in Model.Players)
+            {
+                var mine = Model.Ctx.Me?.Id == player.Id;
+                <button type="submit" name="playerId" value="@player.Id"
+                        style="@(mine ? "border-color:var(--hp-primary);" : "")">
+                    <span class="hp-jersey">@(string.IsNullOrEmpty(player.JerseyNumber) ? "–" : player.JerseyNumber)</span>
+                    <span class="hp-roster-name">@player.Name</span>
+                </button>
+            }
+        </form>
+    }
+
+    <form method="post" style="margin-top:1.25rem;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <button type="submit" class="hp-btn hp-btn-quiet hp-btn-block">
+            @(Model.Ctx.Me is null ? "Skip — I'm a parent" : "Clear my name")
+        </button>
+    </form>
+</div>

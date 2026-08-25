@@ -1,0 +1,45 @@
+@model EnterCodeViewModel
+@{
+    ViewBag.Title = Model.Team.Name + " – Practice Plans";
+    ViewBag.Team = Model.Team;
+    var initials = string.Join("", Model.Team.Name
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2).Select(w => char.ToUpperInvariant(w[0])));
+}
+<div class="hp-rail"></div>
+<div class="hp-shell" style="max-width:26rem;">
+    <div style="text-align:center;margin:2.5rem 0 1.5rem;">
+        @if (Model.LogoUrl is not null)
+        {
+            <img src="@Model.LogoUrl" alt="" style="width:84px;height:84px;object-fit:contain;" />
+        }
+        else
+        {
+            <div class="hp-topbar-fallback" style="width:84px;height:84px;font-size:2rem;margin:0 auto;border-radius:20px;">@initials</div>
+        }
+        <h1 class="hp-title" style="margin-bottom:.1rem;">@Model.Team.Name</h1>
+        <p class="hp-muted" style="margin-top:0;">Enter your team code to see practice plans.</p>
+    </div>
+
+    <form method="post" class="hp-form">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+
+        @if (Model.Error is not null)
+        {
+            <div class="hp-error">@Model.Error</div>
+        }
+
+        <div class="hp-field">
+            <label class="hp-label" for="accessCode">Team code</label>
+            @* Uppercase + no autocorrect: the codes are typed by teenagers on phone keyboards. *@
+            <input class="hp-input hp-code-input" id="accessCode" name="accessCode"
+                   required autofocus maxlength="12"
+                   autocomplete="one-time-code" autocapitalize="characters"
+                   autocorrect="off" spellcheck="false" inputmode="text" />
+        </div>
+
+        <button type="submit" class="hp-btn hp-btn-block">Let me in</button>
+        <p class="hp-muted" style="text-align:center;">Ask your coach if you don't have the code.</p>
+    </form>
+</div>

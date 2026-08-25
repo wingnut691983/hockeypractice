@@ -1,0 +1,7 @@
+@model (string Heading, string Detail)
+@{ ViewBag.Title = Model.Heading; }
+<div class="hp-rail"></div>
+<div class="hp-shell" style="max-width:28rem;">
+    <h1 class="hp-title">@Model.Heading</h1>
+    <p class="hp-muted">@Model.Detail</p>
+</div>

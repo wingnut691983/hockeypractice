@@ -1,0 +1,31 @@
+@model PlanCard
+@{
+    var team = (ViewBag.Team as Team)!;
+    var isNext = ViewData["Next"] as bool? ?? false;
+}
+<a class="hp-card @(isNext ? "hp-card-next" : "")"
+   asp-controller="Plan" asp-action="Details"
+   asp-route-slug="@team.Slug" asp-route-id="@Model.Plan.Id">
+    <div class="hp-card-when">@Model.WhenLabel</div>
+    <div class="hp-card-title">@Model.Plan.Title</div>
+    <div class="hp-card-meta">
+        @if (!string.IsNullOrWhiteSpace(Model.Plan.Location))
+        {
+            <span>@Model.Plan.Location</span>
+        }
+        @if (Model.VideoCount > 0)
+        {
+            <span>@Model.VideoCount video@(Model.VideoCount == 1 ? "" : "s") to watch</span>
+        }
+    </div>
+    <div class="hp-row" style="margin-top:.55rem;">
+        @if (Model.IsDraft)
+        {
+            <span class="hp-pill hp-pill-draft">Draft — only you can see this</span>
+        }
+        @if (Model.ViewedByMe)
+        {
+            <span class="hp-pill hp-pill-viewed">✓ Viewed</span>
+        }
+    </div>
+</a>

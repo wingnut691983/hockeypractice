@@ -1,0 +1,146 @@
+@using HockeyPractice.Services
+@model ManageViewModel
+@{
+    ViewBag.Title = "Manage – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+    var slug = Model.Ctx.Team.Slug;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">Manage</h1>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Notice))
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
+
+    <a class="hp-btn hp-btn-accent hp-btn-block" style="margin:1rem 0;"
+       asp-action="NewPlan" asp-route-slug="@slug">+ New practice plan</a>
+
+    <div class="hp-section">Plans</div>
+    @if (Model.Plans.Count == 0)
+    {
+        <div class="hp-empty">No plans yet.</div>
+    }
+    else
+    {
+        <div class="hp-panel">
+            <ul class="hp-list">
+                @foreach (var card in Model.Plans)
+                {
+                    <li>
+                        <div class="grow">
+                            <div style="font-weight:650;">@card.Plan.Title</div>
+                            <div class="hp-muted">@card.WhenLabel · @card.VideoCount video@(card.VideoCount == 1 ? "" : "s")</div>
+                        </div>
+                        @if (card.IsDraft)
+                        {
+                            <span class="hp-pill hp-pill-draft">Draft</span>
+                        }
+                        <a class="hp-btn hp-btn-quiet hp-btn-sm"
+                           asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@card.Plan.Id">Edit</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="hp-section">Roster</div>
+    <div class="hp-panel">
+        @if (Model.Roster.Count == 0)
+        {
+            <p class="hp-muted" style="margin-top:0;">
+                Add your players so they can tap their name and you can see who's read each plan.
+            </p>
+        }
+        else
+        {
+            <ul class="hp-list">
+                @foreach (var player in Model.Roster)
+                {
+                    <li>
+                        <span class="hp-jersey">@(string.IsNullOrEmpty(player.JerseyNumber) ? "–" : player.JerseyNumber)</span>
+                        <span class="grow">@player.Name</span>
+                        <form method="post" asp-action="DeletePlayer" asp-route-slug="@slug"
+                              asp-route-playerId="@player.Id"
+                              onsubmit="return confirm('Remove @player.Name from the roster? This also deletes their view history.');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+
+        <form method="post" asp-action="AddPlayer" asp-route-slug="@slug"
+              class="hp-row" style="margin-top:.8rem;">
+            @Html.AntiForgeryToken()
+            <input class="hp-input" name="name" placeholder="Player name" required style="flex:2;min-width:10rem;" />
+            <input class="hp-input" name="jerseyNumber" placeholder="#" maxlength="4"
+                   inputmode="numeric" style="flex:0 0 4.5rem;" />
+            <button type="submit" class="hp-btn">Add</button>
+        </form>
+    </div>
+
+    <div class="hp-section">Team code</div>
+    <div class="hp-panel">
+        <p class="hp-muted" style="margin-top:0;">
+            Everyone on the team shares one code. If a player leaves, rotate it — they keep access until you do.
+        </p>
+        <form method="post" asp-action="RotateCode" asp-route-slug="@slug"
+              onsubmit="return confirm('Rotate the team code? Everyone will have to enter the new one.');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="hp-btn hp-btn-quiet">Rotate team code</button>
+        </form>
+    </div>
+
+    <div class="hp-section">Branding</div>
+    <div class="hp-panel">
+        <form method="post" asp-action="Branding" asp-route-slug="@slug"
+              enctype="multipart/form-data" class="hp-form">
+            @Html.AntiForgeryToken()
+            <div class="hp-field">
+                <label class="hp-label" for="name">Team name</label>
+                <input class="hp-input" id="name" name="name" value="@Model.Ctx.Team.Name" />
+            </div>
+            <div class="hp-row">
+                <div class="hp-field" style="flex:1;">
+                    <label class="hp-label" for="primaryColor">Primary</label>
+                    <input class="hp-input" type="color" id="primaryColor" name="primaryColor"
+                           value="@Model.Ctx.Team.PrimaryColor" style="min-height:44px;padding:.2rem;" />
+                </div>
+                <div class="hp-field" style="flex:1;">
+                    <label class="hp-label" for="accentColor">Accent</label>
+                    <input class="hp-input" type="color" id="accentColor" name="accentColor"
+                           value="@Model.Ctx.Team.AccentColor" style="min-height:44px;padding:.2rem;" />
+                </div>
+            </div>
+            <div class="hp-field">
+                <label class="hp-label" for="timeZoneId">Time zone</label>
+                <input class="hp-input" id="timeZoneId" name="timeZoneId"
+                       value="@Model.Ctx.Team.TimeZoneId" placeholder="America/Chicago" />
+            </div>
+            <div class="hp-field">
+                <label class="hp-label" for="logo">Logo (JPEG, PNG, GIF or WebP, under 2 MB)</label>
+                <input class="hp-input" type="file" id="logo" name="logo" accept="image/*" />
+            </div>
+            <button type="submit" class="hp-btn">Save</button>
+        </form>
+    </div>
+
+    <div class="hp-section">Storage</div>
+    <div class="hp-panel">
+        <div class="hp-meter">
+            <div class="hp-meter-fill @(Model.StorageTight ? "tight" : "")"
+                 style="width:@(((int)(Model.UsedFraction * 100)).ToString())%;"></div>
+        </div>
+        <div class="hp-muted">
+            @PlanStorageService.Human(Model.UsedBytes) of @PlanStorageService.Human(Model.QuotaBytes) used
+            @if (Model.StorageTight)
+            {
+                <text>— delete some old plans soon.</text>
+            }
+        </div>
+    </div>
+</div>

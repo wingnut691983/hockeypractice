@@ -1,0 +1,205 @@
+@using HockeyPractice.Services
+@model PlanEditViewModel
+@{
+    ViewBag.Title = (Model.IsNew ? "New plan" : "Edit plan") + " – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+    var slug = Model.Ctx.Team.Slug;
+    var dateValue = (Model.Plan?.PracticeDateLocal ?? Model.DefaultDate).ToString("yyyy-MM-ddTHH:mm");
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">@(Model.IsNew ? "New practice plan" : "Edit plan")</h1>
+
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+
+    <form method="post" enctype="multipart/form-data" class="hp-form" style="margin-top:1rem;"
+          asp-action="@(Model.IsNew ? "NewPlan" : "EditPlan")"
+          asp-route-slug="@slug" asp-route-id="@Model.Plan?.Id">
+        @Html.AntiForgeryToken()
+
+        <div class="hp-field">
+            <label class="hp-label" for="title">Title</label>
+            <input class="hp-input" id="title" name="title" required maxlength="140"
+                   value="@Model.Plan?.Title" placeholder="e.g. Small-area games + breakouts" />
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="practiceDate">Practice date and time</label>
+            <input class="hp-input" type="datetime-local" id="practiceDate" name="practiceDate"
+                   required value="@dateValue" />
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="location">Rink (optional)</label>
+            <input class="hp-input" id="location" name="location" maxlength="120"
+                   value="@Model.Plan?.Location" />
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="coachNotes">A note for the players (optional)</label>
+            <textarea class="hp-textarea" id="coachNotes" name="coachNotes"
+                      maxlength="2000">@Model.Plan?.CoachNotes</textarea>
+        </div>
+
+        @if (Model.IsNew)
+        {
+            <div class="hp-field">
+                <label class="hp-label" for="file">Practice plan (PDF)</label>
+                <input class="hp-input" type="file" id="file" name="file"
+                       accept="application/pdf,.pdf" required />
+                <span class="hp-muted">
+                    PDF only. In Word use File → Save As and pick PDF; in Google Docs use
+                    File → Download → PDF Document.
+                </span>
+            </div>
+
+            <details class="hp-panel" style="margin:0;">
+                <summary style="cursor:pointer;font-weight:700;font-size:.9rem;">
+                    Getting the video names right
+                </summary>
+                <p class="hp-muted" style="margin:.6rem 0 .4rem;">
+                    Video names are read out of the PDF itself. One habit does most of the work:
+                </p>
+                <p style="margin:0 0 .5rem;">
+                    <strong>Put the drill name and the link on the same line.</strong>
+                </p>
+                <div class="hp-mono hp-muted"
+                     style="font-size:.78rem;background:var(--hp-surface-2);padding:.5rem .6rem;border-radius:8px;">
+                    2. Breakouts<br />
+                    &nbsp;&nbsp;&nbsp;D-to-D reversal - https://youtu.be/aBcDeFgHiJk
+                </div>
+                <p class="hp-muted" style="margin:.5rem 0 0;">
+                    That becomes a card reading <em>Breakouts › D-to-D reversal</em>. A URL alone
+                    on its own line has nothing to be named after and falls back to
+                    &ldquo;Video&nbsp;1&rdquo;. Avoid link shorteners &mdash; they hide which site
+                    the video is on, so it can&rsquo;t be played in place. You can rename anything
+                    here after uploading.
+                </p>
+            </details>
+        }
+
+        @if (!Model.IsNew && Model.Links.Count > 0)
+        {
+            <div class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</div>
+            <p class="hp-muted" style="margin:0;">
+                Names come from the plan itself — a hyperlink's text, or the line and section
+                heading it sits under. Edit any that read badly, and untick anything that isn't a
+                drill video.
+            </p>
+            <div class="hp-panel">
+                <ul class="hp-list">
+                    @foreach (var link in Model.Links)
+                    {
+                        <li style="align-items:flex-start;">
+                            <input type="hidden" name="linkId" value="@link.Id" />
+                            <input type="checkbox" name="hiddenLinkId" value="@link.Id"
+                                   checked="@link.IsHidden" title="Hide this link"
+                                   style="width:22px;height:22px;margin-top:.6rem;flex-shrink:0;" />
+                            <div class="grow">
+                                @if (!string.IsNullOrWhiteSpace(link.Section))
+                                {
+                                    <div class="hp-video-section" style="margin-top:0;margin-bottom:.2rem;">
+                                        @link.Section
+                                    </div>
+                                }
+                                <input class="hp-input" name="linkLabel" value="@link.Label" maxlength="140" />
+                                <div class="hp-muted hp-mono"
+                                     style="overflow-wrap:anywhere;font-size:.76rem;margin-top:.2rem;">
+                                    @link.Url
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+                <p class="hp-muted" style="margin-bottom:0;">Ticked = hidden from players.</p>
+            </div>
+        }
+        else if (!Model.IsNew)
+        {
+            <div class="hp-notice">
+                No links were found in this PDF. If you expected videos here, check that the URLs
+                are in the document as text or real hyperlinks.
+            </div>
+        }
+
+        <button type="submit" class="hp-btn hp-btn-block">
+            @(Model.IsNew ? "Upload plan" : "Save changes")
+        </button>
+    </form>
+
+    @if (!Model.IsNew && Model.Plan is not null)
+    {
+        var plan = Model.Plan;
+        <div class="hp-section">Publishing</div>
+        <div class="hp-panel">
+            @if (plan.Status == PlanStatus.Draft)
+            {
+                <p style="margin-top:0;">
+                    This is a <strong>draft</strong> — players can't see it and no email has been sent.
+                </p>
+                <form method="post" asp-action="Publish" asp-route-slug="@slug" asp-route-id="@plan.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn hp-btn-accent">Publish to the team</button>
+                </form>
+            }
+            else
+            {
+                <p style="margin-top:0;">
+                    Published@(plan.PublishedUtc is null ? "" : $" {plan.PublishedUtc:MMM d}"). Players can see this.
+                </p>
+                <div class="hp-row">
+                    <button type="button" class="hp-btn" id="hp-copy"
+                            data-url="@Url.Action("Details", "Plan", new { slug, id = plan.Id }, Context.Request.Scheme)">
+                        Copy link for the team chat
+                    </button>
+                    <form method="post" asp-action="Unpublish" asp-route-slug="@slug" asp-route-id="@plan.Id">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="hp-btn hp-btn-quiet">Unpublish</button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        <div class="hp-panel">
+            <div class="hp-muted" style="margin-bottom:.5rem;">
+                @plan.OriginalFileName · @PlanStorageService.Human(plan.ByteSize)
+            </div>
+            <form method="post" asp-action="DeletePlan" asp-route-slug="@slug" asp-route-id="@plan.Id"
+                  onsubmit="return confirm('Delete this plan and its PDF? This cannot be undone.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="hp-btn hp-btn-danger">Delete plan</button>
+            </form>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var copy = document.getElementById('hp-copy');
+    if (!copy) return;
+
+    copy.addEventListener('click', function () {
+        var url = copy.dataset.url;
+        var done = function () {
+            var original = copy.textContent;
+            copy.textContent = 'Copied ✓';
+            setTimeout(function () { copy.textContent = original; }, 1800);
+        };
+
+        // Native share sheet on a phone goes straight into the group chat; clipboard on desktop.
+        if (navigator.share) {
+            navigator.share({ url: url }).then(done).catch(function () { /* dismissed */ });
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt('Copy this link:', url); });
+        } else {
+            window.prompt('Copy this link:', url);
+        }
+    });
+})();
+</script>
+}

@@ -1,0 +1,677 @@
+/* ============================================================
+   HockeyPractice — phone-first, team-coloured.
+   Light ice base; each team's colours arrive as inline custom
+   properties on <html>, so one stylesheet serves every team.
+   ============================================================ */
+
+:root {
+  /* Overridden per team on <html>. These are the fallbacks. */
+  --hp-primary: #0B4EA2;
+  --hp-accent:  #F0562D;
+
+  --hp-bg:        #f4f6f9;
+  --hp-surface:   #ffffff;
+  --hp-surface-2: #eef1f6;
+  --hp-border:    #d9dfe8;
+  --hp-text:      #12161d;
+  --hp-muted:     #5c6879;
+  --hp-danger:    #c0392b;
+  --hp-success:   #1a8a52;
+
+  --hp-radius: 14px;
+  --hp-shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 14px rgba(16, 24, 40, .06);
+  --hp-tap: 44px; /* minimum touch target */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hp-bg:        #0f1319;
+    --hp-surface:   #171c24;
+    --hp-surface-2: #1f2632;
+    --hp-border:    #2b3441;
+    --hp-text:      #eef2f7;
+    --hp-muted:     #93a0b3;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--hp-bg);
+  color: var(--hp-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;           /* never below 16px: iOS zooms the page on focus otherwise */
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--hp-primary); }
+@media (prefers-color-scheme: dark) { a { color: #7fb3ff; } }
+
+/* ── Shell ─────────────────────────────────────────────── */
+
+.hp-shell {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 0 1rem calc(3rem + env(safe-area-inset-bottom));
+}
+
+.hp-topbar {
+  background: var(--hp-surface);
+  border-bottom: 1px solid var(--hp-border);
+  padding-top: env(safe-area-inset-top);
+}
+.hp-topbar-inner {
+  max-width: 44rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .7rem 1rem;
+  min-height: var(--hp-tap);
+}
+.hp-topbar-logo {
+  width: 40px; height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.hp-topbar-fallback {
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--hp-primary);
+  color: #fff;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 1rem;
+  letter-spacing: -.02em;
+}
+.hp-topbar-name {
+  font-weight: 750;
+  font-size: 1.05rem;
+  letter-spacing: -.015em;
+  line-height: 1.15;
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hp-topbar-sub { color: var(--hp-muted); font-size: .78rem; font-weight: 500; }
+.hp-topbar-spacer { flex: 1; }
+
+/* The team-colour rail under the header does most of the "energetic" work. */
+.hp-rail {
+  height: 4px;
+  background: linear-gradient(90deg, var(--hp-primary) 0%, var(--hp-accent) 100%);
+}
+
+.hp-title {
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -.03em;
+  margin: 1.4rem 0 .25rem;
+}
+.hp-section {
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+  margin: 1.9rem 0 .7rem;
+}
+.hp-empty {
+  color: var(--hp-muted);
+  background: var(--hp-surface);
+  border: 1px dashed var(--hp-border);
+  border-radius: var(--hp-radius);
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
+/* ── Cards ─────────────────────────────────────────────── */
+
+.hp-card {
+  display: block;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  box-shadow: var(--hp-shadow);
+  padding: 1rem;
+  margin-bottom: .75rem;
+  text-decoration: none;
+  color: inherit;
+}
+a.hp-card:active { transform: scale(.99); }
+
+/* The next practice is the whole point of the site — make it unmissable. */
+.hp-card-next {
+  border: 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, var(--hp-primary) 0%, color-mix(in srgb, var(--hp-primary) 62%, var(--hp-accent)) 100%);
+  color: #fff;
+}
+.hp-card-next .hp-card-when { color: rgba(255,255,255,.92); }
+.hp-card-next .hp-card-meta { color: rgba(255,255,255,.82); }
+
+.hp-card-when {
+  font-size: .82rem;
+  font-weight: 750;
+  letter-spacing: .01em;
+  color: var(--hp-accent);
+  text-transform: uppercase;
+}
+.hp-card-title {
+  font-size: 1.18rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+  margin: .2rem 0 .3rem;
+}
+.hp-card-meta {
+  font-size: .86rem;
+  color: var(--hp-muted);
+  display: flex; flex-wrap: wrap; gap: .25rem .8rem;
+}
+
+.hp-pill {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .72rem; font-weight: 700;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  background: var(--hp-surface-2);
+  color: var(--hp-muted);
+}
+.hp-pill-draft   { background: #fdf0d5; color: #8a5a00; }
+.hp-pill-viewed  { background: #e3f5eb; color: var(--hp-success); }
+.hp-card-next .hp-pill { background: rgba(255,255,255,.2); color: #fff; }
+
+/* ── Video strip ───────────────────────────────────────── */
+
+.hp-videos {
+  display: flex;
+  gap: .7rem;
+  overflow-x: auto;
+  padding: .25rem .25rem .8rem;
+  margin: 0 -.25rem;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.hp-video {
+  flex: 0 0 auto;
+  width: 190px;
+  scroll-snap-align: start;
+  text-decoration: none;
+  color: inherit;
+}
+.hp-video-thumb {
+  position: relative;
+  width: 190px; height: 107px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--hp-surface-2);
+  border: 1px solid var(--hp-border);
+  display: grid; place-items: center;
+}
+.hp-video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hp-video-play {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+}
+.hp-video-play span {
+  width: 44px; height: 44px; border-radius: 999px;
+  background: rgba(0,0,0,.62);
+  color: #fff;
+  display: grid; place-items: center;
+  font-size: .9rem; padding-left: 3px;
+}
+.hp-video-label {
+  font-size: .84rem; font-weight: 650;
+  margin-top: .4rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hp-video-host { font-size: .74rem; color: var(--hp-muted); }
+
+/* ── PDF viewer ────────────────────────────────────────── */
+
+.hp-viewer {
+  width: 100%;
+  height: 78vh;
+  min-height: 420px;
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  background: var(--hp-surface);
+  overflow: hidden;
+}
+.hp-viewer iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+/* ── Forms and buttons ─────────────────────────────────── */
+
+.hp-form { display: flex; flex-direction: column; gap: .9rem; }
+.hp-field { display: flex; flex-direction: column; gap: .3rem; }
+.hp-label { font-size: .8rem; font-weight: 700; color: var(--hp-muted); }
+
+.hp-input, .hp-select, .hp-textarea {
+  font: inherit;
+  color: var(--hp-text);
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  padding: .7rem .75rem;
+  min-height: var(--hp-tap);
+  width: 100%;
+}
+.hp-textarea { min-height: 6rem; resize: vertical; }
+.hp-input:focus, .hp-select:focus, .hp-textarea:focus {
+  outline: 2px solid var(--hp-primary);
+  outline-offset: 1px;
+  border-color: var(--hp-primary);
+}
+
+.hp-code-input {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: .35em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: .9rem .5rem;
+}
+
+.hp-btn {
+  font: inherit; font-weight: 700;
+  min-height: var(--hp-tap);
+  padding: .7rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--hp-primary);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  text-decoration: none;
+}
+.hp-btn:active { transform: scale(.99); }
+.hp-btn-block { width: 100%; }
+.hp-btn-accent { background: var(--hp-accent); }
+.hp-btn-quiet {
+  background: var(--hp-surface);
+  color: var(--hp-text);
+  border-color: var(--hp-border);
+}
+.hp-btn-danger { background: transparent; color: var(--hp-danger); border-color: var(--hp-border); }
+.hp-btn-sm { min-height: 36px; padding: .35rem .7rem; font-size: .84rem; }
+
+.hp-error {
+  background: #fdecea; color: #8c2f24;
+  border: 1px solid #f5c6c0;
+  border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
+}
+.hp-notice {
+  background: #e8f2ff; color: #1c4a80;
+  border: 1px solid #bcd8f7;
+  border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
+  overflow-wrap: anywhere;
+}
+@media (prefers-color-scheme: dark) {
+  .hp-error  { background: #3a1f1c; color: #ffb4a8; border-color: #5c2f28; }
+  .hp-notice { background: #16273b; color: #a9cdf5; border-color: #26405e; }
+  .hp-pill-draft  { background: #3a2f14; color: #ffd489; }
+  .hp-pill-viewed { background: #16301f; color: #7fe0ac; }
+}
+
+/* ── Roster picker ─────────────────────────────────────── */
+
+.hp-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: .6rem;
+}
+.hp-roster button {
+  font: inherit;
+  min-height: 60px;
+  display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .7rem;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 12px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.hp-roster button:active { border-color: var(--hp-primary); }
+.hp-jersey {
+  flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 9px;
+  background: var(--hp-primary); color: #fff;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: .84rem;
+}
+.hp-roster-name { font-weight: 650; font-size: .92rem; line-height: 1.2; }
+
+/* ── Coach surfaces ────────────────────────────────────── */
+
+.hp-panel {
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.hp-meter {
+  height: 8px; border-radius: 999px;
+  background: var(--hp-surface-2);
+  overflow: hidden;
+  margin: .5rem 0 .3rem;
+}
+.hp-meter-fill { height: 100%; background: var(--hp-primary); }
+.hp-meter-fill.tight { background: var(--hp-accent); }
+
+.hp-list { list-style: none; margin: 0; padding: 0; }
+.hp-list li {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem 0;
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-list li:last-child { border-bottom: 0; }
+.hp-list .grow { flex: 1; min-width: 0; }
+
+.hp-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.hp-muted { color: var(--hp-muted); font-size: .86rem; }
+.hp-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.hp-tracking { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+.hp-tracking span {
+  font-size: .8rem; padding: .2rem .55rem; border-radius: 999px;
+  background: var(--hp-surface-2); color: var(--hp-muted);
+}
+.hp-tracking span.done { background: #e3f5eb; color: var(--hp-success); }
+@media (prefers-color-scheme: dark) { .hp-tracking span.done { background: #16301f; color: #7fe0ac; } }
+
+.hp-inline-form { display: contents; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  .hp-btn:active, a.hp-card:active { transform: none; }
+}
+
+/* ── In-page video player ──────────────────────────────────
+   Videos open over the plan. Navigating away to a new tab per drill loses players
+   in a stack of tabs and they stop coming back to the plan. */
+
+.hp-player[hidden] { display: none; }
+.hp-player {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+.hp-player-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 9, 14, .82);
+  backdrop-filter: blur(2px);
+}
+.hp-player-box {
+  position: relative;
+  width: 100%;
+  max-width: 56rem;
+  background: var(--hp-surface);
+  border-radius: var(--hp-radius);
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .5);
+}
+.hp-player-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem .5rem .6rem .9rem;
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-player-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: .95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-player-btn {
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: var(--hp-tap);
+  height: var(--hp-tap);
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hp-surface-2);
+  color: var(--hp-text);
+  cursor: pointer;
+}
+
+/* 16:9, so the frame never jumps as videos load. */
+.hp-player-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.hp-player-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.hp-player-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .6rem .7rem;
+}
+.hp-player-count { font-size: .82rem; color: var(--hp-muted); font-weight: 650; }
+.hp-player-nav button[disabled] { opacity: .38; pointer-events: none; }
+
+.hp-player-out {
+  display: block;
+  padding: 0 .9rem .9rem;
+  font-size: .82rem;
+  color: var(--hp-muted);
+}
+
+/* Landscape on a phone: the video should own the screen, not the chrome around it. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .hp-player { padding: 0; }
+  .hp-player-box { max-width: none; height: 100%; border-radius: 0; display: flex; flex-direction: column; }
+  .hp-player-frame { flex: 1; aspect-ratio: auto; }
+  .hp-player-nav, .hp-player-out { display: none; }
+}
+
+/* Where the video sits in the practice plan — the block heading it was found under. */
+.hp-video-section {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--hp-accent);
+  margin-top: .4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-video-section + .hp-video-label { margin-top: .05rem; }
+
+.hp-player-title { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.hp-player-section {
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-player-section[hidden] { display: none; }
+
+/* ── Header navigation ─────────────────────────────────────
+   A phone header has room for identity plus one control, so the actions live behind a
+   single menu rather than competing buttons crammed into one row. */
+
+.hp-topbar-id {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  min-height: var(--hp-tap);
+}
+.hp-topbar-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+
+.hp-menu { position: relative; flex-shrink: 0; }
+.hp-menu > summary { list-style: none; cursor: pointer; }
+.hp-menu > summary::-webkit-details-marker { display: none; }
+
+.hp-menu-trigger {
+  width: var(--hp-tap);
+  height: var(--hp-tap);
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--hp-surface-2);
+  font-size: 1.1rem;
+}
+.hp-menu[open] .hp-menu-trigger { background: var(--hp-primary); color: #fff; }
+
+.hp-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + .4rem);
+  z-index: 300;
+  min-width: 15rem;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(16, 24, 40, .18);
+  padding: .3rem;
+  overflow: hidden;
+}
+
+.hp-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--hp-tap);
+  padding: .55rem .7rem;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--hp-text);
+  text-decoration: none;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.hp-menu-item:active { background: var(--hp-surface-2); }
+.hp-menu-button { font-weight: 600; }
+.hp-menu-quiet { color: var(--hp-muted); font-weight: 500; }
+
+.hp-menu-heading {
+  padding: .5rem .7rem .2rem;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+}
+.hp-menu-sep { height: 1px; background: var(--hp-border); margin: .3rem .3rem; }
+
+/* ── Coach preview banner ──────────────────────────────── */
+
+.hp-previewbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .5rem 1rem;
+  background: var(--hp-accent);
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 650;
+}
+.hp-previewbar button {
+  font: inherit;
+  font-weight: 750;
+  min-height: 34px;
+  padding: .25rem .7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.55);
+  background: rgba(255,255,255,.16);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Coach tab bar ─────────────────────────────────────────
+   Pinned to the bottom on a phone, where thumbs are. Rides up under the header on
+   wider screens, where a bottom bar would look out of place. */
+
+.hp-tabs {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 250;
+  display: flex;
+  background: var(--hp-surface);
+  border-top: 1px solid var(--hp-border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.hp-tab {
+  flex: 1;
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--hp-muted);
+  text-decoration: none;
+}
+.hp-tab-icon { font-size: 1.05rem; line-height: 1; }
+.hp-tab.active { color: var(--hp-primary); }
+.hp-tab.active .hp-tab-icon { transform: translateY(-1px); }
+
+/* Keep the fixed bar from covering the end of the page. */
+body:has(.hp-tabs) .hp-shell { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+
+@media (min-width: 700px) {
+  .hp-tabs {
+    position: static;
+    max-width: 44rem;
+    margin: 0 auto;
+    border-top: 0;
+    border-bottom: 1px solid var(--hp-border);
+    padding: 0 1rem;
+    gap: .4rem;
+    background: transparent;
+  }
+  .hp-tab {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: .4rem;
+    min-height: var(--hp-tap);
+    padding: 0 .8rem;
+    font-size: .85rem;
+    border-bottom: 2px solid transparent;
+  }
+  .hp-tab.active { border-bottom-color: var(--hp-primary); }
+  body:has(.hp-tabs) .hp-shell { padding-bottom: 3rem; }
+}

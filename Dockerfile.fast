@@ -1,0 +1,22 @@
+# Fast local deploy path for Apple Silicon.
+#
+# .NET framework-dependent publish output is IL and carries no architecture of its own — only
+# the runtime underneath it does. So we publish natively on the host (seconds) and assemble the
+# image on top of the linux/amd64 runtime base, skipping QEMU entirely. The canonical
+# `Dockerfile` still builds everything inside the container for CI; this exists because the
+# emulated `dotnet restore` takes 20+ minutes on an M-series Mac.
+#
+# Usage:
+#   dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish
+#   podman build --platform linux/amd64 -f Dockerfile.fast -t <image>:<tag> .
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY publish/ ./
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+EXPOSE 8080
+USER 1000
+
+# Exec form so SIGTERM reaches the process and in-flight requests drain on a rolling deploy.
+ENTRYPOINT ["dotnet", "HockeyPractice.dll"]
