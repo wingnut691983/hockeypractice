@@ -25,6 +25,9 @@ public class TeamContext
     /// <summary>True when a manager is deliberately looking at the player's view.</summary>
     public bool PreviewingAsPlayer => IsRealManager && Level < TeamAccessLevel.Manager;
 
+    /// <summary>Access here was taken through the admin panel, not the team's own code.</summary>
+    public bool ViaSiteAdmin { get; init; }
+
     /// <summary>Other teams this device can reach — drives the switcher once there's more than one.</summary>
     public List<TeamLink> OtherTeams { get; init; } = new();
 }

@@ -15,6 +15,13 @@ public class TeamAccessService
     public const string TeamClaimPrefix   = "hp:team:";
     public const string PlayerClaimPrefix = "hp:player:";
     public const string SiteAdminClaim    = "hp:site";
+
+    /// <summary>
+    /// Marks team access that was taken by a site admin rather than earned with the team's
+    /// code. Doesn't change what they can do — it exists so the UI can say so out loud, since
+    /// silent elevation is what made the roles confusing in the first place.
+    /// </summary>
+    public const string ViaAdminPrefix    = "hp:via:";
     public const string ViewerKeyClaim    = "hp:vk";
 
     /// <summary>Cookie name for the coach's "see it as a player" preview.</summary>
@@ -91,7 +98,8 @@ public class TeamAccessService
     public string ViewerKeyFor(ClaimsPrincipal user) =>
         user.FindFirst(ViewerKeyClaim)?.Value ?? string.Empty;
 
-    public Task GrantTeamAsync(HttpContext http, int teamId, TeamAccessLevel level) =>
+    public Task GrantTeamAsync(HttpContext http, int teamId, TeamAccessLevel level,
+        bool viaSiteAdmin = false) =>
         ReissueAsync(http, claims =>
         {
             claims.RemoveAll(c => c.Type == TeamClaimPrefix + teamId);
@@ -99,7 +107,16 @@ public class TeamAccessService
                 claims.Add(new Claim(TeamClaimPrefix + teamId, "coach"));
             else if (level == TeamAccessLevel.Player)
                 claims.Add(new Claim(TeamClaimPrefix + teamId, "viewer"));
+
+            // Always rewritten, so entering the team's real code clears the admin marker.
+            claims.RemoveAll(c => c.Type == ViaAdminPrefix + teamId);
+            if (viaSiteAdmin && level != TeamAccessLevel.None)
+                claims.Add(new Claim(ViaAdminPrefix + teamId, "1"));
         });
+
+    /// <summary>True when this device's access to the team came from the admin panel.</summary>
+    public bool IsViaSiteAdmin(ClaimsPrincipal user, int teamId) =>
+        user.FindFirst(ViaAdminPrefix + teamId) is not null;
 
     public Task GrantSiteAdminAsync(HttpContext http) =>
         ReissueAsync(http, claims =>

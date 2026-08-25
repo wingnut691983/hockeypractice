@@ -21,14 +21,16 @@ public class SiteAdminController : Controller
     private readonly AppDbContext _db;
     private readonly TeamAccessService _access;
     private readonly PlanStorageService _storage;
+    private readonly ILogger<SiteAdminController> _log;
     private readonly string? _adminCodeHash;
 
     public SiteAdminController(AppDbContext db, TeamAccessService access,
-        PlanStorageService storage, IConfiguration config)
+        PlanStorageService storage, IConfiguration config, ILogger<SiteAdminController> log)
     {
         _db = db;
         _access = access;
         _storage = storage;
+        _log = log;
 
         var code = config["SITE_ADMIN_CODE"];
         _adminCodeHash = string.IsNullOrWhiteSpace(code) ? null : Security.HashCode(code);
@@ -107,6 +109,32 @@ public class SiteAdminController : Controller
             notice = $"Created {name.Trim()} — team code {viewCode}, coach code {coachCode}. " +
                      "Write these down now; they are not stored and cannot be shown again."
         });
+    }
+
+    /// <summary>
+    /// Break-glass: takes manager access to a team without knowing its code.
+    ///
+    /// Deliberately an action rather than an ambient right. A site admin is not a manager of
+    /// every team by default — that silent elevation is what made the roles confusing — but
+    /// when they do need in (a coach has left, something is broken), this grants it in one
+    /// click and the team header then says so on every page until they hand it back.
+    /// </summary>
+    [HttpPost("teams/{teamId:int}/enter")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EnterTeam(int teamId)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId);
+        if (team is null) return NotFound();
+
+        await _access.GrantTeamAsync(HttpContext, team.Id, TeamAccessLevel.Manager,
+            viaSiteAdmin: true);
+
+        _log.LogInformation("Site admin took manager access to team {TeamId} ({Team})",
+            team.Id, team.Name);
+
+        return RedirectToAction("Index", "Coach", new { slug = team.Slug });
     }
 
     /// <summary>

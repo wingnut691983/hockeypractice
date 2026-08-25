@@ -732,3 +732,7 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   text-decoration: none;
 }
 .hp-teamcard-manage:hover { color: var(--hp-primary); }
+
+/* Admin access uses a different colour from the player-preview bar so the two states are
+   never mistaken for each other. */
+.hp-adminbar { background: #6b21a8; }

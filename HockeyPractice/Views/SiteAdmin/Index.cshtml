@@ -12,8 +12,9 @@
     </div>
     <h1 class="hp-title">Site admin</h1>
     <p class="hp-muted" style="margin-top:-.25rem;">
-        Create and remove teams, and issue their access codes. Practice plans and rosters are
-        the team manager's to run — being a site admin doesn't give you access to them.
+        Create and remove teams, and issue their access codes. Running a team is the manager's
+        job, so you don't hold that access by default — use <strong>Manage</strong> to take it
+        when you need it. The team's pages will say you're in as site admin while you are.
     </p>
 
     @if (Model.Notice is not null)
@@ -42,9 +43,11 @@
                             <div class="hp-muted hp-mono">/t/@summary.Team.Slug</div>
                             <div class="hp-muted">@summary.PlanCount plans · @summary.PlayerCount players</div>
                         </div>
-                        <a class="hp-btn hp-btn-quiet hp-btn-sm"
-                           asp-controller="Team" asp-action="Index"
-                           asp-route-slug="@summary.Team.Slug">Visit</a>
+                        <form method="post" asp-action="EnterTeam" asp-route-teamId="@summary.Team.Id">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                    title="Take manager access to this team">Manage</button>
+                        </form>
 
                         <details style="flex-basis:100%;margin-top:.4rem;">
                             <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">Access codes</summary>

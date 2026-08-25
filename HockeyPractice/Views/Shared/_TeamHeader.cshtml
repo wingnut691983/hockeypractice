@@ -100,6 +100,19 @@
 </header>
 <div class="hp-rail"></div>
 
+@if (Model.ViaSiteAdmin)
+{
+    @* Admin access is deliberately loud. Someone acting outside their normal role should be
+       able to see that at a glance, and hand it back without hunting for the control. *@
+    <div class="hp-previewbar hp-adminbar">
+        <span>You're in as site admin, not with this team's code.</span>
+        <form method="post" asp-controller="Team" asp-action="SignOutOfTeam" asp-route-slug="@slug">
+            @Html.AntiForgeryToken()
+            <button type="submit">Hand back</button>
+        </form>
+    </div>
+}
+
 @if (Model.PreviewingAsPlayer)
 {
     <div class="hp-previewbar">

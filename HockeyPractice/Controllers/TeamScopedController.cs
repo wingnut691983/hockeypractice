@@ -61,6 +61,7 @@ public abstract class TeamScopedController : Controller
             RealLevel = realLevel,
             Me = me,
             LogoUrl = LogoUrlFor(team),
+            ViaSiteAdmin = Access.IsViaSiteAdmin(User, team.Id),
             OtherTeams = await OtherTeamsAsync(team.Id)
         }, null);
     }
