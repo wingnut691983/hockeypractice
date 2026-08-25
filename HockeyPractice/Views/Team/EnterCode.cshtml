@@ -1,6 +1,6 @@
 @model EnterCodeViewModel
 @{
-    ViewBag.Title = Model.Team.Name + " – Practice Plans";
+    ViewBag.Title = Model.Team.Name + (Model.ManageMode ? " – Manage" : " – Practice Plans");
     ViewBag.Team = Model.Team;
     var initials = string.Join("", Model.Team.Name
         .Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -8,22 +8,33 @@
 }
 <div class="hp-rail"></div>
 <div class="hp-shell" style="max-width:26rem;">
-    <div style="text-align:center;margin:2.5rem 0 1.5rem;">
+    <div style="text-align:center;margin:2.25rem 0 1.5rem;">
         @if (Model.LogoUrl is not null)
         {
             <img src="@Model.LogoUrl" alt="" style="width:84px;height:84px;object-fit:contain;" />
         }
         else
         {
-            <div class="hp-topbar-fallback" style="width:84px;height:84px;font-size:2rem;margin:0 auto;border-radius:20px;">@initials</div>
+            <div class="hp-topbar-fallback"
+                 style="width:84px;height:84px;font-size:2rem;margin:0 auto;border-radius:20px;background:@Model.Team.PrimaryColor;">@initials</div>
         }
         <h1 class="hp-title" style="margin-bottom:.1rem;">@Model.Team.Name</h1>
-        <p class="hp-muted" style="margin-top:0;">Enter your team code to see practice plans.</p>
+        <p class="hp-muted" style="margin-top:0;">
+            @if (Model.ManageMode)
+            {
+                <text>Enter the manager code to upload plans and edit the roster.</text>
+            }
+            else
+            {
+                <text>Enter your team code to see practice plans.</text>
+            }
+        </p>
     </div>
 
     <form method="post" class="hp-form">
         @Html.AntiForgeryToken()
         <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <input type="hidden" name="manage" value="@Model.ManageMode.ToString().ToLowerInvariant()" />
 
         @if (Model.Error is not null)
         {
@@ -31,15 +42,37 @@
         }
 
         <div class="hp-field">
-            <label class="hp-label" for="accessCode">Team code</label>
-            @* Uppercase + no autocorrect: the codes are typed by teenagers on phone keyboards. *@
+            <label class="hp-label" for="accessCode">
+                @(Model.ManageMode ? "Manager code" : "Team code")
+            </label>
+            @* Uppercase, no autocorrect: these get typed by teenagers on phone keyboards. *@
             <input class="hp-input hp-code-input" id="accessCode" name="accessCode"
                    required autofocus maxlength="12"
                    autocomplete="one-time-code" autocapitalize="characters"
                    autocorrect="off" spellcheck="false" inputmode="text" />
         </div>
 
-        <button type="submit" class="hp-btn hp-btn-block">Let me in</button>
-        <p class="hp-muted" style="text-align:center;">Ask your coach if you don't have the code.</p>
+        <button type="submit" class="hp-btn hp-btn-block">
+            @(Model.ManageMode ? "Sign in to manage" : "Let me in")
+        </button>
     </form>
+
+    <div style="text-align:center;margin-top:1.25rem;">
+        @if (Model.ManageMode)
+        {
+            <a class="hp-teamcard-manage" asp-action="EnterCode" asp-route-slug="@Model.Team.Slug">
+                &larr; I just want the practice plans
+            </a>
+        }
+        else
+        {
+            <a class="hp-teamcard-manage" asp-action="EnterCode" asp-route-slug="@Model.Team.Slug"
+               asp-route-manage="true">
+                Coach or team manager? Sign in to manage &rarr;
+            </a>
+            <p class="hp-muted" style="font-size:.8rem;margin-top:.6rem;">
+                Ask your coach if you don't have the team code.
+            </p>
+        }
+    </div>
 </div>

@@ -84,7 +84,7 @@
                 hidden data-title="@Model.Plan.Title">Share</button>
     </div>
 
-    @if (Model.Ctx.IsCoach)
+    @if (Model.Ctx.IsManager)
     {
         var total = Model.Viewed.Count + Model.NotViewed.Count;
         <div class="hp-section">Who's seen it</div>

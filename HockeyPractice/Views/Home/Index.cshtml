@@ -1,47 +1,66 @@
-@model List<Team>
-@inject HockeyPractice.Services.TeamAccessService Access
-@{
-    ViewBag.Title = "Practice Plans";
-    var isSiteAdmin = Access.IsSiteAdmin(User);
-}
+@model HomeViewModel
+@{ ViewBag.Title = "Practice Plans"; }
 <div class="hp-rail"></div>
 <div class="hp-shell">
     <h1 class="hp-title">Practice Plans</h1>
 
-    @if (Model.Count == 0)
+    @if (Model.Teams.Count == 0)
     {
         <div class="hp-empty">
             No teams yet.<br />
-            <span class="hp-muted">
-                @if (isSiteAdmin)
-                {
-                    <a asp-controller="SiteAdmin" asp-action="Index">Create the first one</a>
-                }
-                else
-                {
-                    <text>A site admin sets these up.</text>
-                }
-            </span>
+            <span class="hp-muted">Whoever runs this site sets them up from Site admin, below.</span>
         </div>
     }
     else
     {
-        <p class="hp-muted" style="margin-top:0;">Pick your team.</p>
-        @foreach (var team in Model)
-        {
-            <a class="hp-card" asp-controller="Team" asp-action="Index" asp-route-slug="@team.Slug">
-                <div class="hp-card-title" style="margin:0;">@team.Name</div>
-            </a>
-        }
-    }
+        <p class="hp-muted" style="margin-top:0;">Choose your team.</p>
 
-    @* Only rendered when the site-admin claim is actually held — a player or parent never
-       receives this markup, so admin isn't a URL you stumble onto. *@
-    @if (isSiteAdmin)
-    {
-        <div class="hp-section">Site</div>
-        <a class="hp-btn hp-btn-quiet" asp-controller="SiteAdmin" asp-action="Index">
-            Manage teams &amp; admin
-        </a>
+        @foreach (var team in Model.Teams)
+        {
+            var level = Model.LevelFor(team.Id);
+            var initials = string.Join("", team.Name
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Take(2).Select(w => char.ToUpperInvariant(w[0])));
+
+            <div class="hp-teamcard">
+                <div class="hp-teamcard-head">
+                    <div class="hp-topbar-fallback" aria-hidden="true"
+                         style="background:@team.PrimaryColor;">@initials</div>
+                    <div style="min-width:0;">
+                        <div class="hp-teamcard-name">@team.Name</div>
+                        @if (level == TeamAccessLevel.Manager)
+                        {
+                            <div class="hp-topbar-sub">You manage this team</div>
+                        }
+                        else if (level == TeamAccessLevel.Player)
+                        {
+                            <div class="hp-topbar-sub">You're signed in</div>
+                        }
+                    </div>
+                </div>
+
+                @* Two ways in, stated plainly. The player path is the primary action because
+                   that is what almost everyone visiting this site is here to do. *@
+                <div class="hp-teamcard-actions">
+                    <a class="hp-btn hp-btn-block" asp-controller="Team" asp-action="Plans"
+                       asp-route-slug="@team.Slug">
+                        @(level == TeamAccessLevel.None ? "See practice plans" : "Practice plans")
+                    </a>
+
+                    @if (level == TeamAccessLevel.Manager)
+                    {
+                        <a class="hp-btn hp-btn-quiet hp-btn-block" asp-controller="Coach"
+                           asp-action="Index" asp-route-slug="@team.Slug">Manage team</a>
+                    }
+                    else
+                    {
+                        <a class="hp-teamcard-manage" asp-controller="Team" asp-action="EnterCode"
+                           asp-route-slug="@team.Slug" asp-route-manage="true">
+                            Coach or team manager? Sign in to manage &rarr;
+                        </a>
+                    }
+                </div>
+            </div>
+        }
     }
 </div>

@@ -16,11 +16,14 @@ public class TeamContext
     public Player? Me { get; init; }
     public string? LogoUrl { get; init; }
 
-    public bool IsCoach => Level >= TeamAccessLevel.Coach;
-    public bool IsSiteAdmin => RealLevel >= TeamAccessLevel.SiteAdmin;
+    /// <summary>Manager rights as currently rendered — false while previewing as a player.</summary>
+    public bool IsManager => Level >= TeamAccessLevel.Manager;
 
-    /// <summary>True when a coach is deliberately looking at the player's view.</summary>
-    public bool PreviewingAsPlayer => RealLevel >= TeamAccessLevel.Coach && Level < TeamAccessLevel.Coach;
+    /// <summary>Manager rights actually held, regardless of preview. Drives navigation.</summary>
+    public bool IsRealManager => RealLevel >= TeamAccessLevel.Manager;
+
+    /// <summary>True when a manager is deliberately looking at the player's view.</summary>
+    public bool PreviewingAsPlayer => IsRealManager && Level < TeamAccessLevel.Manager;
 
     /// <summary>Other teams this device can reach — drives the switcher once there's more than one.</summary>
     public List<TeamLink> OtherTeams { get; init; } = new();
@@ -34,6 +37,13 @@ public class EnterCodeViewModel
     public string? Error { get; init; }
     public string? ReturnUrl { get; init; }
     public string? LogoUrl { get; init; }
+
+    /// <summary>
+    /// Asking for the manager code rather than the team code. Only changes what the page says
+    /// and where it sends you — either code is still accepted, and each grants exactly what it
+    /// is, so entering the wrong one on the wrong screen can't escalate anything.
+    /// </summary>
+    public bool ManageMode { get; init; }
 }
 
 public class RosterPickViewModel
@@ -77,4 +87,16 @@ public class PlanDetailViewModel
     public List<Player> Viewed { get; init; } = new();
     public List<Player> NotViewed { get; init; } = new();
     public int AnonymousViews { get; init; }
+}
+
+/// <summary>The landing page: pick a team, then choose how you're going in.</summary>
+public class HomeViewModel
+{
+    public List<Team> Teams { get; init; } = new();
+
+    /// <summary>Access this device already holds per team, so returning users skip the code.</summary>
+    public Dictionary<int, TeamAccessLevel> Access { get; init; } = new();
+
+    public TeamAccessLevel LevelFor(int teamId) =>
+        Access.TryGetValue(teamId, out var level) ? level : TeamAccessLevel.None;
 }

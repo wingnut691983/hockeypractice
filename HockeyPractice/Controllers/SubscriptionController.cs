@@ -25,7 +25,7 @@ public class SubscriptionController : TeamScopedController
     [EnableRateLimiting("code-entry")]
     public async Task<IActionResult> Subscribe(string slug, string email)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var address = (email ?? string.Empty).Trim();

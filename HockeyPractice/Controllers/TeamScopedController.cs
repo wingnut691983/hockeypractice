@@ -61,7 +61,7 @@ public abstract class TeamScopedController : Controller
             RealLevel = realLevel,
             Me = me,
             LogoUrl = LogoUrlFor(team),
-            OtherTeams = await OtherTeamsAsync(team.Id, realLevel)
+            OtherTeams = await OtherTeamsAsync(team.Id)
         }, null);
     }
 
@@ -70,21 +70,20 @@ public abstract class TeamScopedController : Controller
     /// every team; anyone else sees only the ones they hold a claim for, so the switcher can
     /// never advertise a team they can't open.
     /// </summary>
-    private async Task<List<TeamLink>> OtherTeamsAsync(int currentTeamId, TeamAccessLevel level)
+    private async Task<List<TeamLink>> OtherTeamsAsync(int currentTeamId)
     {
-        var query = Db.Teams.Where(t => t.Id != currentTeamId);
+        // Only teams this device actually holds a claim for. A site admin gets no special
+        // listing here — administering the site is not access to a team's plans, and a
+        // switcher offering teams you'd then be asked to enter a code for is just a dead end.
+        var reachable = User.Claims
+            .Where(c => c.Type.StartsWith(TeamAccessService.TeamClaimPrefix, StringComparison.Ordinal))
+            .Select(c => int.TryParse(c.Type[TeamAccessService.TeamClaimPrefix.Length..], out var id) ? id : -1)
+            .Where(id => id > 0 && id != currentTeamId)
+            .ToList();
 
-        if (level < TeamAccessLevel.SiteAdmin)
-        {
-            var reachable = User.Claims
-                .Where(c => c.Type.StartsWith(TeamAccessService.TeamClaimPrefix, StringComparison.Ordinal))
-                .Select(c => int.TryParse(c.Type[TeamAccessService.TeamClaimPrefix.Length..], out var id) ? id : -1)
-                .Where(id => id > 0 && id != currentTeamId)
-                .ToList();
+        if (reachable.Count == 0) return new List<TeamLink>();
 
-            if (reachable.Count == 0) return new List<TeamLink>();
-            query = query.Where(t => reachable.Contains(t.Id));
-        }
+        var query = Db.Teams.Where(t => t.Id != currentTeamId && reachable.Contains(t.Id));
 
         return await query
             .OrderBy(t => t.Name)

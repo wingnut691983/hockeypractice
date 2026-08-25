@@ -1,5 +1,6 @@
 using HockeyPractice.Persistence;
 using HockeyPractice.Services;
+using HockeyPractice.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,13 +21,16 @@ public class HomeController : Controller
     {
         var teams = await _db.Teams.OrderBy(t => t.Name).ToListAsync();
 
-        // The common case is one team — skip the picker entirely rather than making players
-        // tap through a list of one. A site admin is the exception: this page is their way
-        // into admin, and redirecting past it would strand them with no link at all.
-        if (teams.Count == 1 && !_access.IsSiteAdmin(User))
-            return RedirectToAction("Index", "Team", new { slug = teams[0].Slug });
+        // Always show the list, even for a single team. Auto-forwarding saved players one tap
+        // but removed the only page where the two ways in — read the plans, or manage the team
+        // — are both visible. One tap is not the friction worth optimising away.
+        var levels = teams.ToDictionary(t => t.Id, t => _access.RealLevelFor(User, t.Id));
 
-        return View(teams);
+        return View(new HomeViewModel
+        {
+            Teams = teams,
+            Access = levels
+        });
     }
 
     [Route("Home/Error")]

@@ -19,7 +19,7 @@ public class PlanController : TeamScopedController
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Details(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans
@@ -27,7 +27,7 @@ public class PlanController : TeamScopedController
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
 
         if (plan is null) return NotFound();
-        if (plan.Status != PlanStatus.Published && !ctx!.IsCoach) return NotFound();
+        if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
 
         // Roster tracking is the coach's view only. A player or parent sees their own badge
         // and nothing about anybody else on the team.
@@ -35,7 +35,7 @@ public class PlanController : TeamScopedController
         var notViewed = new List<Player>();
         var anonymous = 0;
 
-        if (ctx!.IsCoach)
+        if (ctx!.IsManager)
         {
             var roster = await Db.Players
                 .Where(p => p.TeamId == ctx.Team.Id && p.IsActive)
@@ -74,12 +74,12 @@ public class PlanController : TeamScopedController
     [HttpGet("{id:int}/file")]
     public async Task<IActionResult> File(string slug, int id, bool download = false)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
-        if (plan.Status != PlanStatus.Published && !ctx!.IsCoach) return NotFound();
+        if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
         if (!_storage.Exists(ctx!.Team.Id, plan.Id)) return NotFound();
 
         var stream = _storage.Open(ctx.Team.Id, plan.Id);
@@ -99,7 +99,7 @@ public class PlanController : TeamScopedController
     [IgnoreAntiforgeryToken]
     public async Task<IActionResult> Viewed(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.FirstOrDefaultAsync(

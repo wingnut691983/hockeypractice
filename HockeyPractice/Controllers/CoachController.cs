@@ -39,7 +39,7 @@ public class CoachController : TeamScopedController
     [HttpGet("")]
     public async Task<IActionResult> Index(string slug, string? notice)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plans = await Db.Plans
@@ -73,7 +73,7 @@ public class CoachController : TeamScopedController
     [HttpGet("plans/new")]
     public async Task<IActionResult> NewPlan(string slug)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         ViewBag.NavSection = "manage";
@@ -94,7 +94,7 @@ public class CoachController : TeamScopedController
     public async Task<IActionResult> NewPlan(string slug, string title, DateTime practiceDate,
         string? location, string? coachNotes, IFormFile? file)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var error = _storage.ValidateUpload(file);
@@ -162,7 +162,7 @@ public class CoachController : TeamScopedController
     [HttpGet("plans/{id:int}")]
     public async Task<IActionResult> EditPlan(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.Include(p => p.Links)
@@ -186,7 +186,7 @@ public class CoachController : TeamScopedController
         DateTime practiceDate, string? location, string? coachNotes,
         int[]? linkId, string[]? linkLabel, int[]? hiddenLinkId)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.Include(p => p.Links)
@@ -236,7 +236,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ReExtract(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.Include(p => p.Links)
@@ -280,7 +280,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Publish(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
@@ -315,7 +315,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Unpublish(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
@@ -330,7 +330,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeletePlan(string slug, int id)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
@@ -349,7 +349,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddPlayer(string slug, string name, string? jerseyNumber)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         if (!string.IsNullOrWhiteSpace(name))
@@ -374,7 +374,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeletePlayer(string slug, int playerId)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var player = await Db.Players
@@ -395,7 +395,7 @@ public class CoachController : TeamScopedController
     public async Task<IActionResult> Branding(string slug, string? name, string? primaryColor,
         string? accentColor, string? timeZoneId, IFormFile? logo)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var team = ctx!.Team;
@@ -422,7 +422,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RotateCode(string slug)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var fresh = Security.NewAccessCode();

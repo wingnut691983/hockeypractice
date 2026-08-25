@@ -7,7 +7,7 @@
 
     // Which tab is current, so the bar reflects where you actually are.
     var section = (ViewBag.NavSection as string) ?? "plans";
-    var showTabs = Model.RealLevel >= TeamAccessLevel.Coach;
+    var showTabs = Model.RealLevel >= TeamAccessLevel.Manager;
 }
 <header class="hp-topbar">
     <div class="hp-topbar-inner">
@@ -27,9 +27,9 @@
                     {
                         <text>Player view</text>
                     }
-                    else if (Model.IsCoach)
+                    else if (Model.IsManager)
                     {
-                        <text>Coach</text>
+                        <text>Team manager</text>
                     }
                     else if (Model.Me is not null)
                     {
@@ -51,14 +51,14 @@
                 <span aria-hidden="true">☰</span>
             </summary>
             <div class="hp-menu-panel">
-                @if (!Model.IsCoach)
+                @if (!Model.IsManager)
                 {
                     <a class="hp-menu-item" asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug">
                         @(Model.Me is null ? "Pick your name" : "Change name (" + Model.Me.Name + ")")
                     </a>
                 }
 
-                @if (Model.RealLevel >= TeamAccessLevel.Coach)
+                @if (Model.RealLevel >= TeamAccessLevel.Manager)
                 {
                     <a class="hp-menu-item" asp-controller="Coach" asp-action="Index" asp-route-slug="@slug">
                         Manage team
@@ -85,13 +85,9 @@
                     }
                 }
 
-                @* Gated on the real site-admin claim, not hidden by CSS — a player or parent
-                   never receives this markup at all. *@
-                @if (Model.IsSiteAdmin)
-                {
-                    <div class="hp-menu-heading">Site</div>
-                    <a class="hp-menu-item" asp-controller="SiteAdmin" asp-action="Index">All teams &amp; admin</a>
-                }
+                @* No site-admin entry here on purpose. Running the site is a different job from
+                   running a team, and mixing them into one menu is what made the roles
+                   confusing. Site admin lives in the footer, on every page. *@
 
                 <div class="hp-menu-sep"></div>
                 <form method="post" asp-controller="Team" asp-action="SignOutOfTeam" asp-route-slug="@slug">

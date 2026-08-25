@@ -43,23 +43,29 @@ public class TeamController : TeamScopedController
     }
 
     [HttpGet("code")]
-    public async Task<IActionResult> EnterCode(string slug, string? returnUrl)
+    public async Task<IActionResult> EnterCode(string slug, string? returnUrl, bool manage = false)
     {
         var team = await Db.Teams.FirstOrDefaultAsync(t => t.Slug == slug);
         if (team is null) return NotFound();
+
+        // Already a manager and asking for the manage screen — don't make them re-enter a code.
+        if (manage && Access.RealLevelFor(User, team.Id) >= TeamAccessLevel.Manager)
+            return RedirectToAction("Index", "Coach", new { slug });
 
         return View(new EnterCodeViewModel
         {
             Team = team,
             ReturnUrl = returnUrl,
-            LogoUrl = LogoUrlFor(team)
+            LogoUrl = LogoUrlFor(team),
+            ManageMode = manage
         });
     }
 
     [HttpPost("code")]
     [ValidateAntiForgeryToken]
     [EnableRateLimiting("code-entry")]
-    public async Task<IActionResult> EnterCode(string slug, string accessCode, string? returnUrl)
+    public async Task<IActionResult> EnterCode(string slug, string accessCode, string? returnUrl,
+        bool manage = false)
     {
         var team = await Db.Teams.FirstOrDefaultAsync(t => t.Slug == slug);
         if (team is null) return NotFound();
@@ -72,15 +78,36 @@ public class TeamController : TeamScopedController
                 Team = team,
                 ReturnUrl = returnUrl,
                 LogoUrl = LogoUrlFor(team),
-                Error = "That code didn't work. Check with your coach."
+                ManageMode = manage,
+                Error = manage
+                    ? "That manager code didn't work."
+                    : "That code didn't work. Check with your coach."
+            });
+        }
+
+        // Asked for the manage screen but entered the team code — say so plainly instead of
+        // silently dropping them somewhere they didn't ask to be.
+        if (manage && granted < TeamAccessLevel.Manager)
+        {
+            return View(new EnterCodeViewModel
+            {
+                Team = team,
+                ReturnUrl = returnUrl,
+                LogoUrl = LogoUrlFor(team),
+                ManageMode = true,
+                Error = "That's the team code, which gets you the practice plans. " +
+                        "Managing the team needs the separate manager code."
             });
         }
 
         if (TryReturnUrlRedirect(returnUrl, out var back))
             return back;
 
-        // Players land on the roster picker once; coaches go straight to work.
-        if (granted == TeamAccessLevel.Viewer && Access.PlayerFor(User, team.Id) is null)
+        if (granted >= TeamAccessLevel.Manager)
+            return RedirectToAction("Index", "Coach", new { slug });
+
+        // Players pick their name once, so the coach can see who has read a plan.
+        if (Access.PlayerFor(User, team.Id) is null)
             return RedirectToAction(nameof(WhoAmI), new { slug });
 
         return RedirectToAction(nameof(Plans), new { slug });
@@ -90,7 +117,7 @@ public class TeamController : TeamScopedController
     [HttpGet("whoami")]
     public async Task<IActionResult> WhoAmI(string slug, string? returnUrl)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var players = await Db.Players
@@ -105,7 +132,7 @@ public class TeamController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> WhoAmI(string slug, int? playerId, string? returnUrl)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         // Only accept a player that actually belongs to this team.
@@ -125,7 +152,7 @@ public class TeamController : TeamScopedController
     [HttpGet("plans")]
     public async Task<IActionResult> Plans(string slug)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Viewer);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
         var team = ctx!.Team;
@@ -133,7 +160,7 @@ public class TeamController : TeamScopedController
 
         var query = Db.Plans.Where(p => p.TeamId == team.Id);
         // Drafts are the coach's alone — a player must not see a plan that isn't finished.
-        if (!ctx.IsCoach) query = query.Where(p => p.Status == PlanStatus.Published);
+        if (!ctx.IsManager) query = query.Where(p => p.Status == PlanStatus.Published);
 
         var plans = await query
             .Select(p => new
@@ -203,7 +230,7 @@ public class TeamController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> TogglePreview(string slug, string? returnUrl)
     {
-        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Coach);
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var team = ctx!.Team;
@@ -257,8 +284,8 @@ public class TeamController : TeamScopedController
         if (string.IsNullOrWhiteSpace(code)) return TeamAccessLevel.None;
 
         var level = TeamAccessLevel.None;
-        if (Security.CodeMatches(code, team.CoachCodeHash)) level = TeamAccessLevel.Coach;
-        else if (Security.CodeMatches(code, team.ViewCodeHash)) level = TeamAccessLevel.Viewer;
+        if (Security.CodeMatches(code, team.CoachCodeHash)) level = TeamAccessLevel.Manager;
+        else if (Security.CodeMatches(code, team.ViewCodeHash)) level = TeamAccessLevel.Player;
 
         if (level != TeamAccessLevel.None)
             await Access.GrantTeamAsync(HttpContext, team.Id, level);

@@ -692,3 +692,43 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   text-decoration: none;
 }
 .hp-footer a:hover { color: var(--hp-text); }
+
+/* ── Landing page team cards ───────────────────────────────
+   Both ways into a team are visible here: read the plans, or manage it. This is the only
+   page where that choice is presented, so it is stated rather than hidden behind a menu. */
+
+.hp-teamcard {
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  box-shadow: var(--hp-shadow);
+  padding: 1rem;
+  margin-bottom: .85rem;
+}
+.hp-teamcard-head { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.hp-teamcard-name {
+  font-size: 1.15rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-teamcard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  margin-top: .9rem;
+}
+.hp-teamcard-manage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hp-tap);
+  font-size: .84rem;
+  font-weight: 650;
+  color: var(--hp-muted);
+  text-decoration: none;
+}
+.hp-teamcard-manage:hover { color: var(--hp-primary); }

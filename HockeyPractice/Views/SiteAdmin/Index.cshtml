@@ -11,6 +11,10 @@
         </form>
     </div>
     <h1 class="hp-title">Site admin</h1>
+    <p class="hp-muted" style="margin-top:-.25rem;">
+        Create and remove teams, and issue their access codes. Practice plans and rosters are
+        the team manager's to run — being a site admin doesn't give you access to them.
+    </p>
 
     @if (Model.Notice is not null)
     {
@@ -39,7 +43,31 @@
                             <div class="hp-muted">@summary.PlanCount plans · @summary.PlayerCount players</div>
                         </div>
                         <a class="hp-btn hp-btn-quiet hp-btn-sm"
-                           asp-controller="Team" asp-action="Index" asp-route-slug="@summary.Team.Slug">Open</a>
+                           asp-controller="Team" asp-action="Index"
+                           asp-route-slug="@summary.Team.Slug">Visit</a>
+
+                        <details style="flex-basis:100%;margin-top:.4rem;">
+                            <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">Access codes</summary>
+                            <p class="hp-muted" style="font-size:.82rem;margin:.5rem 0;">
+                                Codes are stored hashed and can't be read back — issuing a new one
+                                is the only way to recover access. The new code is shown once, here.
+                            </p>
+                            <div class="hp-row">
+                                <form method="post" asp-action="RegenerateCodes" asp-route-teamId="@summary.Team.Id"
+                                      onsubmit="return confirm('Issue a new TEAM code? Every player and parent will have to enter it again.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="which" value="player" />
+                                    <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">New team code</button>
+                                </form>
+                                <form method="post" asp-action="RegenerateCodes" asp-route-teamId="@summary.Team.Id"
+                                      onsubmit="return confirm('Issue a new MANAGER code? Anyone using the old one loses manage access.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="which" value="manager" />
+                                    <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">New manager code</button>
+                                </form>
+                            </div>
+                        </details>
+
                         <details style="flex-basis:100%;margin-top:.4rem;">
                             <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">Delete team</summary>
                             <form method="post" asp-action="DeleteTeam" asp-route-teamId="@summary.Team.Id"

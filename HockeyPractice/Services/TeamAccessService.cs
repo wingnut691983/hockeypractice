@@ -29,12 +29,14 @@ public class TeamAccessService
     /// </summary>
     public TeamAccessLevel RealLevelFor(ClaimsPrincipal user, int teamId)
     {
-        if (IsSiteAdmin(user)) return TeamAccessLevel.SiteAdmin;
-
+        // Site admin is NOT consulted here. Administering the site does not make someone a
+        // manager of a team — if a site admin needs to run a team, they hold that team's
+        // manager code like anyone else. Their recovery path is regenerating the codes.
         return user.FindFirst(TeamClaimPrefix + teamId)?.Value switch
         {
-            "coach"  => TeamAccessLevel.Coach,
-            "viewer" => TeamAccessLevel.Viewer,
+            // Stored claim values are unchanged so existing cookies keep working.
+            "coach"  => TeamAccessLevel.Manager,
+            "viewer" => TeamAccessLevel.Player,
             _        => TeamAccessLevel.None
         };
     }
@@ -46,9 +48,9 @@ public class TeamAccessService
     public TeamAccessLevel DisplayLevelFor(ClaimsPrincipal user, int teamId, HttpRequest request)
     {
         var real = RealLevelFor(user, teamId);
-        if (real < TeamAccessLevel.Coach) return real;
+        if (real < TeamAccessLevel.Manager) return real;
 
-        return IsPreviewingAsPlayer(request, teamId) ? TeamAccessLevel.Viewer : real;
+        return IsPreviewingAsPlayer(request, teamId) ? TeamAccessLevel.Player : real;
     }
 
     public bool IsPreviewingAsPlayer(HttpRequest request, int teamId) =>
@@ -93,9 +95,9 @@ public class TeamAccessService
         ReissueAsync(http, claims =>
         {
             claims.RemoveAll(c => c.Type == TeamClaimPrefix + teamId);
-            if (level == TeamAccessLevel.Coach)
+            if (level == TeamAccessLevel.Manager)
                 claims.Add(new Claim(TeamClaimPrefix + teamId, "coach"));
-            else if (level == TeamAccessLevel.Viewer)
+            else if (level == TeamAccessLevel.Player)
                 claims.Add(new Claim(TeamClaimPrefix + teamId, "viewer"));
         });
 

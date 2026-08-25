@@ -110,6 +110,42 @@ public class SiteAdminController : Controller
     }
 
     /// <summary>
+    /// Issues a fresh pair of codes for a team and shows them once.
+    ///
+    /// This is the site admin's only route into a team, and it is deliberately indirect: they
+    /// can hand out access, but they can't read a team's plans or roster without holding the
+    /// code like anyone else. It is also the recovery path when a coach loses theirs.
+    /// </summary>
+    [HttpPost("teams/{teamId:int}/codes")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RegenerateCodes(int teamId, string which)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        var team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == teamId);
+        if (team is null) return NotFound();
+
+        string notice;
+        if (which == "manager")
+        {
+            var code = Security.NewAccessCode(8);
+            team.CoachCodeHash = Security.HashCode(code);
+            notice = $"{team.Name} — new manager code {code}. " +
+                     "Anyone using the old one will need this instead.";
+        }
+        else
+        {
+            var code = Security.NewAccessCode();
+            team.ViewCodeHash = Security.HashCode(code);
+            notice = $"{team.Name} — new team code {code}. " +
+                     "Every player and parent will need to enter this again.";
+        }
+
+        await _db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index), new { notice });
+    }
+
+    /// <summary>
     /// Removes a team and everything under it — plans, roster, view history, subscribers, and
     /// the team's directory on disk. Requires the team's name typed back as confirmation,
     /// because this is unrecoverable and a misclick would take a season of plans with it.
