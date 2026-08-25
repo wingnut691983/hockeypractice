@@ -25,7 +25,7 @@
             @* Each card carries its own team's colours, so everything inside it — the badge,
                the rail, the primary button — picks them up. The page itself can't be themed:
                with more than one team there is no single palette to apply. *@
-            <div class="hp-teamcard" style="--hp-primary:@team.SafePrimary; --hp-accent:@team.SafeAccent;">
+            <div class="hp-teamcard" style="@HockeyPractice.Infrastructure.Palette.CssVariables(team.SafePrimary, team.SafeAccent)">
                 <div class="hp-teamcard-rail"></div>
                 <div class="hp-teamcard-head">
                     <div class="hp-topbar-fallback" aria-hidden="true">@initials</div>

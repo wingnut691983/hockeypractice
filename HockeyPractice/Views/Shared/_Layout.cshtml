@@ -3,10 +3,13 @@
     var title = ViewBag.Title as string ?? "Practice Plans";
     var primary = team?.SafePrimary ?? Team.DefaultPrimary;
     var accent  = team?.SafeAccent  ?? Team.DefaultAccent;
+    var palette = HockeyPractice.Infrastructure.Palette.CssVariables(primary, accent);
 }
 <!DOCTYPE html>
 @* Team colours ride on the root element so one stylesheet serves every team. *@
-<html lang="en" style="--hp-primary:@primary; --hp-accent:@accent;">
+@* Text colours are derived from the team's own, not assumed: plenty of real hockey colours
+   are light enough that white text on them is unreadable. *@
+<html lang="en" style="@palette">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />

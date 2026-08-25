@@ -34,6 +34,21 @@
   }
 }
 
+
+/* Team colours used as TEXT need a different treatment from team colours used as a
+   BACKGROUND: a light gold is fine behind dark text but illegible as text on white. These
+   aliases resolve per element, so the landing page's per-card palettes work too. */
+:root, .hp-teamcard {
+  --hp-primary-text: var(--hp-primary-ink, var(--hp-primary));
+  --hp-accent-text:  var(--hp-accent-ink,  var(--hp-accent));
+}
+@media (prefers-color-scheme: dark) {
+  :root, .hp-teamcard {
+    --hp-primary-text: var(--hp-primary-ink-dark, var(--hp-primary));
+    --hp-accent-text:  var(--hp-accent-ink-dark,  var(--hp-accent));
+  }
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body { margin: 0; padding: 0; }
@@ -47,7 +62,7 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-a { color: var(--hp-primary); }
+a { color: var(--hp-primary-text); }
 @media (prefers-color-scheme: dark) { a { color: #7fb3ff; } }
 
 /* ── Shell ─────────────────────────────────────────────── */
@@ -81,7 +96,7 @@ a { color: var(--hp-primary); }
   width: 40px; height: 40px; flex-shrink: 0;
   border-radius: 10px;
   background: var(--hp-primary);
-  color: #fff;
+  color: var(--hp-on-primary, #fff);
   display: grid; place-items: center;
   font-weight: 800; font-size: 1rem;
   letter-spacing: -.02em;
@@ -145,17 +160,17 @@ a.hp-card:active { transform: scale(.99); }
 .hp-card-next {
   border: 0;
   padding: 1.25rem;
-  background: linear-gradient(135deg, var(--hp-primary) 0%, color-mix(in srgb, var(--hp-primary) 62%, var(--hp-accent)) 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--hp-primary) 0%, var(--hp-next-to, var(--hp-accent)) 100%);
+  color: var(--hp-on-next, #fff);
 }
-.hp-card-next .hp-card-when { color: rgba(255,255,255,.92); }
-.hp-card-next .hp-card-meta { color: rgba(255,255,255,.82); }
+.hp-card-next .hp-card-when { color: var(--hp-on-next, #fff); opacity: .92; }
+.hp-card-next .hp-card-meta { color: var(--hp-on-next, #fff); opacity: .82; }
 
 .hp-card-when {
   font-size: .82rem;
   font-weight: 750;
   letter-spacing: .01em;
-  color: var(--hp-accent);
+  color: var(--hp-accent-text);
   text-transform: uppercase;
 }
 .hp-card-title {
@@ -180,7 +195,8 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-pill-draft   { background: #fdf0d5; color: #8a5a00; }
 .hp-pill-viewed  { background: #e3f5eb; color: var(--hp-success); }
-.hp-card-next .hp-pill { background: rgba(255,255,255,.2); color: #fff; }
+.hp-card-next .hp-pill { background: color-mix(in srgb, var(--hp-on-next, #fff) 20%, transparent);
+                         color: var(--hp-on-next, #fff); }
 
 /* ── Video strip ───────────────────────────────────────── */
 
@@ -281,7 +297,7 @@ a.hp-card:active { transform: scale(.99); }
   border-radius: 10px;
   border: 1px solid transparent;
   background: var(--hp-primary);
-  color: #fff;
+  color: var(--hp-on-primary, #fff);
   cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
   text-decoration: none;
@@ -338,7 +354,7 @@ a.hp-card:active { transform: scale(.99); }
 .hp-jersey {
   flex-shrink: 0;
   width: 34px; height: 34px; border-radius: 9px;
-  background: var(--hp-primary); color: #fff;
+  background: var(--hp-primary); color: var(--hp-on-primary, #fff);
   display: grid; place-items: center;
   font-weight: 800; font-size: .84rem;
 }
@@ -496,7 +512,7 @@ a.hp-card:active { transform: scale(.99); }
   font-weight: 800;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--hp-accent);
+  color: var(--hp-accent-text);
   margin-top: .4rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -545,7 +561,7 @@ a.hp-card:active { transform: scale(.99); }
   background: var(--hp-surface-2);
   font-size: 1.1rem;
 }
-.hp-menu[open] .hp-menu-trigger { background: var(--hp-primary); color: #fff; }
+.hp-menu[open] .hp-menu-trigger { background: var(--hp-primary); color: var(--hp-on-primary, #fff); }
 
 .hp-menu-panel {
   position: absolute;
@@ -602,7 +618,7 @@ a.hp-card:active { transform: scale(.99); }
   gap: .75rem;
   padding: .5rem 1rem;
   background: var(--hp-accent);
-  color: #fff;
+  color: var(--hp-on-accent, #fff);
   font-size: .85rem;
   font-weight: 650;
 }
@@ -646,7 +662,7 @@ a.hp-card:active { transform: scale(.99); }
   text-decoration: none;
 }
 .hp-tab-icon { font-size: 1.05rem; line-height: 1; }
-.hp-tab.active { color: var(--hp-primary); }
+.hp-tab.active { color: var(--hp-primary-text); }
 .hp-tab.active .hp-tab-icon { transform: translateY(-1px); }
 
 /* Keep the fixed bar from covering the end of the page. */
@@ -742,7 +758,7 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   color: var(--hp-muted);
   text-decoration: none;
 }
-.hp-teamcard-manage:hover { color: var(--hp-primary); }
+.hp-teamcard-manage:hover { color: var(--hp-primary-text); }
 
 /* Admin access uses a different colour from the player-preview bar so the two states are
    never mistaken for each other. */
@@ -781,7 +797,7 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   border-radius: 8px;
   font-size: .8rem;
   font-weight: 700;
-  color: var(--hp-primary);
+  color: var(--hp-primary-text);
   text-decoration: none;
 }
 .hp-identity a:active { background: var(--hp-surface); }
@@ -794,7 +810,7 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   border-bottom-color: color-mix(in srgb, var(--hp-accent) 35%, var(--hp-border));
 }
 .hp-identity-unset .hp-identity-text { color: var(--hp-text); }
-.hp-identity-unset a { color: var(--hp-accent); font-weight: 800; }
+.hp-identity-unset a { color: var(--hp-accent-text); font-weight: 800; }
 
 /* ── Link visibility toggle (plan editor) ──────────────────
    Was an unlabelled checkbox with inverted meaning. Now a labelled control that states

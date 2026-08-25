@@ -1,4 +1,5 @@
 using System.Net;
+using HockeyPractice.Infrastructure;
 using HockeyPractice.Models;
 using HockeyPractice.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -87,15 +88,18 @@ public class NotificationService
             sent, subscribers.Count, plan.Id);
     }
 
+    // Same contrast problem as the site: a team with light colours got an unreadable button.
+    // Email clients have no custom properties, so the colour is resolved here instead.
     private static string Button(string url, string label, Team team) =>
-        $"<a href=\"{Esc(url)}\" style=\"display:inline-block;background:{Esc(team.PrimaryColor)};" +
-        "color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px\">" +
+        $"<a href=\"{Esc(url)}\" style=\"display:inline-block;background:{Esc(team.SafePrimary)};" +
+        $"color:{Palette.On(team.SafePrimary)};text-decoration:none;font-weight:700;" +
+        "padding:12px 20px;border-radius:10px\">" +
         $"{Esc(label)}</a>";
 
     private static string Wrap(Team team, string body) =>
         "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;" +
         "line-height:1.5;color:#12161d;max-width:520px\">" +
-        $"<div style=\"height:4px;background:{Esc(team.PrimaryColor)};border-radius:2px\"></div>" +
+        $"<div style=\"height:4px;background:{Esc(team.SafePrimary)};border-radius:2px\"></div>" +
         body +
         "</div>";
 
