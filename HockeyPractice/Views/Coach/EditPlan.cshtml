@@ -87,18 +87,26 @@
             <div class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</div>
             <p class="hp-muted" style="margin:0;">
                 Names come from the plan itself — a hyperlink's text, or the line and section
-                heading it sits under. Edit any that read badly, and untick anything that isn't a
-                drill video.
+                heading it sits under. Rename anything that reads badly, and turn off anything
+                that isn't a drill video.
             </p>
             <div class="hp-panel">
-                <ul class="hp-list">
+                <ul class="hp-list hp-linklist">
                     @foreach (var link in Model.Links)
                     {
-                        <li style="align-items:flex-start;">
+                        <li>
                             <input type="hidden" name="linkId" value="@link.Id" />
-                            <input type="checkbox" name="hiddenLinkId" value="@link.Id"
-                                   checked="@link.IsHidden" title="Hide this link"
-                                   style="width:22px;height:22px;margin-top:.6rem;flex-shrink:0;" />
+
+                            @* Positive framing, and a real label rather than a bare box: ticked
+                               means the players see it. The old control was an unlabelled
+                               checkbox whose meaning was inverted, explained by two notes that
+                               contradicted each other. *@
+                            <label class="hp-showtoggle">
+                                <input type="checkbox" name="visibleLinkId" value="@link.Id"
+                                       checked="@(!link.IsHidden)" />
+                                <span>Show to players</span>
+                            </label>
+
                             <div class="grow">
                                 @if (!string.IsNullOrWhiteSpace(link.Section))
                                 {
@@ -115,7 +123,6 @@
                         </li>
                     }
                 </ul>
-                <p class="hp-muted" style="margin-bottom:0;">Ticked = hidden from players.</p>
             </div>
 
             <div class="hp-panel" style="margin:0;">

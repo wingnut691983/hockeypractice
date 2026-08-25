@@ -184,7 +184,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPlan(string slug, int id, string title,
         DateTime practiceDate, string? location, string? coachNotes,
-        int[]? linkId, string[]? linkLabel, int[]? hiddenLinkId)
+        int[]? linkId, string[]? linkLabel, int[]? visibleLinkId)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -198,8 +198,9 @@ public class CoachController : TeamScopedController
         plan.Location = location?.Trim();
         plan.CoachNotes = coachNotes?.Trim();
 
-        // Labels arrive parallel to ids; hidden arrives as the set of checked boxes.
-        var hidden = (hiddenLinkId ?? []).ToHashSet();
+        // Labels arrive parallel to ids. The checkboxes are "show to players", so the ones
+        // that arrive are the visible links — an unticked box submits nothing at all.
+        var visible = (visibleLinkId ?? []).ToHashSet();
         if (linkId is not null)
         {
             for (var i = 0; i < linkId.Length; i++)
@@ -216,9 +217,10 @@ public class CoachController : TeamScopedController
                     link.Label = typed;
                 }
 
-                if (link.IsHidden != hidden.Contains(link.Id))
+                var nowHidden = !visible.Contains(link.Id);
+                if (link.IsHidden != nowHidden)
                     link.WasEditedByCoach = true;
-                link.IsHidden = hidden.Contains(link.Id);
+                link.IsHidden = nowHidden;
                 link.SortOrder = i;
             }
         }

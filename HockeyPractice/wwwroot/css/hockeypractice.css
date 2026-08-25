@@ -795,3 +795,45 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-identity-unset .hp-identity-text { color: var(--hp-text); }
 .hp-identity-unset a { color: var(--hp-accent); font-weight: 800; }
+
+/* ── Link visibility toggle (plan editor) ──────────────────
+   Was an unlabelled checkbox with inverted meaning. Now a labelled control that states
+   what ticking it does, sized as a real tap target. */
+
+.hp-linklist > li {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  flex-wrap: wrap;
+  padding: .8rem 0;
+}
+.hp-linklist > li .grow { flex: 1 1 14rem; min-width: 0; }
+
+.hp-showtoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  flex-shrink: 0;
+  min-height: var(--hp-tap);
+  padding: .3rem .6rem .3rem .4rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  background: var(--hp-surface-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: .82rem;
+  font-weight: 650;
+  color: var(--hp-muted);
+}
+.hp-showtoggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--hp-primary); margin: 0; }
+
+/* Ticked reads as active, so the state is legible without reading the words. */
+.hp-showtoggle:has(input:checked) {
+  background: color-mix(in srgb, var(--hp-primary) 12%, var(--hp-surface));
+  border-color: color-mix(in srgb, var(--hp-primary) 45%, var(--hp-border));
+  color: var(--hp-text);
+}
+.hp-showtoggle:focus-within { outline: 2px solid var(--hp-primary); outline-offset: 1px; }
+
+/* A link that won't be shown is dimmed, so scanning the list tells you the state. */
+.hp-linklist > li:has(.hp-showtoggle input:not(:checked)) .grow { opacity: .55; }
