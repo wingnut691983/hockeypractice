@@ -100,6 +100,33 @@
 </header>
 <div class="hp-rail"></div>
 
+@* Who the site thinks you are, stated on every page. Without this the roster pick is a
+   one-time screen you can't confirm afterwards — you're left wondering whether it took. *@
+@if (!Model.IsManager)
+{
+    <div class="hp-identity @(Model.Me is null ? "hp-identity-unset" : "")">
+        @if (Model.Me is not null)
+        {
+            <span class="hp-jersey hp-jersey-sm">
+                @(string.IsNullOrEmpty(Model.Me.JerseyNumber) ? "–" : Model.Me.JerseyNumber)
+            </span>
+            <span class="hp-identity-text">You're signed in as <strong>@Model.Me.Name</strong></span>
+            <a asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug"
+               asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)">
+                Not you?
+            </a>
+        }
+        else
+        {
+            <span class="hp-identity-text">Tap your name so your coach knows you've seen the plan.</span>
+            <a asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug"
+               asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)">
+                Choose your name
+            </a>
+        }
+    </div>
+}
+
 @if (Model.ViaSiteAdmin)
 {
     @* Admin access is deliberately loud. Someone acting outside their normal role should be

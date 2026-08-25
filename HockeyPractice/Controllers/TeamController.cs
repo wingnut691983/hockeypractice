@@ -100,15 +100,24 @@ public class TeamController : TeamScopedController
             });
         }
 
+        if (granted >= TeamAccessLevel.Manager)
+        {
+            if (TryReturnUrlRedirect(returnUrl, out var managerBack)) return managerBack;
+            return RedirectToAction("Index", "Coach", new { slug });
+        }
+
+        // Players pick their name once, so the coach can see who has read a plan. This is
+        // checked BEFORE returnUrl: arriving via a deep link (the landing page's "See practice
+        // plans" button sets one) otherwise skipped the question entirely, and the player was
+        // never counted as having read anything. Where they were headed is carried through.
+        if (Access.PlayerFor(User, team.Id) is null &&
+            await Db.Players.AnyAsync(p => p.TeamId == team.Id && p.IsActive))
+        {
+            return RedirectToAction(nameof(WhoAmI), new { slug, returnUrl });
+        }
+
         if (TryReturnUrlRedirect(returnUrl, out var back))
             return back;
-
-        if (granted >= TeamAccessLevel.Manager)
-            return RedirectToAction("Index", "Coach", new { slug });
-
-        // Players pick their name once, so the coach can see who has read a plan.
-        if (Access.PlayerFor(User, team.Id) is null)
-            return RedirectToAction(nameof(WhoAmI), new { slug });
 
         return RedirectToAction(nameof(Plans), new { slug });
     }

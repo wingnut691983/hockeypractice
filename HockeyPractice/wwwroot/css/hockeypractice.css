@@ -747,3 +747,51 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 /* Admin access uses a different colour from the player-preview bar so the two states are
    never mistaken for each other. */
 .hp-adminbar { background: #6b21a8; }
+
+/* ── "Who am I" strip ──────────────────────────────────────
+   The roster pick is a one-time screen, so without this a player has no way to confirm it
+   registered. Stated on every team page rather than buried in the menu. */
+
+.hp-identity {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: .5rem 1rem;
+  font-size: .85rem;
+  background: var(--hp-surface-2);
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-identity-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--hp-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-identity-text strong { color: var(--hp-text); font-weight: 750; }
+.hp-identity a {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 .6rem;
+  border-radius: 8px;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--hp-primary);
+  text-decoration: none;
+}
+.hp-identity a:active { background: var(--hp-surface); }
+
+.hp-jersey-sm { width: 26px; height: 26px; font-size: .74rem; border-radius: 7px; }
+
+/* Nobody picked yet — make it an invitation rather than a status line. */
+.hp-identity-unset {
+  background: color-mix(in srgb, var(--hp-accent) 14%, var(--hp-surface));
+  border-bottom-color: color-mix(in srgb, var(--hp-accent) 35%, var(--hp-border));
+}
+.hp-identity-unset .hp-identity-text { color: var(--hp-text); }
+.hp-identity-unset a { color: var(--hp-accent); font-weight: 800; }
