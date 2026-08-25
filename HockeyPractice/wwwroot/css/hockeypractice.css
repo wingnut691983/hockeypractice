@@ -304,7 +304,9 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-btn:active { transform: scale(.99); }
 .hp-btn-block { width: 100%; }
-.hp-btn-accent { background: var(--hp-accent); }
+/* Must restate the text colour, not just the background: inheriting .hp-btn's
+   --hp-on-primary put white text on a light accent. */
+.hp-btn-accent { background: var(--hp-accent); color: var(--hp-on-accent, #fff); }
 .hp-btn-quiet {
   background: var(--hp-surface);
   color: var(--hp-text);
@@ -628,9 +630,10 @@ a.hp-card:active { transform: scale(.99); }
   min-height: 34px;
   padding: .25rem .7rem;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,.55);
-  background: rgba(255,255,255,.16);
-  color: #fff;
+  /* Tint from whatever the bar's own text colour is, so this works on a light accent too. */
+  border: 1px solid color-mix(in srgb, currentColor 55%, transparent);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -762,7 +765,9 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 
 /* Admin access uses a different colour from the player-preview bar so the two states are
    never mistaken for each other. */
-.hp-adminbar { background: #6b21a8; }
+/* Fixed purple, so it sets its own text colour rather than inheriting the accent's — which
+   would be dark text for a light-accented team. */
+.hp-adminbar { background: #6b21a8; color: #ffffff; }
 
 /* ── "Who am I" strip ──────────────────────────────────────
    The roster pick is a one-time screen, so without this a player has no way to confirm it
