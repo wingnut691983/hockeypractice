@@ -18,6 +18,15 @@
 </head>
 <body>
     @RenderBody()
+
+    @* A quiet, always-reachable path to /admin. Safe to show unconditionally: the login
+       there is code-gated server-side and reveals nothing by itself. Hiding this link
+       entirely (as an earlier version did) meant the only way to reach it was already
+       knowing the URL — which broke first-time setup, since the claim needed to make the
+       link "visible" can only be obtained by visiting the page the link would have shown. *@
+    <footer class="hp-footer">
+        <a asp-controller="SiteAdmin" asp-action="Index">Site admin</a>
+    </footer>
 <script>
 (function () {
     // A <details> menu stays open until it's told otherwise; close it on an outside tap or

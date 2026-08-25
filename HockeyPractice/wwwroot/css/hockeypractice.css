@@ -675,3 +675,20 @@ body:has(.hp-tabs) .hp-shell { padding-bottom: calc(5rem + env(safe-area-inset-b
   .hp-tab.active { border-bottom-color: var(--hp-primary); }
   body:has(.hp-tabs) .hp-shell { padding-bottom: 3rem; }
 }
+
+/* Quiet, deliberately unobtrusive — a utility link for whoever runs the site, not a
+   navigation item players or parents need to notice. */
+.hp-footer {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom));
+  text-align: center;
+}
+body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+.hp-footer a {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--hp-muted);
+  text-decoration: none;
+}
+.hp-footer a:hover { color: var(--hp-text); }
