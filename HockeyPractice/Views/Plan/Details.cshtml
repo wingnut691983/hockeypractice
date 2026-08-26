@@ -159,6 +159,35 @@
         }).catch(function () { /* tracking must never break the page */ });
     }
 
+    // ── Disable pdf.js's own pinch-to-zoom, leave the toolbar +/- as the only way ──────
+    // Two things fight each other on a pinch gesture over the PDF: the browser's own native
+    // page zoom, and pdf.js's internal canvas-zoom handler (which even at its "reduced" setting
+    // still zooms in coarse steps, just not smoothly — never fully off). Both listen on
+    // touchstart; pdf.js's own listener sits on the iframe's `window` in the bubble phase. A
+    // capture-phase listener registered earlier, directly in the iframe's own document (reachable
+    // same-origin via the officially documented "webviewerloaded" event pdf.js fires on the
+    // PARENT document before it wires anything up), runs first and stops the event outright —
+    // so neither system ever sees the gesture, and only the header's +/- buttons do anything.
+    document.addEventListener('webviewerloaded', function (e) {
+        var pdfWin = e.detail && e.detail.source;
+        if (!pdfWin) return;
+
+        try {
+            pdfWin.document.addEventListener('touchstart', function (te) {
+                if (te.touches.length > 1) {
+                    te.preventDefault();
+                    te.stopPropagation();
+                }
+            }, { capture: true, passive: false });
+
+            // Belt and suspenders: if a future pdf.js build changes how its own listener is
+            // registered, this still keeps pinch from doing smooth zoom.
+            if (pdfWin.PDFViewerApplicationOptions) {
+                pdfWin.PDFViewerApplicationOptions.set('supportsPinchToZoom', false);
+            }
+        } catch (err) { /* cross-origin or a pdf.js internals change — fail open, not broken */ }
+    });
+
     // The viewer is same-origin, so its load event is a real signal that the PDF opened.
     if (pdfFrame) {
         pdfFrame.addEventListener('load', function () { setTimeout(record, 1500); });
