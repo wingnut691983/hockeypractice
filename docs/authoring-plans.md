@@ -28,6 +28,12 @@ This is the difference between:
 Lead-in words — *watch, see, video, link, reference* — are stripped automatically, so
 "Watch: X" and "Video — X" both come out as "X". Write whichever reads naturally.
 
+If a URL really is alone on its own line, it's not automatically "Video 1" anymore — the site
+looks up the video's own published title (YouTube/Vimeo, no API key needed) before giving up.
+That title is a real fallback, not a replacement: a name you wrote in the document always wins,
+since you chose it for this specific practice and a channel's own title usually wasn't written
+with that in mind.
+
 ## Use section headings
 
 Each video also shows which block of practice it belongs to. Headings are detected when a
