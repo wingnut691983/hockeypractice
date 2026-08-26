@@ -43,9 +43,22 @@ public class AppDbContext : DbContext
             .HasOne(v => v.Player).WithMany()
             .HasForeignKey(v => v.PlayerId).OnDelete(DeleteBehavior.SetNull);
 
-        // One view row per viewer per plan — the beacon is idempotent, and "12 of 17 viewed"
-        // must count people, not page loads.
-        b.Entity<PlanView>().HasIndex(v => new { v.PracticePlanId, v.ViewerKey }).IsUnique();
+        // Two separate uniqueness rules, not one. A shared family device is legitimately used
+        // by more than one player over a season — keying uniqueness purely on ViewerKey meant
+        // a second player picking themselves on the same phone their sibling already used could
+        // never be recorded; the row was permanently claimed by whoever viewed first. Once a
+        // player is identified, THEY are the identity that must be unique per plan, independent
+        // of which device did the viewing. Only while anonymous (no player chosen — a parent who
+        // skipped, most likely) does the device itself stand in as the identity.
+        b.Entity<PlanView>()
+            .HasIndex(v => new { v.PracticePlanId, v.PlayerId })
+            .IsUnique()
+            .HasFilter("[PlayerId] IS NOT NULL");
+
+        b.Entity<PlanView>()
+            .HasIndex(v => new { v.PracticePlanId, v.ViewerKey })
+            .IsUnique()
+            .HasFilter("[PlayerId] IS NULL");
 
         b.Entity<Subscriber>()
             .HasOne(s => s.Team).WithMany(t => t.Subscribers)

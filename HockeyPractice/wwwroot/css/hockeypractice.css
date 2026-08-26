@@ -247,10 +247,16 @@ a.hp-card:active { transform: scale(.99); }
 
 /* ── PDF viewer ────────────────────────────────────────── */
 
+/* No fixed height on purpose. A fixed-height box gives the PDF its own separate scroll
+   region inside the iframe — once you scroll that to its end, the gesture is trapped there
+   and doesn't hand off to continue scrolling the page, which is the "can't scroll past the
+   bottom of the PDF" report. JS below measures the document's real rendered height and sets
+   an explicit pixel height on the iframe, so the whole plan (header, videos, every page of
+   the PDF) is one continuous flow the page scrolls normally, with no separate scroll region
+   to get stuck in. min-height is only a floor for the moment before that measurement lands. */
 .hp-viewer {
   width: 100%;
-  height: 78vh;
-  min-height: 420px;
+  min-height: 60vh;
   border: 1px solid var(--hp-border);
   border-radius: var(--hp-radius);
   background: var(--hp-surface);
@@ -896,3 +902,41 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   object-fit: contain;
   flex-shrink: 0;
 }
+
+/* ── Floating zoom control ──────────────────────────────────
+   pdf.js's own toolbar used to stay pinned at the top of a small fixed-height box. Once the
+   PDF auto-sizes to its full content and the page scrolls through it as one, that toolbar
+   scrolls away like anything else — this replaces it for reachability, and it's the only way
+   to zoom now that pinch is deliberately disabled on the viewer. */
+.hp-viewer-wrap { position: relative; }
+
+.hp-zoom {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + .6rem);
+  z-index: 40;
+  float: right;
+  margin-top: .6rem;
+  margin-right: .6rem;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--hp-surface) 88%, transparent);
+  border: 1px solid var(--hp-border);
+  box-shadow: var(--hp-shadow);
+  backdrop-filter: blur(6px);
+}
+.hp-zoom[hidden] { display: none; }
+.hp-zoom button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--hp-text);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.hp-zoom button:active { background: var(--hp-surface-2); }

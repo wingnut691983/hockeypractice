@@ -102,34 +102,43 @@ public class PlanController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
+        // A manager opening their own plan to check who has read it is not a "view" — without
+        // this, every glance at the tracking dashboard silently inflated the anonymous-view
+        // count, since the same client-side beacon fires on this page for everyone.
+        if (ctx!.IsManager) return NoContent();
+
         var plan = await Db.Plans.FirstOrDefaultAsync(
-            p => p.Id == id && p.TeamId == ctx!.Team.Id && p.Status == PlanStatus.Published);
+            p => p.Id == id && p.TeamId == ctx.Team.Id && p.Status == PlanStatus.Published);
         if (plan is null) return NotFound();
 
         var viewerKey = Access.ViewerKeyFor(User);
         if (string.IsNullOrEmpty(viewerKey)) return NoContent();
 
-        var existing = await Db.PlanViews
-            .FirstOrDefaultAsync(v => v.PracticePlanId == plan.Id && v.ViewerKey == viewerKey);
+        // Identity, not device, is what must be unique. A family device is legitimately shared
+        // by more than one player over a season — keying purely on ViewerKey meant a second
+        // player picking themselves on a phone their sibling already used could never be
+        // recorded; the existing row was permanently claimed by whoever viewed it first. Once a
+        // player is known, THAT is the identity to look up and dedupe on; the device only stands
+        // in when nobody has been identified yet (a parent who skipped the roster pick).
+        var existing = ctx.Me is not null
+            ? await Db.PlanViews.FirstOrDefaultAsync(v => v.PracticePlanId == plan.Id && v.PlayerId == ctx.Me.Id)
+            : await Db.PlanViews.FirstOrDefaultAsync(v => v.PracticePlanId == plan.Id && v.PlayerId == null && v.ViewerKey == viewerKey);
 
         if (existing is null)
         {
             Db.PlanViews.Add(new PlanView
             {
                 PracticePlanId = plan.Id,
-                PlayerId = ctx!.Me?.Id,
+                PlayerId = ctx.Me?.Id,
                 ViewerKey = viewerKey
             });
         }
-        else if (existing.PlayerId is null && ctx!.Me is not null)
-        {
-            // The device viewed anonymously first and has since picked a roster name —
-            // attach it rather than creating a second row for the same person.
-            existing.PlayerId = ctx.Me.Id;
-        }
         else
         {
-            return NoContent();
+            // Already recorded for this identity. Refresh which device it was last seen on —
+            // harmless, and keeps the row pointing at the device that actually viewed it most
+            // recently rather than whichever device happened to view it first.
+            existing.ViewerKey = viewerKey;
         }
 
         try
@@ -138,7 +147,7 @@ public class PlanController : TeamScopedController
         }
         catch (DbUpdateException)
         {
-            // Two tabs racing the same beacon; the unique index did its job.
+            // Two tabs racing the same beacon for the same identity; the unique index did its job.
         }
 
         return NoContent();

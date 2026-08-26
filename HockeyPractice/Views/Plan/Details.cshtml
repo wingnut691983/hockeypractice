@@ -74,8 +74,20 @@
     }
 
     <div class="hp-section">The plan</div>
-    <div class="hp-viewer">
-        <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
+    <div class="hp-viewer-wrap">
+        <div class="hp-viewer">
+            <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
+        </div>
+
+        @* Auto-sizing the PDF (below) removes pdf.js's own scroll region so the whole page
+           scrolls as one — but that also means its toolbar, which used to stay pinned at the
+           top of a small fixed box, now scrolls away with everything else in a long plan.
+           This floats independently, reachable no matter how far into the document you've
+           scrolled, and is the ONLY way to zoom now that pinch is deliberately disabled. *@
+        <div class="hp-zoom" id="hp-zoom" hidden>
+            <button type="button" id="hp-zoom-out" aria-label="Zoom out">&#8722;</button>
+            <button type="button" id="hp-zoom-in" aria-label="Zoom in">+</button>
+        </div>
     </div>
 
     <div class="hp-row" style="margin-top:.8rem;">
@@ -383,11 +395,106 @@
         }, true);
     }
 
+    // ── Auto-height the PDF, so it's one continuous scroll instead of a scroll-within-a-
+    // scroll ──────────────────────────────────────────────────────────────────────────
+    // A fixed-height iframe gives pdf.js its own internal scroll region. Once that's scrolled
+    // to its end, the gesture is trapped there rather than continuing onto the rest of the
+    // page — you have to lift your finger and start a fresh touch outside the iframe's box to
+    // keep scrolling. Removing the separate scroll region entirely removes the whole class of
+    // "trapped scroll" problem: measure the document's real rendered height and set the
+    // iframe's own height to match, so the outer page's normal scroll carries through the
+    // whole plan, PDF included, the same way it would through a long article.
+    function autoSizePdfFrame() {
+        try {
+            var doc = pdfFrame.contentWindow && pdfFrame.contentWindow.document;
+            var ResizeObserverCtor = pdfFrame.contentWindow && pdfFrame.contentWindow.ResizeObserver;
+            if (!doc || !ResizeObserverCtor) return;   // older browser: keep the CSS min-height fallback
+
+            var container = doc.getElementById('viewerContainer');
+            if (!container) return;
+            var toolbar = doc.getElementById('toolbarContainer');
+
+            // #viewerContainer is what scrolls (overflow:auto, absolutely positioned to fill
+            // the iframe's own viewport) — its OWN box size does NOT grow as pages render in;
+            // that's the entire point of overflow:auto, content overflows a fixed box instead
+            // of resizing it. #viewer, the plain block-flow div pdf.js stacks page elements
+            // into, is what actually grows with content — THAT'S what has to be observed for
+            // the callback to fire as rendering progresses. scrollHeight (queried on the
+            // scrollable container) is still the right measurement, just not the right thing
+            // to attach the observer to.
+            var content = doc.getElementById('viewer') || container;
+
+            var lastHeight = 0;
+            function apply() {
+                var toolbarHeight = toolbar ? toolbar.offsetHeight : 0;
+                var total = toolbarHeight + container.scrollHeight;
+
+                // Ignore sub-pixel/rounding jitter so this doesn't fire on every ResizeObserver
+                // tick — that's how you get the "ResizeObserver loop" warning and janky layout.
+                if (Math.abs(total - lastHeight) < 2) return;
+                lastHeight = total;
+                pdfFrame.style.height = total + 'px';
+            }
+
+            apply();
+            var ro = new ResizeObserverCtor(apply);
+            ro.observe(content);
+            if (toolbar) ro.observe(toolbar);   // toolbar height can change (narrow-width wrapping)
+        } catch (err) {
+            // pdf.js internals changed, or something cross-origin — the CSS min-height fallback
+            // means the viewer still works, just back to its own internal scroll.
+        }
+    }
+
+    // ── Floating zoom control ────────────────────────────────────────────────────────
+    // pdf.js's own toolbar used to stay reachable for free — pinned at the top of a small
+    // fixed box while its content scrolled underneath. Auto-sizing removes that separate
+    // scroll region (see above), so the toolbar is now just the first thing in a very tall
+    // element and scrolls away like anything else. Since pinch-to-zoom is deliberately
+    // disabled on this viewer, losing easy access to zoom entirely would trade one rough edge
+    // for a worse one. This calls straight into pdf.js's own zoom methods.
+    function wireZoomControl() {
+        var zoomBar = document.getElementById('hp-zoom');
+        var zoomIn = document.getElementById('hp-zoom-in');
+        var zoomOut = document.getElementById('hp-zoom-out');
+        if (!zoomBar || !pdfFrame) return;
+
+        function app() {
+            var w = pdfFrame.contentWindow;
+            return w && w.PDFViewerApplication;
+        }
+
+        zoomIn.addEventListener('click', function () {
+            var a = app();
+            if (a) { try { a.zoomIn(); } catch (e) { /* ignore */ } }
+        });
+        zoomOut.addEventListener('click', function () {
+            var a = app();
+            if (a) { try { a.zoomOut(); } catch (e) { /* ignore */ } }
+        });
+
+        // Only worth showing while the plan is actually on screen — not while reading the
+        // video cards above it, and not once scrolled down to the tracking/download section.
+        if ('IntersectionObserver' in window) {
+            var wrap = document.querySelector('.hp-viewer-wrap');
+            if (wrap) {
+                new IntersectionObserver(function (entries) {
+                    zoomBar.hidden = !entries[0].isIntersecting;
+                }, { threshold: 0.05 }).observe(wrap);
+            }
+        } else {
+            zoomBar.hidden = false;   // no IntersectionObserver: fall back to always-visible
+        }
+    }
+
     if (pdfFrame) {
         // Delegated on the iframe's document, so it survives the viewer re-rendering its
         // annotation layer on scroll or zoom — no polling needed.
         pdfFrame.addEventListener('load', interceptPdfLinks);
+        pdfFrame.addEventListener('load', autoSizePdfFrame);
         interceptPdfLinks();   // in case the frame finished before this script ran
+        autoSizePdfFrame();
+        wireZoomControl();
     }
 
     // Native share sheet, for pasting into the team group chat. Hidden where unsupported.
