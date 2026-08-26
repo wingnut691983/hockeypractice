@@ -24,7 +24,7 @@
         <div class="hp-field">
             <label class="hp-label" for="title">Title</label>
             <input class="hp-input" id="title" name="title" required maxlength="140"
-                   value="@Model.Plan?.Title" placeholder="e.g. Small-area games + breakouts" />
+                   value="@(Model.Plan?.Title ?? Model.RetainedTitle)" placeholder="e.g. Small-area games + breakouts" />
         </div>
 
         <div class="hp-field">
@@ -36,13 +36,13 @@
         <div class="hp-field">
             <label class="hp-label" for="location">Rink (optional)</label>
             <input class="hp-input" id="location" name="location" maxlength="120"
-                   value="@Model.Plan?.Location" />
+                   value="@(Model.Plan?.Location ?? Model.RetainedLocation)" />
         </div>
 
         <div class="hp-field">
             <label class="hp-label" for="coachNotes">A note for the players (optional)</label>
             <textarea class="hp-textarea" id="coachNotes" name="coachNotes"
-                      maxlength="2000">@Model.Plan?.CoachNotes</textarea>
+                      maxlength="2000">@(Model.Plan?.CoachNotes ?? Model.RetainedNotes)</textarea>
         </div>
 
         @if (Model.IsNew)
@@ -146,7 +146,10 @@
             </div>
         }
 
-        <button type="submit" class="hp-btn hp-btn-block">
+        @* data-busy: the layout's submit guard swaps this in while the request runs, so a
+           coach on slow rink wifi sees the upload is actually happening. *@
+        <button type="submit" class="hp-btn hp-btn-block"
+                data-busy="@(Model.IsNew ? "Uploading…" : "Saving…")">
             @(Model.IsNew ? "Upload plan" : "Save changes")
         </button>
     </form>
@@ -189,7 +192,7 @@
                 @plan.OriginalFileName · @PlanStorageService.Human(plan.ByteSize)
             </div>
             <form method="post" asp-action="DeletePlan" asp-route-slug="@slug" asp-route-id="@plan.Id"
-                  onsubmit="return confirm('Delete this plan and its PDF? This cannot be undone.');">
+                  data-confirm="Delete this plan and its PDF? This cannot be undone.">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="hp-btn hp-btn-danger">Delete plan</button>
             </form>

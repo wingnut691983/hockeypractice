@@ -858,3 +858,15 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 
 /* A link that won't be shown is dimmed, so scanning the list tells you the state. */
 .hp-linklist > li:has(.hp-showtoggle input:not(:checked)) .grow { opacity: .55; }
+
+/* The team code, displayed for sharing — big enough to read out loud at the rink. */
+.hp-code-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: .18em;
+  padding: .35rem .6rem;
+  border-radius: 8px;
+  background: var(--hp-surface-2);
+  border: 1px dashed var(--hp-border);
+}

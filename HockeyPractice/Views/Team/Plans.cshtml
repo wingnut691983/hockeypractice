@@ -53,9 +53,9 @@
     @* Not shown to managers: the person posting the plans has no use for a "tell me when a
        plan is posted" box, and it crowds the page they now land on. A manager previewing the
        player view still sees it, since that's the point of previewing. *@
-    @if (!Model.Ctx.IsManager)
+    @if (!Model.Ctx.IsManager && Model.EmailSignupAvailable)
     {
-    <div class="hp-section">Get a heads-up</div>
+    <div class="hp-section" id="heads-up">Get a heads-up</div>
     <div class="hp-panel">
         @if (sub == "check")
         {

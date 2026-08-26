@@ -40,6 +40,17 @@ public class Team
     /// <summary>Shared with players and parents. Rotatable without a redeploy.</summary>
     [Required] public string ViewCodeHash { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The player code in plaintext, so the coach can share the join link all season.
+    ///
+    /// Deliberate: this code is a shared, low-privilege secret handed to every family on the
+    /// team — its entire purpose is to be given out. Storing only its hash made the invite
+    /// link unusable the moment the creation notice scrolled away, which gutted the primary
+    /// onboarding flow. The manager and site-admin codes guard real capability and stay
+    /// hash-only. Null on teams created before this existed, until the code is next rotated.
+    /// </summary>
+    [MaxLength(12)] public string? ViewCode { get; set; }
+
     /// <summary>Coach tier: upload, publish, roster, branding, view tracking.</summary>
     [Required] public string CoachCodeHash { get; set; } = string.Empty;
 

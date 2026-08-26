@@ -104,8 +104,11 @@ public class CoachController : TeamScopedController
         {
             return View("EditPlan", new PlanEditViewModel
             {
-                Ctx = ctx!, DefaultDate = practiceDate, Error = error,
-                MaxUploadBytes = _storage.QuotaBytes
+                Ctx = ctx!, Error = error,
+                // A default(DateTime) from failed binding renders as year 1 — fall back.
+                DefaultDate = practiceDate == default ? NextPracticeSlot(ctx!.Team.TimeZoneId) : practiceDate,
+                MaxUploadBytes = _storage.QuotaBytes,
+                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes
             });
         }
 
@@ -132,7 +135,8 @@ public class CoachController : TeamScopedController
             return View("EditPlan", new PlanEditViewModel
             {
                 Ctx = ctx, DefaultDate = practiceDate, Error = saved.Error,
-                MaxUploadBytes = _storage.QuotaBytes
+                MaxUploadBytes = _storage.QuotaBytes,
+                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes
             });
         }
 
@@ -428,7 +432,8 @@ public class CoachController : TeamScopedController
         if (failure is not null) return failure;
 
         var fresh = Security.NewAccessCode();
-        ctx!.Team.ViewCodeHash = Security.HashCode(fresh);
+        ctx!.Team.ViewCode = fresh;
+        ctx.Team.ViewCodeHash = Security.HashCode(fresh);
         await Db.SaveChangesAsync();
 
         return RedirectToAction(nameof(Index), new { slug, notice = $"New team code: {fresh}" });

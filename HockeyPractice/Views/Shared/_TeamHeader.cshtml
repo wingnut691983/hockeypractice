@@ -104,7 +104,7 @@
    one-time screen you can't confirm afterwards — you're left wondering whether it took. *@
 @if (!Model.IsManager)
 {
-    <div class="hp-identity @(Model.Me is null ? "hp-identity-unset" : "")">
+    <div class="hp-identity @(Model.Me is null && !Model.IsParent ? "hp-identity-unset" : "")">
         @if (Model.Me is not null)
         {
             <span class="hp-jersey hp-jersey-sm">
@@ -114,6 +114,15 @@
             <a asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug"
                asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)">
                 Not you?
+            </a>
+        }
+        else if (Model.IsParent)
+        {
+            @* They answered the question — no nagging, just a quiet way to change it. *@
+            <span class="hp-identity-text">Watching as a parent</span>
+            <a asp-controller="Team" asp-action="WhoAmI" asp-route-slug="@slug"
+               asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)">
+                Change
             </a>
         }
         else

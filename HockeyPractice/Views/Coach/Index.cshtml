@@ -64,7 +64,7 @@
                         <span class="grow">@player.Name</span>
                         <form method="post" asp-action="DeletePlayer" asp-route-slug="@slug"
                               asp-route-playerId="@player.Id"
-                              onsubmit="return confirm('Remove @player.Name from the roster? This also deletes their view history.');">
+                              data-confirm="Remove @player.Name from the roster? This also deletes their view history.">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
                         </form>
@@ -83,16 +83,39 @@
         </form>
     </div>
 
-    <div class="hp-section">Team code</div>
+    <div class="hp-section">Invite the team</div>
     <div class="hp-panel">
-        <p class="hp-muted" style="margin-top:0;">
-            Everyone on the team shares one code. If a player leaves, rotate it — they keep access until you do.
-        </p>
-        <form method="post" asp-action="RotateCode" asp-route-slug="@slug"
-              onsubmit="return confirm('Rotate the team code? Everyone will have to enter the new one.');">
+        @if (Model.Ctx.Team.ViewCode is { } viewCode)
+        {
+            var joinUrl = Url.Action("Index", "Team", new { slug, c = viewCode }, Context.Request.Scheme);
+            <p class="hp-muted" style="margin-top:0;">
+                Send this link to players and parents — one tap and they're in. Or they can type
+                the code on the team page.
+            </p>
+            <div class="hp-row" style="align-items:center;gap:.8rem;">
+                <span class="hp-code-display">@viewCode</span>
+                <button type="button" class="hp-btn" id="hp-share-invite"
+                        data-url="@joinUrl"
+                        data-text="Practice plans for @Model.Ctx.Team.Name — tap to join:">
+                    Share invite link
+                </button>
+            </div>
+        }
+        else
+        {
+            <p class="hp-muted" style="margin-top:0;">
+                This team's code was created before shareable links existed, so it can't be shown
+                here. Rotate it once and the new code will stay visible for sharing.
+            </p>
+        }
+        <form method="post" asp-action="RotateCode" asp-route-slug="@slug" style="margin-top:.8rem;"
+              data-confirm="Rotate the team code? Everyone will have to enter the new one.">
             @Html.AntiForgeryToken()
-            <button type="submit" class="hp-btn hp-btn-quiet">Rotate team code</button>
+            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">Rotate team code</button>
         </form>
+        <p class="hp-muted" style="font-size:.8rem;margin-bottom:0;">
+            If a player leaves the team, rotate — they keep access until you do.
+        </p>
     </div>
 
     <div class="hp-section">Branding</div>
@@ -144,3 +167,27 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+(function () {
+    var btn = document.getElementById('hp-share-invite');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var url = btn.dataset.url;
+        var done = function () {
+            var t = btn.textContent;
+            btn.textContent = 'Copied ✓';
+            setTimeout(function () { btn.textContent = t; }, 1800);
+        };
+        if (navigator.share) {
+            navigator.share({ text: btn.dataset.text, url: url }).catch(function () { /* dismissed */ });
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(done).catch(function () { window.prompt('Copy this link:', url); });
+        } else {
+            window.prompt('Copy this link:', url);
+        }
+    });
+})();
+</script>
+}

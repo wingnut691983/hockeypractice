@@ -62,6 +62,7 @@ public abstract class TeamScopedController : Controller
             Me = me,
             LogoUrl = LogoUrlFor(team),
             ViaSiteAdmin = Access.IsViaSiteAdmin(User, team.Id),
+            IsParent = Access.IsParent(User, team.Id),
             OtherTeams = await OtherTeamsAsync(team.Id)
         }, null);
     }

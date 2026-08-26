@@ -35,8 +35,9 @@
     <form method="post" style="margin-top:1.25rem;">
         @Html.AntiForgeryToken()
         <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <input type="hidden" name="parent" value="true" />
         <button type="submit" class="hp-btn hp-btn-quiet hp-btn-block">
-            @(Model.Ctx.Me is null ? "Skip — I'm a parent" : "Clear my name")
+            @(Model.Ctx.Me is null ? "I'm a parent — just show me the plans" : "Clear my name")
         </button>
     </form>
 </div>

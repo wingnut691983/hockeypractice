@@ -28,6 +28,9 @@ public class TeamContext
     /// <summary>Access here was taken through the admin panel, not the team's own code.</summary>
     public bool ViaSiteAdmin { get; init; }
 
+    /// <summary>Viewer answered the who-are-you question with "I'm a parent".</summary>
+    public bool IsParent { get; init; }
+
     /// <summary>Other teams this device can reach — drives the switcher once there's more than one.</summary>
     public List<TeamLink> OtherTeams { get; init; } = new();
 }
@@ -62,6 +65,13 @@ public class PlanListViewModel
 
     /// <summary>The soonest practice that has not finished yet, if any.</summary>
     public PlanCard? Next { get; init; }
+
+    /// <summary>
+    /// Whether a real mail provider is configured. When it isn't, the signup box is not shown
+    /// at all — offering it and then never sending the confirmation email is a trap, not a
+    /// feature, and that was exactly the live state before this flag was consulted.
+    /// </summary>
+    public bool EmailSignupAvailable { get; init; }
     public List<PlanCard> Upcoming { get; init; } = new();
     public List<PlanCard> Past { get; init; } = new();
     public bool HasAny => Next != null || Upcoming.Count > 0 || Past.Count > 0;

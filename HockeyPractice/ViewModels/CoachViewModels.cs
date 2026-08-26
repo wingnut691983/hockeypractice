@@ -29,4 +29,13 @@ public class PlanEditViewModel
     /// <summary>Pre-filled with the next plausible practice slot so the coach rarely edits it.</summary>
     public DateTime DefaultDate { get; init; }
     public long MaxUploadBytes { get; init; }
+
+    /// <summary>
+    /// What the coach had typed when a new-plan upload failed validation. Files can't be
+    /// re-populated, but losing a typed title and note over picking the wrong file would
+    /// mean retyping it all on a phone keyboard.
+    /// </summary>
+    public string? RetainedTitle { get; init; }
+    public string? RetainedLocation { get; init; }
+    public string? RetainedNotes { get; init; }
 }

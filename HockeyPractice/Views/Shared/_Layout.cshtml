@@ -32,6 +32,36 @@
     </footer>
 <script>
 (function () {
+    // Confirmations come from a data attribute, not inline onsubmit. Inline confirm() with an interpolated name
+    // breaks on an apostrophe — "O'Brien" produced a JS parse error, and a handler that fails
+    // to parse doesn't stop the form, so the delete ran with NO confirmation at all.
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        var msg = form.getAttribute && form.getAttribute('data-confirm');
+        if (msg && !window.confirm(msg)) {
+            e.preventDefault();
+            return;
+        }
+
+        // One tap, one submit. A slow upload on rink wifi invites a second tap, and a second
+        // tap meant a duplicate plan. Disable after the browser captures the form data (next
+        // tick), so named submit buttons — the roster picker relies on them — still post.
+        var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+        setTimeout(function () {
+            buttons.forEach(function (b) {
+                b.disabled = true;
+                var busy = b.getAttribute('data-busy');
+                if (busy) b.textContent = busy;
+            });
+        }, 0);
+    });
+
+    // Back/forward cache restores the page with buttons still disabled — re-enable.
+    window.addEventListener('pageshow', function () {
+        document.querySelectorAll('button[type="submit"][disabled], input[type="submit"][disabled]')
+            .forEach(function (b) { b.disabled = false; });
+    });
+
     // A <details> menu stays open until it's told otherwise; close it on an outside tap or
     // Escape so it behaves like a menu rather than a stuck panel.
     document.addEventListener('click', function (e) {

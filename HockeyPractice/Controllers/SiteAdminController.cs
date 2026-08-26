@@ -98,6 +98,7 @@ public class SiteAdminController : Controller
         {
             Name = name.Trim(),
             Slug = candidate,
+            ViewCode = viewCode,
             ViewCodeHash = Security.HashCode(viewCode),
             CoachCodeHash = Security.HashCode(coachCode),
             TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? "America/Chicago" : timeZoneId.Trim()
@@ -164,6 +165,7 @@ public class SiteAdminController : Controller
         else
         {
             var code = Security.NewAccessCode();
+            team.ViewCode = code;
             team.ViewCodeHash = Security.HashCode(code);
             notice = $"{team.Name} — new team code {code}. " +
                      "Every player and parent will need to enter this again.";

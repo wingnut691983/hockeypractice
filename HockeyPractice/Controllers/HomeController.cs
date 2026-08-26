@@ -34,7 +34,11 @@ public class HomeController : Controller
     }
 
     [Route("Home/Error")]
-    public IActionResult Error() => View();
+    public IActionResult Error(int? status)
+    {
+        ViewBag.Status = status;
+        return View();
+    }
 
     /// <summary>
     /// Web app manifest, so "Add to Home Screen" gives a real icon rather than a browser

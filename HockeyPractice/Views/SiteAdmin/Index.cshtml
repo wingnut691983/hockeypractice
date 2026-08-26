@@ -51,19 +51,29 @@
 
                         <details style="flex-basis:100%;margin-top:.4rem;">
                             <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">Access codes</summary>
-                            <p class="hp-muted" style="font-size:.82rem;margin:.5rem 0;">
-                                Codes are stored hashed and can't be read back — issuing a new one
-                                is the only way to recover access. The new code is shown once, here.
-                            </p>
+                            @if (summary.Team.ViewCode is { } vc)
+                            {
+                                <p class="hp-muted" style="font-size:.82rem;margin:.5rem 0;">
+                                    Team code (players and parents): <span class="hp-mono"><strong>@vc</strong></span>.
+                                    The manager code can't be read back — issue a new one to recover it.
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="hp-muted" style="font-size:.82rem;margin:.5rem 0;">
+                                    Codes for this team can't be read back — issue a new one to
+                                    recover access. New codes stay visible here.
+                                </p>
+                            }
                             <div class="hp-row">
                                 <form method="post" asp-action="RegenerateCodes" asp-route-teamId="@summary.Team.Id"
-                                      onsubmit="return confirm('Issue a new TEAM code? Every player and parent will have to enter it again.');">
+                                      data-confirm="Issue a new TEAM code? Every player and parent will have to enter it again.">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="which" value="player" />
                                     <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">New team code</button>
                                 </form>
                                 <form method="post" asp-action="RegenerateCodes" asp-route-teamId="@summary.Team.Id"
-                                      onsubmit="return confirm('Issue a new MANAGER code? Anyone using the old one loses manage access.');">
+                                      data-confirm="Issue a new MANAGER code? Anyone using the old one loses manage access.">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="which" value="manager" />
                                     <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">New manager code</button>

@@ -124,6 +124,10 @@ if (app.Environment.IsDevelopment())
 else
     app.UseExceptionHandler("/Home/Error");
 
+// A deleted plan's old link, a mistyped team name — without this those render as a blank
+// white 404, which reads as "the site is broken" to a teenager or parent.
+app.UseStatusCodePagesWithReExecute("/Home/Error", "?status={0}");
+
 // The vendored pdf.js viewer ships font and locale assets whose extensions ASP.NET's default
 // provider doesn't know, and unknown types are not served at all. Without these mappings the
 // viewer 404s on its standard fonts (.pfb) — which is how a PDF that relies on the base-14

@@ -92,6 +92,17 @@ public class TeamAccessService
         int.TryParse(user.FindFirst(PlayerClaimPrefix + teamId)?.Value, out var id) ? id : null;
 
     /// <summary>
+    /// True once the viewer has answered the who-are-you question at all — including "I'm a
+    /// parent" (stored as the sentinel "p"). Distinguishes "never asked" from "chose to skip",
+    /// so a parent isn't nagged to pick a player name on every page forever.
+    /// </summary>
+    public bool HasDeclaredIdentity(ClaimsPrincipal user, int teamId) =>
+        user.FindFirst(PlayerClaimPrefix + teamId) is not null;
+
+    public bool IsParent(ClaimsPrincipal user, int teamId) =>
+        user.FindFirst(PlayerClaimPrefix + teamId)?.Value == "p";
+
+    /// <summary>
     /// Opaque per-device key used to deduplicate views when no roster player has been picked.
     /// Minted on first grant; never derived from IP or anything personal.
     /// </summary>
@@ -128,12 +139,14 @@ public class TeamAccessService
     public Task RevokeSiteAdminAsync(HttpContext http) =>
         ReissueAsync(http, claims => claims.RemoveAll(c => c.Type == SiteAdminClaim));
 
-    public Task SetPlayerAsync(HttpContext http, int teamId, int? playerId) =>
+    public Task SetPlayerAsync(HttpContext http, int teamId, int? playerId, bool parent = false) =>
         ReissueAsync(http, claims =>
         {
             claims.RemoveAll(c => c.Type == PlayerClaimPrefix + teamId);
             if (playerId is int id)
                 claims.Add(new Claim(PlayerClaimPrefix + teamId, id.ToString()));
+            else if (parent)
+                claims.Add(new Claim(PlayerClaimPrefix + teamId, "p"));
         });
 
     /// <summary>

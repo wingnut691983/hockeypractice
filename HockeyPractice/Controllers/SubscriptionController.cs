@@ -30,13 +30,13 @@ public class SubscriptionController : TeamScopedController
 
         var address = (email ?? string.Empty).Trim();
         if (!new EmailAddressAttribute().IsValid(address) || address.Length > 200)
-            return RedirectToAction("Plans", "Team", new { slug, sub = "invalid" });
+            return Redirect(Url.Action("Plans", "Team", new { slug, sub = "invalid" }) + "#heads-up");
 
         var existing = await Db.Subscribers
             .FirstOrDefaultAsync(s => s.TeamId == ctx!.Team.Id && s.Email == address);
 
         if (existing is { ConfirmedUtc: not null })
-            return RedirectToAction("Plans", "Team", new { slug, sub = "already" });
+            return Redirect(Url.Action("Plans", "Team", new { slug, sub = "already" }) + "#heads-up");
 
         var subscriber = existing ?? new Subscriber
         {
@@ -56,7 +56,7 @@ public class SubscriptionController : TeamScopedController
             new { token = subscriber.ConfirmToken }, Request.Scheme)!;
         await _notifications.SendConfirmationAsync(ctx.Team, subscriber, confirmUrl);
 
-        return RedirectToAction("Plans", "Team", new { slug, sub = "check" });
+        return Redirect(Url.Action("Plans", "Team", new { slug, sub = "check" }) + "#heads-up");
     }
 
     [HttpGet("s/confirm/{token}")]

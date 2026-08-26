@@ -14,9 +14,15 @@ namespace HockeyPractice.Controllers;
 public class TeamController : TeamScopedController
 {
     private readonly DataPaths _paths;
+    private readonly NotificationService _notifications;
 
-    public TeamController(AppDbContext db, TeamAccessService access, DataPaths paths)
-        : base(db, access) => _paths = paths;
+    public TeamController(AppDbContext db, TeamAccessService access, DataPaths paths,
+        NotificationService notifications)
+        : base(db, access)
+    {
+        _paths = paths;
+        _notifications = notifications;
+    }
 
     /// <summary>
     /// Entry point. A join link carries the code as ?c= so a player taps once and never types.
@@ -24,6 +30,7 @@ public class TeamController : TeamScopedController
     /// sit in browser history or survive a screenshot of the address bar.
     /// </summary>
     [HttpGet("")]
+    [EnableRateLimiting("code-entry")]   // ?c= checks a code, so it gets the same guard as the form
     public async Task<IActionResult> Index(string slug, string? c)
     {
         var team = await Db.Teams.FirstOrDefaultAsync(t => t.Slug == slug);
@@ -32,6 +39,18 @@ public class TeamController : TeamScopedController
         if (!string.IsNullOrWhiteSpace(c))
         {
             var granted = await TryGrantAsync(team, c);
+
+            // Same flow as the code form: a new player picks their name before anything else.
+            // The join link is the MAIN way players arrive (the coach shares it in the group
+            // chat), so skipping the question here undercounted almost everyone.
+            if (granted == TeamAccessLevel.Player &&
+                Access.PlayerFor(User, team.Id) is null &&
+                !Access.HasDeclaredIdentity(User, team.Id) &&
+                await Db.Players.AnyAsync(p => p.TeamId == team.Id && p.IsActive))
+            {
+                return RedirectToAction(nameof(WhoAmI), new { slug });
+            }
+
             if (granted != TeamAccessLevel.None)
                 return RedirectToAction(nameof(Plans), new { slug });
         }
@@ -113,7 +132,7 @@ public class TeamController : TeamScopedController
         // checked BEFORE returnUrl: arriving via a deep link (the landing page's "See practice
         // plans" button sets one) otherwise skipped the question entirely, and the player was
         // never counted as having read anything. Where they were headed is carried through.
-        if (Access.PlayerFor(User, team.Id) is null &&
+        if (!Access.HasDeclaredIdentity(User, team.Id) &&
             await Db.Players.AnyAsync(p => p.TeamId == team.Id && p.IsActive))
         {
             return RedirectToAction(nameof(WhoAmI), new { slug, returnUrl });
@@ -142,7 +161,8 @@ public class TeamController : TeamScopedController
 
     [HttpPost("whoami")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> WhoAmI(string slug, int? playerId, string? returnUrl)
+    public async Task<IActionResult> WhoAmI(string slug, int? playerId, string? returnUrl,
+        bool parent = false)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
@@ -154,7 +174,7 @@ public class TeamController : TeamScopedController
             playerId = null;
         }
 
-        await Access.SetPlayerAsync(HttpContext, ctx!.Team.Id, playerId);
+        await Access.SetPlayerAsync(HttpContext, ctx!.Team.Id, playerId, parent);
 
         return TryReturnUrlRedirect(returnUrl, out var back)
             ? back
@@ -208,7 +228,8 @@ public class TeamController : TeamScopedController
             Ctx = ctx,
             Next = upcoming.FirstOrDefault(),
             Upcoming = upcoming.Skip(1).ToList(),
-            Past = past
+            Past = past,
+            EmailSignupAvailable = _notifications.IsLive
         });
     }
 

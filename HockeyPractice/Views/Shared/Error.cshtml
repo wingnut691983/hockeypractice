@@ -1,5 +1,27 @@
-@{ ViewBag.Title = "Something went wrong"; }
-<div class="hp-shell">
-    <h1 class="hp-title">Something went wrong</h1>
-    <p class="hp-empty">Try again. If it keeps happening, let your coach know.</p>
+@{
+    var status = ViewBag.Status as int?;
+    var notFound = status == 404;
+    var tooMany = status == 429;
+    ViewBag.Title = notFound ? "Page not found" : tooMany ? "Slow down a second" : "Something went wrong";
+}
+<div class="hp-rail"></div>
+<div class="hp-shell" style="text-align:center;">
+    <h1 class="hp-title" style="margin-top:3rem;">
+        @(notFound ? "That page isn't here" : tooMany ? "Too many tries" : "Something went wrong")
+    </h1>
+    <p class="hp-muted">
+        @if (notFound)
+        {
+            <text>The link may be old, or the plan it pointed to was removed.</text>
+        }
+        else if (tooMany)
+        {
+            <text>Give it a minute, then try the code again.</text>
+        }
+        else
+        {
+            <text>Try again in a moment. If it keeps happening, let your coach know.</text>
+        }
+    </p>
+    <a class="hp-btn" style="margin-top:.5rem;" asp-controller="Home" asp-action="Index">Go to the teams</a>
 </div>
