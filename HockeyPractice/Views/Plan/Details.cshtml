@@ -210,6 +210,29 @@
     var nextBtn = document.getElementById('hp-player-next');
     var current = -1;
     var opened = false;
+    var savedScrollY = 0;
+
+    // Body scroll-lock via overflow:hidden loses the scroll position on close on iOS Safari —
+    // it does not reliably restore where you were, which is exactly the "back to the top"
+    // report this replaces. Locking with position:fixed and an explicit -Y offset, then
+    // reversing that and re-asserting scrollTo on close, is the technique that actually holds
+    // the position across every mobile browser, not just desktop ones where overflow:hidden
+    // happens to look fine.
+    function lockScroll() {
+        savedScrollY = window.scrollY || window.pageYOffset || 0;
+        document.body.style.position = 'fixed';
+        document.body.style.top = (-savedScrollY) + 'px';
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+    }
+
+    function unlockScroll() {
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        window.scrollTo(0, savedScrollY);
+    }
 
     function show(index) {
         if (index < 0 || index >= cards.length) return;
@@ -241,28 +264,39 @@
         nextBtn.style.visibility = showNav ? '' : 'hidden';
 
         modal.hidden = false;
-        document.body.style.overflow = 'hidden';
-
         if (!opened) {
+            lockScroll();
             opened = true;
             // A history entry so the phone's Back gesture closes the video rather than
             // leaving the practice plan altogether.
             try { history.pushState({ hpPlayer: true }, ''); } catch (e) { /* ignore */ }
         }
-        document.getElementById('hp-player-close').focus();
+        // preventScroll: focusing the close button must not itself yank the page — it lives
+        // inside a fixed-position overlay, so it's always on screen regardless of body scroll.
+        document.getElementById('hp-player-close').focus({ preventScroll: true });
     }
 
     function close(fromPop) {
         if (modal.hidden) return;
         modal.hidden = true;
         frame.src = 'about:blank';   // stops playback and its audio
-        document.body.style.overflow = '';
+        unlockScroll();
+
         if (opened && !fromPop) {
             opened = false;
             try { history.back(); } catch (e) { /* ignore */ }
+            // history.back()'s popstate lands on a later tick and can bring its own idea of
+            // scroll position with it (this is the other half of the original bug — the
+            // browser's own restoration disagreeing with where the video actually opened from,
+            // particularly on iOS). Re-assert ours once that settles so it's the final word.
+            requestAnimationFrame(function () { window.scrollTo(0, savedScrollY); });
+        } else {
+            opened = false;
         }
-        opened = false;
-        if (current >= 0 && cards[current]) cards[current].focus();
+
+        // preventScroll for the same reason as on open — returning focus to the card that was
+        // tapped must not re-scroll to it; the whole point is staying exactly where you were.
+        if (current >= 0 && cards[current]) cards[current].focus({ preventScroll: true });
     }
 
     cards.forEach(function (card, index) {

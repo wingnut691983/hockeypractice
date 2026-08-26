@@ -8,10 +8,22 @@
     // Which tab is current, so the bar reflects where you actually are.
     var section = (ViewBag.NavSection as string) ?? "plans";
     var showTabs = Model.RealLevel >= TeamAccessLevel.Manager;
+
+    // The logo/name has always linked back to the plans list, but nothing showed that —
+    // no icon, no hover state a phone can even trigger. A back chevron makes it read as
+    // navigation rather than just a static header, and only appears where it means
+    // something: you don't need a "back to plans" hint while already looking at the plans.
+    var onPlansPage =
+        string.Equals(ViewContext.RouteData.Values["controller"] as string, "Team", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(ViewContext.RouteData.Values["action"] as string, "Plans", StringComparison.OrdinalIgnoreCase);
 }
 <header class="hp-topbar">
     <div class="hp-topbar-inner">
         <a class="hp-topbar-id" asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">
+            @if (!onPlansPage)
+            {
+                <span class="hp-topbar-back" aria-hidden="true">&#8249;</span>
+            }
             @if (Model.LogoUrl is not null)
             {
                 <img class="hp-topbar-logo" src="@Model.LogoUrl" alt="" />

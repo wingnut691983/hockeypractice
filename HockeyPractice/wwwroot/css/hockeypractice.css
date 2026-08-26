@@ -547,6 +547,22 @@ a.hp-card:active { transform: scale(.99); }
   color: inherit;
   min-width: 0;
   min-height: var(--hp-tap);
+  border-radius: 10px;
+  margin: -.3rem -.4rem;
+  padding: .3rem .4rem;
+}
+/* Visible the instant you press it — a phone has no hover to discover a link is tappable. */
+.hp-topbar-id:active { background: var(--hp-surface-2); }
+
+/* Only rendered on pages other than the plans list — reads as "back to plans" precisely
+   where that's the action tapping the logo/name performs. */
+.hp-topbar-back {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--hp-primary-text);
+  flex-shrink: 0;
+  margin-right: -.15rem;
 }
 .hp-topbar-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 
