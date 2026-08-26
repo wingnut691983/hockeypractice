@@ -870,3 +870,13 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   background: var(--hp-surface-2);
   border: 1px dashed var(--hp-border);
 }
+
+/* Team logo on the landing page card, sized to match the initials badge it replaces so the
+   card layout doesn't shift between teams that have one and teams that don't. object-fit
+   keeps a non-square logo (a wide wordmark, a tall crest) from stretching. */
+.hp-teamcard-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}

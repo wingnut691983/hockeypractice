@@ -18,6 +18,9 @@
         @foreach (var team in Model.Teams)
         {
             var level = Model.LevelFor(team.Id);
+            var logoUrl = team.LogoFileName is null
+                ? null
+                : Url.Action("Logo", "Team", new { slug = team.Slug });
             var initials = string.Join("", team.Name
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Take(2).Select(w => char.ToUpperInvariant(w[0])));
@@ -28,7 +31,14 @@
             <div class="hp-teamcard" style="@HockeyPractice.Infrastructure.Palette.CssVariables(team.SafePrimary, team.SafeAccent)">
                 <div class="hp-teamcard-rail"></div>
                 <div class="hp-teamcard-head">
-                    <div class="hp-topbar-fallback" aria-hidden="true">@initials</div>
+                    @if (logoUrl is not null)
+                    {
+                        <img class="hp-teamcard-logo" src="@logoUrl" alt="" />
+                    }
+                    else
+                    {
+                        <div class="hp-topbar-fallback" aria-hidden="true">@initials</div>
+                    }
                     <div style="min-width:0;">
                         <div class="hp-teamcard-name">@team.Name</div>
                         @if (level == TeamAccessLevel.Manager)
