@@ -164,7 +164,7 @@ public class CoachController : TeamScopedController
     }
 
     [HttpGet("plans/{id:int}")]
-    public async Task<IActionResult> EditPlan(string slug, int id)
+    public async Task<IActionResult> EditPlan(string slug, int id, string? notice)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -180,7 +180,8 @@ public class CoachController : TeamScopedController
             Plan = plan,
             Links = plan.Links.OrderBy(l => l.SortOrder).ToList(),
             DefaultDate = plan.PracticeDateLocal,
-            MaxUploadBytes = _storage.QuotaBytes
+            MaxUploadBytes = _storage.QuotaBytes,
+            Notice = notice
         });
     }
 
@@ -280,6 +281,89 @@ public class CoachController : TeamScopedController
         _log.LogInformation("Re-extracted {Count} links for plan {PlanId}", fresh.Count, plan.Id);
 
         return RedirectToAction(nameof(EditPlan), new { slug, id });
+    }
+
+    /// <summary>
+    /// Swaps the PDF on an existing plan without disturbing anything else — the shareable URL,
+    /// the view history, and publish state all stay put.
+    ///
+    /// Deleting and re-uploading was the only way to fix a typo, and that generated a new plan
+    /// id, so any link already pasted into the team chat 404'd, the coach's "12 of 17 viewed"
+    /// reset to zero even though most of the team had already read it, and any relabelled or
+    /// hidden video links were lost. This keeps the id and reuses the same preserve-edits pass
+    /// ReExtract uses, so a coach's own wording survives a replacement too.
+    /// </summary>
+    [HttpPost("plans/{id:int}/replace")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public async Task<IActionResult> ReplaceFile(string slug, int id, IFormFile? file)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.Include(p => p.Links)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+
+        var error = _storage.ValidateUpload(file);
+        if (error is not null)
+        {
+            ViewBag.NavSection = "manage";
+            return View("EditPlan", new PlanEditViewModel
+            {
+                Ctx = ctx!, Plan = plan, Links = plan.Links.OrderBy(l => l.SortOrder).ToList(),
+                DefaultDate = plan.PracticeDateLocal, MaxUploadBytes = _storage.QuotaBytes,
+                Error = error
+            });
+        }
+
+        // Remember the coach's own wording and visibility choices, keyed by URL — the same
+        // preservation ReExtract uses, so replacing the file doesn't undo a correction someone
+        // already made.
+        var edited = plan.Links
+            .Where(l => l.WasEditedByCoach)
+            .ToDictionary(l => l.Url, l => (l.Label, l.IsHidden), StringComparer.OrdinalIgnoreCase);
+
+        var saved = await _storage.SaveAsync(ctx!.Team.Id, plan.Id, file!);
+        if (!saved.Ok)
+        {
+            ViewBag.NavSection = "manage";
+            return View("EditPlan", new PlanEditViewModel
+            {
+                Ctx = ctx, Plan = plan, Links = plan.Links.OrderBy(l => l.SortOrder).ToList(),
+                DefaultDate = plan.PracticeDateLocal, MaxUploadBytes = _storage.QuotaBytes,
+                Error = saved.Error
+            });
+        }
+
+        plan.OriginalFileName = SafeFileName(file!.FileName);
+        plan.ByteSize = saved.Bytes;
+
+        var fresh = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
+        await _videoTitles.PopulateTitlesAsync(fresh);
+        LinkExtractionService.ApplyVideoTitles(fresh);
+
+        foreach (var link in fresh)
+        {
+            if (!edited.TryGetValue(link.Url, out var keep)) continue;
+            link.Label = keep.Label;
+            link.IsHidden = keep.IsHidden;
+            link.WasEditedByCoach = true;
+        }
+
+        Db.PlanLinks.RemoveRange(plan.Links);
+        foreach (var link in fresh)
+        {
+            link.PracticePlanId = plan.Id;
+            Db.PlanLinks.Add(link);
+        }
+
+        await Db.SaveChangesAsync();
+        _log.LogInformation("Replaced PDF for plan {PlanId} on team {TeamId} ({Bytes} bytes)",
+            plan.Id, ctx.Team.Id, saved.Bytes);
+
+        return RedirectToAction(nameof(EditPlan),
+            new { slug, id, notice = "Replaced the PDF. Links were re-read from the new file." });
     }
 
     [HttpPost("plans/{id:int}/publish")]

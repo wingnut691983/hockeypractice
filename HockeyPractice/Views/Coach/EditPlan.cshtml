@@ -11,6 +11,10 @@
 <div class="hp-shell">
     <h1 class="hp-title">@(Model.IsNew ? "New practice plan" : "Edit plan")</h1>
 
+    @if (Model.Notice is not null)
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
     @if (Model.Error is not null)
     {
         <div class="hp-error">@Model.Error</div>
@@ -157,6 +161,24 @@
     @if (!Model.IsNew && Model.Plan is not null)
     {
         var plan = Model.Plan;
+
+        <div class="hp-section">Replace the PDF</div>
+        <div class="hp-panel">
+            <p class="hp-muted" style="margin-top:0;">
+                Swap in a corrected file. The link players already have keeps working, and
+                who's already read it isn't reset. Links are re-read from the new PDF —
+                anything you've renamed or hidden here is kept where the same link is still
+                in the new file.
+            </p>
+            <form method="post" enctype="multipart/form-data" class="hp-row"
+                  asp-action="ReplaceFile" asp-route-slug="@slug" asp-route-id="@plan.Id">
+                @Html.AntiForgeryToken()
+                <input class="hp-input" type="file" name="file" accept="application/pdf,.pdf"
+                       required style="flex:1;min-width:12rem;" />
+                <button type="submit" class="hp-btn hp-btn-quiet" data-busy="Replacing…">Replace</button>
+            </form>
+        </div>
+
         <div class="hp-section">Publishing</div>
         <div class="hp-panel">
             @if (plan.Status == PlanStatus.Draft)

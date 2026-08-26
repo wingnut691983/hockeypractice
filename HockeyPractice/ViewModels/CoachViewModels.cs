@@ -38,4 +38,6 @@ public class PlanEditViewModel
     public string? RetainedTitle { get; init; }
     public string? RetainedLocation { get; init; }
     public string? RetainedNotes { get; init; }
+
+    public string? Notice { get; init; }
 }
