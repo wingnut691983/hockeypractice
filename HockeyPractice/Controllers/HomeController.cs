@@ -19,7 +19,7 @@ public class HomeController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var teams = await _db.Teams.OrderBy(t => t.Name).ToListAsync();
+        var teams = await _db.Teams.OrderBy(t => t.SortOrder).ThenBy(t => t.Name).ToListAsync();
 
         // Always show the list, even for a single team. Auto-forwarding saved players one tap
         // but removed the only page where the two ways in — read the plans, or manage the team
@@ -51,8 +51,8 @@ public class HomeController : Controller
         var start = Url.Action("Index", "Home") ?? "/";
         return Json(new
         {
-            name = "Practice Plans",
-            short_name = "Practice",
+            name = "EBHockey Plans",
+            short_name = "EBHockey",
             start_url = start,
             scope = start,
             display = "standalone",

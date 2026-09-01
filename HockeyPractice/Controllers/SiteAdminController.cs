@@ -94,6 +94,12 @@ public class SiteAdminController : Controller
         var viewCode = Security.NewAccessCode();
         var coachCode = Security.NewAccessCode(8);
 
+        // New teams land at the end of the list rather than defaulting to 0, which would jump
+        // them ahead of every existing team.
+        var nextSortOrder = await _db.Teams.AnyAsync()
+            ? await _db.Teams.MaxAsync(t => t.SortOrder) + 1
+            : 0;
+
         _db.Teams.Add(new Team
         {
             Name = name.Trim(),
@@ -101,7 +107,8 @@ public class SiteAdminController : Controller
             ViewCode = viewCode,
             ViewCodeHash = Security.HashCode(viewCode),
             CoachCodeHash = Security.HashCode(coachCode),
-            TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? "America/Chicago" : timeZoneId.Trim()
+            TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? "America/Chicago" : timeZoneId.Trim(),
+            SortOrder = nextSortOrder
         });
         await _db.SaveChangesAsync();
 
@@ -136,6 +143,32 @@ public class SiteAdminController : Controller
             team.Id, team.Name);
 
         return RedirectToAction("Index", "Coach", new { slug = team.Slug });
+    }
+
+    /// <summary>
+    /// Swaps a team's SortOrder with its neighbour in the current listing, moving it one place
+    /// up or down. Swapping (rather than renumbering the whole list) keeps this a single-row
+    /// write and is immune to ties or gaps in the existing values.
+    /// </summary>
+    [HttpPost("teams/{teamId:int}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveTeam(int teamId, string direction)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        var ordered = await _db.Teams.OrderBy(t => t.SortOrder).ThenBy(t => t.Name).ToListAsync();
+        var index = ordered.FindIndex(t => t.Id == teamId);
+        if (index < 0) return NotFound();
+
+        var neighborIndex = direction == "up" ? index - 1 : index + 1;
+        if (neighborIndex < 0 || neighborIndex >= ordered.Count)
+            return RedirectToAction(nameof(Index));
+
+        (ordered[index].SortOrder, ordered[neighborIndex].SortOrder) =
+            (ordered[neighborIndex].SortOrder, ordered[index].SortOrder);
+
+        await _db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>
@@ -206,7 +239,7 @@ public class SiteAdminController : Controller
     private async Task<AdminViewModel> BuildAsync(string? notice, string? error = null)
     {
         var teams = await _db.Teams
-            .OrderBy(t => t.Name)
+            .OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
             .Select(t => new TeamSummary
             {
                 Team = t,

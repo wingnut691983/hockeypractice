@@ -166,6 +166,14 @@ a.hp-card:active { transform: scale(.99); }
 .hp-card-next .hp-card-when { color: var(--hp-on-next, #fff); opacity: .92; }
 .hp-card-next .hp-card-meta { color: var(--hp-on-next, #fff); opacity: .82; }
 
+/* Fixed brand colour, not themed — same reasoning as .hp-pill-draft/.hp-pill-viewed: this
+   marks a fixed external meaning (Spotify), not team identity, so it doesn't follow
+   --hp-primary/--hp-accent. Only the small label is tinted; the card body stays on the
+   normal surface so it doesn't visually compete with .hp-card-next for "most important
+   card on the page". */
+.hp-card-spotify-label { color: #1DB954; }
+@media (prefers-color-scheme: dark) { .hp-card-spotify-label { color: #2fe070; } }
+
 .hp-card-when {
   font-size: .82rem;
   font-weight: 750;

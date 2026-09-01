@@ -1,6 +1,6 @@
 @{
     var team = ViewBag.Team as Team;
-    var title = ViewBag.Title as string ?? "Practice Plans";
+    var title = ViewBag.Title as string ?? "EBHockey Plans";
     var primary = team?.SafePrimary ?? Team.DefaultPrimary;
     var accent  = team?.SafeAccent  ?? Team.DefaultAccent;
     var palette = HockeyPractice.Infrastructure.Palette.CssVariables(primary, accent);

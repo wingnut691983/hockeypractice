@@ -7,6 +7,16 @@
 @await Html.PartialAsync("_TeamHeader", Model.Ctx)
 
 <div class="hp-shell">
+    @if (!string.IsNullOrWhiteSpace(Model.Ctx.Team.SafeSpotifyPlaylistUrl))
+    {
+        <a class="hp-card hp-card-spotify" style="margin-top:1.25rem;"
+           href="@Model.Ctx.Team.SafeSpotifyPlaylistUrl" target="_blank" rel="noopener noreferrer">
+            <div class="hp-card-when hp-card-spotify-label">&#9834; Team playlist</div>
+            <div class="hp-card-title">Open in Spotify</div>
+            <div class="hp-card-meta"><span>Add your songs before practice</span></div>
+        </a>
+    }
+
     @if (Model.Ctx.IsManager)
     {
         <a class="hp-btn hp-btn-accent hp-btn-block" style="margin-top:1.25rem;"

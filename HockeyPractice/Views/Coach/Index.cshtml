@@ -152,6 +152,26 @@
         </form>
     </div>
 
+    <div class="hp-section">Locker-room playlist</div>
+    <div class="hp-panel">
+        <form method="post" asp-action="Playlist" asp-route-slug="@slug" class="hp-form">
+            @Html.AntiForgeryToken()
+            <div class="hp-field">
+                <label class="hp-label" for="spotifyPlaylistUrl">Spotify playlist link</label>
+                <input class="hp-input" id="spotifyPlaylistUrl" name="spotifyPlaylistUrl"
+                       value="@Model.Ctx.Team.SpotifyPlaylistUrl"
+                       placeholder="https://open.spotify.com/playlist/..." inputmode="url" />
+            </div>
+            <p class="hp-muted" style="font-size:.8rem;margin:0;">
+                Must be an open.spotify.com playlist link. In Spotify, set the playlist to
+                <strong>Collaborative</strong> (playlist menu &rarr; &ldquo;Make collaborative&rdquo;)
+                so players can actually add songs &mdash; this site only shows the link, it can't
+                grant that permission itself. Leave blank and save to remove it.
+            </p>
+            <button type="submit" class="hp-btn">Save</button>
+        </form>
+    </div>
+
     <div class="hp-section">Storage</div>
     <div class="hp-panel">
         <div class="hp-meter">

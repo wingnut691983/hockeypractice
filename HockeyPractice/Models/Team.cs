@@ -57,6 +57,38 @@ public class Team
     /// <summary>IANA id, e.g. "America/Chicago". Used only to render "today"/"tomorrow" correctly.</summary>
     [MaxLength(60)] public string TimeZoneId { get; set; } = "America/Chicago";
 
+    /// <summary>
+    /// Site admin's chosen display order on the team picker and the admin dashboard. Lower
+    /// sorts first. Not unique or contiguous — moving a team up/down just swaps this value with
+    /// its neighbour's, so gaps and ties are expected and harmless; every ordered query breaks
+    /// ties on Name for a stable result.
+    /// </summary>
+    public int SortOrder { get; set; }
+
+    /// <summary>
+    /// Link to the team's shared/collaborative Spotify playlist (e.g. locker-room music).
+    /// Validated to be an open.spotify.com playlist link on save. Not gated by role — every
+    /// viewer with team access sees it; granting "add song" permission happens entirely inside
+    /// Spotify's own app, not here.
+    /// </summary>
+    [MaxLength(300)]
+    public string? SpotifyPlaylistUrl { get; set; }
+
+    /// <summary>
+    /// Same defence as SafePrimary/SafeAccent: the controller validates on save, but a value
+    /// that reached this column any other way (a future admin tool, a manual DB edit) should
+    /// lose the team its playlist card rather than land a javascript:/data: URL in an href.
+    /// </summary>
+    [NotMapped]
+    public string? SafeSpotifyPlaylistUrl =>
+        SpotifyPlaylistUrl is not null && SpotifyPlaylistRegex.IsMatch(SpotifyPlaylistUrl)
+            ? SpotifyPlaylistUrl
+            : null;
+
+    private static readonly Regex SpotifyPlaylistRegex =
+        new(@"^https://open\.spotify\.com/(intl-[a-z]{2}/)?playlist/[A-Za-z0-9]+(\?\S*)?$",
+            RegexOptions.IgnoreCase);
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
     public List<Player> Players { get; set; } = new();

@@ -505,6 +505,47 @@ public class CoachController : TeamScopedController
     }
 
     /// <summary>
+    /// Sets or clears the team's shared Spotify playlist link. A single removable value, so
+    /// this uses direct-overwrite semantics (like a plan's Location/CoachNotes) rather than
+    /// Branding's "only touch it if non-empty" partial-update style — clearing the box and
+    /// hitting Save has one obvious meaning here.
+    ///
+    /// An invalid non-empty submission is rejected rather than silently dropped: unlike a bad
+    /// hex color, a broken playlist link isn't visually self-evident, so a manager needs to be
+    /// told the paste didn't take rather than left wondering why nothing changed.
+    /// </summary>
+    [HttpPost("playlist")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Playlist(string slug, string? spotifyPlaylistUrl)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var team = ctx!.Team;
+        var trimmed = spotifyPlaylistUrl?.Trim();
+
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            team.SpotifyPlaylistUrl = null;
+            await Db.SaveChangesAsync();
+            return RedirectToAction(nameof(Index), new { slug, notice = "Playlist link removed." });
+        }
+
+        if (!IsSpotifyPlaylistUrl(trimmed))
+        {
+            return RedirectToAction(nameof(Index), new
+            {
+                slug,
+                notice = "That doesn't look like an open.spotify.com playlist link. Nothing was changed."
+            });
+        }
+
+        team.SpotifyPlaylistUrl = trimmed;
+        await Db.SaveChangesAsync();
+        return RedirectToAction(nameof(Index), new { slug, notice = "Playlist link saved." });
+    }
+
+    /// <summary>
     /// Rotates the shared view code. Every player uses the same code, so this is how a coach
     /// cuts off someone who has left the team without waiting on a deploy.
     /// </summary>
@@ -563,6 +604,15 @@ public class CoachController : TeamScopedController
     private static bool IsHexColor(string? value) =>
         !string.IsNullOrWhiteSpace(value) &&
         System.Text.RegularExpressions.Regex.IsMatch(value, "^#[0-9a-fA-F]{6}$");
+
+    // Same pattern as Team.SpotifyPlaylistRegex — duplicated rather than shared, matching this
+    // file's existing IsHexColor/SafeColor split.
+    private static readonly System.Text.RegularExpressions.Regex SpotifyPlaylistUrlPattern =
+        new(@"^https://open\.spotify\.com/(intl-[a-z]{2}/)?playlist/[A-Za-z0-9]+(\?\S*)?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static bool IsSpotifyPlaylistUrl(string value) =>
+        SpotifyPlaylistUrlPattern.IsMatch(value);
 
     private static string SafeFileName(string raw)
     {

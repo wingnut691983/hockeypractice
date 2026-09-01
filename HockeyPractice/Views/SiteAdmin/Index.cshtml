@@ -35,9 +35,24 @@
     {
         <div class="hp-panel">
             <ul class="hp-list">
-                @foreach (var summary in Model.Teams)
+                @for (var i = 0; i < Model.Teams.Count; i++)
                 {
+                    var summary = Model.Teams[i];
                     <li style="flex-wrap:wrap;">
+                        <div class="hp-row" style="gap:.2rem;">
+                            <form method="post" asp-action="MoveTeam" asp-route-teamId="@summary.Team.Id">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="direction" value="up" />
+                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
+                                        @(i == 0 ? "disabled" : "")>&uarr;</button>
+                            </form>
+                            <form method="post" asp-action="MoveTeam" asp-route-teamId="@summary.Team.Id">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="direction" value="down" />
+                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
+                                        @(i == Model.Teams.Count - 1 ? "disabled" : "")>&darr;</button>
+                            </form>
+                        </div>
                         <div class="grow">
                             <div style="font-weight:650;">@summary.Team.Name</div>
                             <div class="hp-muted hp-mono">/t/@summary.Team.Slug</div>
