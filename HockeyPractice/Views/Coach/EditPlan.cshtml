@@ -173,11 +173,19 @@
             </div>
         }
 
-        @* data-busy: the layout's submit guard swaps this in while the request runs, so a
-           coach on slow rink wifi sees the upload is actually happening. *@
-        <button type="submit" class="hp-btn hp-btn-block"
-                data-busy="@(Model.IsNew ? "Uploading…" : "Saving…")">
-            @(Model.IsNew ? "Upload plan" : "Save changes")
+        @* Three cases, not two. A new drill plan isn't uploading anything, and saving it drops
+           you straight into the add-drills step — so the button says where it's taking you
+           rather than describing a file transfer that isn't happening.
+           data-busy: the layout's submit guard swaps this in while the request runs, so a coach
+           on slow rink wifi sees something is actually happening. *@
+        @{
+            var submitLabel = !Model.IsNew ? "Save changes"
+                : Model.IsDrillPlan ? "Add drills" : "Upload plan";
+            var submitBusy = !Model.IsNew ? "Saving…"
+                : Model.IsDrillPlan ? "Saving…" : "Uploading…";
+        }
+        <button type="submit" class="hp-btn hp-btn-block" data-busy="@submitBusy">
+            @submitLabel
         </button>
     </form>
 
