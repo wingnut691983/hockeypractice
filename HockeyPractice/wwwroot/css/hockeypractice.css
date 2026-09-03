@@ -263,6 +263,50 @@ a.hp-card:active { transform: scale(.99); }
   background: #fff;   /* diagrams are usually line art on white; keep that behind transparency */
 }
 
+/* ── Pasted / dropped diagram ──────────────────────────────
+   Confirmation that a paste actually landed. Tokens only, so dark mode follows. */
+
+.hp-paste-preview {
+  margin-top: .5rem;
+  padding: .6rem;
+  background: var(--hp-surface-2);
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+}
+.hp-paste-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 12rem;
+  width: auto;
+  border-radius: 8px;
+  background: #fff;   /* diagrams are line art on white; keep that behind transparency */
+}
+.hp-paste-chip {
+  display: inline-flex; align-items: center;
+  font-size: .8rem; font-weight: 650;
+  padding: .3rem .6rem;
+  border-radius: 999px;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  color: var(--hp-text);
+  overflow-wrap: anywhere;
+}
+.hp-paste-note {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .6rem; flex-wrap: wrap;
+  margin-top: .5rem;
+  font-size: .8rem;
+  color: var(--hp-muted);
+}
+
+/* While a file is held over the form. Dashed, so it reads as "drop here" rather than as an
+   error outline. */
+.hp-dropping {
+  outline: 2px dashed var(--hp-accent);
+  outline-offset: 6px;
+  border-radius: var(--hp-radius);
+}
+
 /* ── Video strip ───────────────────────────────────────── */
 
 .hp-videos {

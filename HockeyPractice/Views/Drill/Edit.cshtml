@@ -30,6 +30,7 @@
     @* enctype matters: without it the browser posts the filename only and the file arrives null,
        with nothing to indicate anything went wrong. *@
     <form method="post" enctype="multipart/form-data" class="hp-form" style="margin-top:1rem;"
+          id="hp-drill-form"
           asp-action="@(Model.IsNew ? "Create" : "Update")"
           asp-route-slug="@slug" asp-route-id="@Model.Drill?.Id">
         @Html.AntiForgeryToken()
@@ -96,12 +97,37 @@
             }
             <input class="hp-input" type="file" id="diagram" name="diagram"
                    accept="image/*,application/pdf,.pdf" />
+
+            @* Filled in by the paste/drop script. Hidden until something is actually staged, so a
+               coach is never looking at an empty box wondering whether it worked. *@
+            @* The label rides on a data attribute rather than being interpolated into the script
+               below. Same lesson as the layout's data-confirm: a value dropped straight into a JS
+               string literal breaks the moment it contains an apostrophe, and a script that fails
+               to parse fails silently. *@
+            <div class="hp-paste-preview" id="hp-paste-preview" hidden
+                 data-ready-label="@(Model.Drill?.DiagramFileName is not null
+                     ? "Ready to save — this replaces the current diagram"
+                     : "Ready to save")">
+                <img id="hp-paste-thumb" alt="The diagram about to be saved" hidden />
+                <span class="hp-paste-chip" id="hp-paste-chip" hidden></span>
+                <div class="hp-paste-note">
+                    <span id="hp-paste-label"></span>
+                    @* type="button" is load-bearing: a bare <button> in a form defaults to submit,
+                       so clearing the diagram would save the drill instead. *@
+                    <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-paste-clear">
+                        Clear
+                    </button>
+                </div>
+            </div>
+
             <span class="hp-muted" style="font-size:.8rem;">
                 A photo or screenshot shows right inside the plan, and gets shrunk automatically. A
                 PDF shows as a link players tap to open &mdash; images are easier to read on a phone.
+                You can also <strong>paste a screenshot</strong> straight in, or drag an image onto
+                this page.
                 @if (Model.Drill?.DiagramFileName is not null)
                 {
-                    <text>Choosing a new file replaces the current one.</text>
+                    <text>Anything new replaces the current one.</text>
                 }
             </span>
         </div>
@@ -162,3 +188,151 @@
         </div>
     }
 </div>
+
+@section Scripts {
+<script>
+(function () {
+    // A coach clipping a diagram out of a PDF or a video already has it on the clipboard, and
+    // hunting through the file picker for something they just copied is the slow way round. Paste
+    // and drag both end up in the same place: the real <input type="file">, so the upload goes
+    // through the exact same validation, shrinking and storage as picking a file by hand.
+    var input = document.getElementById('diagram');
+    var form = document.getElementById('hp-drill-form');
+    if (!input || !form) return;
+
+    var preview = document.getElementById('hp-paste-preview');
+    var thumb = document.getElementById('hp-paste-thumb');
+    var chip = document.getElementById('hp-paste-chip');
+    var label = document.getElementById('hp-paste-label');
+    var clear = document.getElementById('hp-paste-clear');
+    var objectUrl = null;
+
+    // Assigning to input.files works everywhere current but throws on older Safari. If it does,
+    // leave the file picker exactly as it was and say nothing — the coach still has a way in.
+    function canInject() {
+        try { return typeof DataTransfer === 'function' && !!new DataTransfer(); }
+        catch (e) { return false; }
+    }
+
+    function releaseUrl() {
+        if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    }
+
+    function showPreview(file) {
+        releaseUrl();
+        var isImage = file.type && file.type.indexOf('image/') === 0;
+
+        if (isImage) {
+            objectUrl = URL.createObjectURL(file);
+            thumb.src = objectUrl;
+            thumb.hidden = false;
+            chip.hidden = true;
+        } else {
+            // A PDF has nothing to show, so name it rather than render a broken image.
+            chip.textContent = file.name || 'PDF';
+            chip.hidden = false;
+            thumb.hidden = true;
+        }
+
+        label.textContent = preview.dataset.readyLabel || 'Ready to save';
+        preview.hidden = false;
+    }
+
+    function hidePreview() {
+        releaseUrl();
+        preview.hidden = true;
+        thumb.hidden = true;
+        chip.hidden = true;
+        thumb.removeAttribute('src');
+    }
+
+    function accept(file) {
+        if (!file || !canInject()) return false;
+        try {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+        } catch (e) {
+            return false;   // leave whatever the picker already had alone
+        }
+        showPreview(file);
+        return true;
+    }
+
+    // ── Paste ────────────────────────────────────────────────────────
+    // Only acts on a paste that actually carries a file. Pasting text into the description has to
+    // keep behaving normally, so there is no preventDefault unless a file is really there.
+    document.addEventListener('paste', function (e) {
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].kind !== 'file') continue;
+            var file = items[i].getAsFile();
+            if (file && accept(file)) e.preventDefault();
+            return;
+        }
+    });
+
+    // ── Drag and drop ────────────────────────────────────────────────
+    // Bound to the whole document, not just the form. Without preventDefault the browser opens a
+    // dropped file as a page and the half-filled form is gone — and a near miss outside the form
+    // is exactly when that would happen, so catching it only over the form would leave the
+    // footgun loaded. Dragging an image onto this page has one obvious meaning; take it wherever
+    // it lands.
+    function hasFiles(e) {
+        var types = e.dataTransfer && e.dataTransfer.types;
+        // types is a plain array in current browsers and a DOMStringList in older ones; the
+        // borrowed indexOf handles both.
+        return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+    }
+
+    ['dragenter', 'dragover'].forEach(function (name) {
+        document.addEventListener(name, function (e) {
+            if (!hasFiles(e)) return;
+            e.preventDefault();
+            form.classList.add('hp-dropping');
+        });
+    });
+
+    ['dragleave', 'dragend'].forEach(function (name) {
+        document.addEventListener(name, function (e) {
+            // Only when the pointer has actually left the window, not on the stream of leave
+            // events fired while crossing elements inside it.
+            if (name === 'dragleave' && e.relatedTarget) return;
+            form.classList.remove('hp-dropping');
+        });
+    });
+
+    document.addEventListener('drop', function (e) {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        form.classList.remove('hp-dropping');
+
+        var files = e.dataTransfer.files;
+        if (files && files.length) accept(files[0]);
+    });
+
+    // Choosing a file by hand after pasting must win, and must be what the preview shows.
+    input.addEventListener('change', function () {
+        if (input.files && input.files.length) showPreview(input.files[0]);
+        else hidePreview();
+    });
+
+    clear.addEventListener('click', function () {
+        input.value = '';
+        hidePreview();
+    });
+
+    // Coming back via the Back button restores the page from the bfcache, but a file put into the
+    // input by script does not reliably come back with it. Without this the preview would still be
+    // sitting there promising a diagram that is no longer attached, and saving would quietly drop
+    // it. Clear both so the form can't lie about what it's about to send.
+    window.addEventListener('pageshow', function (e) {
+        if (!e.persisted) return;
+        input.value = '';
+        hidePreview();
+    });
+})();
+</script>
+}
