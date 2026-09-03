@@ -160,7 +160,8 @@ public class DrillController : TeamScopedController
 
         SyncTags(drill, tags);
 
-        var notice = "Drill saved.";
+        var notice = $"Saved \"{drill.Title}\".";
+        var diagramFailed = false;
         if (diagram is { Length: > 0 })
         {
             var saved = await _storage.SaveDiagramAsync(ctx!.Team.Id, drill.Id, diagram);
@@ -176,12 +177,20 @@ public class DrillController : TeamScopedController
             }
             else
             {
+                diagramFailed = true;
                 notice = $"Saved, but the new diagram wasn't accepted: {saved.Error}";
             }
         }
 
         await Db.SaveChangesAsync();
-        return RedirectToAction(nameof(Edit), new { slug, id, notice });
+
+        // Saving is the end of editing, so go back to the library — the same place Archive and
+        // Delete already land, and the drill is right there to confirm the change took.
+        // The exception is a rejected diagram: bouncing away would leave the coach re-finding the
+        // drill to try another picture, so that one stays put with the reason on screen.
+        return diagramFailed
+            ? RedirectToAction(nameof(Edit), new { slug, id, notice })
+            : RedirectToAction(nameof(Index), new { slug, notice });
     }
 
     [HttpPost("{id:int}/archive")]
