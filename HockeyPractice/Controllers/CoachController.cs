@@ -49,7 +49,12 @@ public class CoachController : TeamScopedController
             plansQuery = plansQuery.Where(p => p.Tags.Any(t => t.NormalizedName.Contains(needle)));
 
         var plans = await plansQuery
-            .Select(p => new { Plan = p, Videos = p.Links.Count(l => !l.IsHidden) })
+            .Select(p => new
+            {
+                Plan = p,
+                Videos = p.Links.Count(l => !l.IsHidden),
+                Drills = p.Drills.Count
+            })
             .OrderByDescending(x => x.Plan.PracticeDateLocal)
             .ToListAsync();
 
@@ -61,6 +66,7 @@ public class CoachController : TeamScopedController
             {
                 Plan = x.Plan,
                 VideoCount = x.Videos,
+                DrillCount = x.Drills,
                 WhenLabel = WhenLabel.For(x.Plan.PracticeDateLocal, ctx!.Team.TimeZoneId)
             }).ToList(),
             Roster = await Db.Players.Where(p => p.TeamId == ctx!.Team.Id)
@@ -77,8 +83,23 @@ public class CoachController : TeamScopedController
 
     // ── Plans ────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Asks which kind of plan this is before showing a form, because the two need different
+    /// fields. Two plain links rather than a JavaScript toggle: nothing to mis-toggle, and the
+    /// file input is simply absent for a drill plan rather than hidden-but-still-required.
+    /// </summary>
+    [HttpGet("plans/choose")]
+    public async Task<IActionResult> ChoosePlanKind(string slug)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        ViewBag.NavSection = "manage";
+        return View(ctx!);
+    }
+
     [HttpGet("plans/new")]
-    public async Task<IActionResult> NewPlan(string slug)
+    public async Task<IActionResult> NewPlan(string slug, PlanKind kind = PlanKind.Pdf)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -87,9 +108,12 @@ public class CoachController : TeamScopedController
         return View("EditPlan", new PlanEditViewModel
         {
             Ctx = ctx!,
+            Kind = kind,
             DefaultDate = NextPracticeSlot(ctx!.Team.TimeZoneId),
             MaxUploadBytes = _storage.QuotaBytes,
-            Error = _storage.IsFull()
+            // Only a PDF plan is blocked by a full volume at this point; a drill plan writes
+            // nothing until a diagram is added.
+            Error = kind == PlanKind.Pdf && _storage.IsFull()
                 ? "Storage is nearly full. Delete some old plans before uploading a new one."
                 : null
         });
@@ -99,19 +123,21 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> NewPlan(string slug, string title, DateTime practiceDate,
-        string? location, string? coachNotes, IFormFile? file, string? tags)
+        string? location, string? coachNotes, IFormFile? file, string? tags,
+        PlanKind kind = PlanKind.Pdf)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var error = _storage.ValidateUpload(file);
+        // A drill plan has no file to check — its content comes from the library afterwards.
+        var error = kind == PlanKind.Pdf ? _storage.ValidateUpload(file) : null;
         if (string.IsNullOrWhiteSpace(title)) error ??= "Give the plan a title.";
 
         if (error is not null)
         {
             return View("EditPlan", new PlanEditViewModel
             {
-                Ctx = ctx!, Error = error,
+                Ctx = ctx!, Error = error, Kind = kind,
                 // A default(DateTime) from failed binding renders as year 1 — fall back.
                 DefaultDate = practiceDate == default ? NextPracticeSlot(ctx!.Team.TimeZoneId) : practiceDate,
                 MaxUploadBytes = _storage.QuotaBytes,
@@ -127,7 +153,8 @@ public class CoachController : TeamScopedController
             PracticeDateLocal = practiceDate,
             Location = location?.Trim(),
             CoachNotes = coachNotes?.Trim(),
-            OriginalFileName = SafeFileName(file!.FileName),
+            Kind = kind,
+            OriginalFileName = kind == PlanKind.Pdf ? SafeFileName(file!.FileName) : null,
             Status = PlanStatus.Draft
         };
 
@@ -135,14 +162,23 @@ public class CoachController : TeamScopedController
         Db.Plans.Add(plan);
         await Db.SaveChangesAsync();
 
-        var saved = await _storage.SaveAsync(ctx.Team.Id, plan.Id, file);
+        if (kind == PlanKind.Drills)
+        {
+            foreach (var (name, norm) in ParseTags(tags))
+                Db.PlanTags.Add(new PlanTag { PracticePlanId = plan.Id, Name = name, NormalizedName = norm });
+
+            await Db.SaveChangesAsync();
+            return RedirectToAction(nameof(EditPlan), new { slug, id = plan.Id });
+        }
+
+        var saved = await _storage.SaveAsync(ctx.Team.Id, plan.Id, file!);
         if (!saved.Ok)
         {
             Db.Plans.Remove(plan);
             await Db.SaveChangesAsync();
             return View("EditPlan", new PlanEditViewModel
             {
-                Ctx = ctx, DefaultDate = practiceDate, Error = saved.Error,
+                Ctx = ctx, DefaultDate = practiceDate, Error = saved.Error, Kind = kind,
                 MaxUploadBytes = _storage.QuotaBytes,
                 RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes,
                 RetainedTags = tags
@@ -176,7 +212,7 @@ public class CoachController : TeamScopedController
     }
 
     [HttpGet("plans/{id:int}")]
-    public async Task<IActionResult> EditPlan(string slug, int id, string? notice)
+    public async Task<IActionResult> EditPlan(string slug, int id, string? notice, string? drillTag)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -185,17 +221,111 @@ public class CoachController : TeamScopedController
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
-        ViewBag.NavSection = "manage";
-        return View(new PlanEditViewModel
+        var model = new PlanEditViewModel
         {
             Ctx = ctx!,
             Plan = plan,
+            Kind = plan.Kind,
             Links = plan.Links.OrderBy(l => l.SortOrder).ToList(),
             DefaultDate = plan.PracticeDateLocal,
             MaxUploadBytes = _storage.QuotaBytes,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
-            Notice = notice
+            Notice = notice,
+            PlanDrills = plan.Kind == PlanKind.Drills
+                ? await PlanDrillsAsync(plan.Id)
+                : new List<DrillCard>(),
+            Library = plan.Kind == PlanKind.Drills
+                ? await DrillLibraryAsync(ctx.Team.Id, drillTag)
+                : new List<DrillCard>(),
+            AllDrillTags = plan.Kind == PlanKind.Drills
+                ? await DistinctDrillTagsAsync(ctx.Team.Id)
+                : new List<string>(),
+            ActiveDrillTag = drillTag
+        };
+
+        ViewBag.NavSection = "manage";
+        return View(model);
+    }
+
+    // ── Building a plan out of drills ────────────────────────────────────
+
+    [HttpPost("plans/{id:int}/drills/add")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddDrill(string slug, int id, int drillId, string? drillTag)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+
+        // The drill must belong to this team — a plan can't borrow another team's library.
+        var drill = await Db.Drills.FirstOrDefaultAsync(d => d.Id == drillId && d.TeamId == ctx!.Team.Id);
+        if (drill is null) return NotFound();
+
+        var next = await Db.PlanDrills.Where(pd => pd.PracticePlanId == plan.Id)
+            .Select(pd => (int?)pd.SortOrder).MaxAsync() ?? -1;
+
+        Db.PlanDrills.Add(new PlanDrill
+        {
+            PracticePlanId = plan.Id,
+            DrillId = drill.Id,
+            SortOrder = next + 1
         });
+        await Db.SaveChangesAsync();
+
+        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+    }
+
+    [HttpPost("plans/{id:int}/drills/{planDrillId:int}/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveDrill(string slug, int id, int planDrillId, string? drillTag)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var entry = await Db.PlanDrills
+            .FirstOrDefaultAsync(pd => pd.Id == planDrillId && pd.PracticePlanId == id
+                                       && pd.PracticePlan!.TeamId == ctx!.Team.Id);
+        if (entry is null) return NotFound();
+
+        Db.PlanDrills.Remove(entry);
+        await Db.SaveChangesAsync();
+
+        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+    }
+
+    /// <summary>
+    /// Moves a drill one place up or down by swapping SortOrder with its neighbour — the same
+    /// approach as the site-admin team reorder, which is immune to gaps and ties.
+    /// </summary>
+    [HttpPost("plans/{id:int}/drills/{planDrillId:int}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveDrill(string slug, int id, int planDrillId,
+        string direction, string? drillTag)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+
+        var ordered = await Db.PlanDrills.Where(pd => pd.PracticePlanId == plan.Id)
+            .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
+            .ToListAsync();
+
+        var index = ordered.FindIndex(pd => pd.Id == planDrillId);
+        if (index < 0) return NotFound();
+
+        var neighbour = direction == "up" ? index - 1 : index + 1;
+        if (neighbour < 0 || neighbour >= ordered.Count)
+            return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+
+        (ordered[index].SortOrder, ordered[neighbour].SortOrder) =
+            (ordered[neighbour].SortOrder, ordered[index].SortOrder);
+
+        await Db.SaveChangesAsync();
+        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
     }
 
     [HttpPost("plans/{id:int}")]
@@ -281,6 +411,9 @@ public class CoachController : TeamScopedController
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
+        // PDF-only: there is nothing to re-read on a drill plan.
+        if (plan.Kind != PlanKind.Pdf) return NotFound();
+
         if (!_storage.Exists(ctx!.Team.Id, plan.Id))
             return RedirectToAction(nameof(EditPlan), new { slug, id });
 
@@ -335,6 +468,10 @@ public class CoachController : TeamScopedController
         var plan = await Db.Plans.Include(p => p.Links)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
+
+        // PDF-only. Without this, a stale tab or a crafted POST could bolt a PDF onto a drill
+        // plan, leaving a row that claims to be one kind while carrying the other's content.
+        if (plan.Kind != PlanKind.Pdf) return NotFound();
 
         var error = _storage.ValidateUpload(file);
         if (error is not null)
@@ -406,6 +543,18 @@ public class CoachController : TeamScopedController
 
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
+
+        // A PDF plan can't be empty — the upload is required. A drill plan can, and publishing one
+        // would email the whole team a link to a blank page.
+        if (plan.Kind == PlanKind.Drills &&
+            !await Db.PlanDrills.AnyAsync(pd => pd.PracticePlanId == plan.Id))
+        {
+            return RedirectToAction(nameof(EditPlan), new
+            {
+                slug, id,
+                notice = "Add at least one drill before publishing this plan."
+            });
+        }
 
         // Genuinely the first publish, not a republish after an unpublish. Keying off
         // PublishedUtc rather than Status is what stops a fix-and-republish from mailing
@@ -644,6 +793,55 @@ public class CoachController : TeamScopedController
 
     private static bool IsSpotifyPlaylistUrl(string value) =>
         SpotifyPlaylistUrlPattern.IsMatch(value);
+
+    /// <summary>The plan's drills, in order. Ties on SortOrder break on Id so the order is stable.</summary>
+    private async Task<List<DrillCard>> PlanDrillsAsync(int planId)
+    {
+        var entries = await Db.PlanDrills
+            .Include(pd => pd.Drill)
+            .Where(pd => pd.PracticePlanId == planId)
+            .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
+            .ToListAsync();
+
+        return entries.Select(pd => new DrillCard
+        {
+            Drill = pd.Drill!,
+            PlanDrillId = pd.Id,
+            EmbedUrl = LinkExtractionService.EmbedUrlFor(pd.Drill!.VideoUrl)
+        }).ToList();
+    }
+
+    /// <summary>The team's pickable drills — archived ones are deliberately left out.</summary>
+    private async Task<List<DrillCard>> DrillLibraryAsync(int teamId, string? tag)
+    {
+        var needle = tag?.Trim().ToLowerInvariant();
+
+        var query = Db.Drills.Include(d => d.Tags)
+            .Where(d => d.TeamId == teamId && !d.IsArchived);
+
+        if (!string.IsNullOrEmpty(needle))
+            query = query.Where(d => d.Tags.Any(t => t.NormalizedName.Contains(needle)));
+
+        var drills = await query.OrderBy(d => d.Title).ToListAsync();
+        return drills.Select(d => new DrillCard { Drill = d }).ToList();
+    }
+
+    /// <summary>
+    /// Distinct drill-tag names for the team. Grouped in memory rather than with EF GroupBy, whose
+    /// "first row per group" translation is fragile on SQLite.
+    /// </summary>
+    private async Task<List<string>> DistinctDrillTagsAsync(int teamId)
+    {
+        var rows = await Db.DrillTags
+            .Where(t => t.Drill!.TeamId == teamId && !t.Drill.IsArchived)
+            .Select(t => new { t.Id, t.Name, t.NormalizedName })
+            .ToListAsync();
+
+        return rows.GroupBy(t => t.NormalizedName)
+            .Select(g => g.OrderBy(t => t.Id).First().Name)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     private const int MaxTagsPerPlan = 15;
 

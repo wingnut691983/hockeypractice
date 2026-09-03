@@ -198,7 +198,8 @@ public class TeamController : TeamScopedController
             .Select(p => new
             {
                 Plan = p,
-                Videos = p.Links.Count(l => !l.IsHidden)
+                Videos = p.Links.Count(l => !l.IsHidden),
+                Drills = p.Drills.Count
             })
             .OrderByDescending(x => x.Plan.PracticeDateLocal)
             .ToListAsync();
@@ -211,6 +212,7 @@ public class TeamController : TeamScopedController
         {
             Plan = x.Plan,
             VideoCount = x.Videos,
+            DrillCount = x.Drills,
             ViewedByMe = mine.Contains(x.Plan.Id),
             WhenLabel = WhenLabel.For(x.Plan.PracticeDateLocal, team.TimeZoneId)
         }).ToList();

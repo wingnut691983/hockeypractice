@@ -1,0 +1,44 @@
+@using HockeyPractice.Services
+@model DrillCard
+@{
+    // The shared *content* of a drill row — name, gist, what it carries, tags. Deliberately no
+    // <li> and no buttons: the library, the plan picker and the plan's own list each need
+    // different controls, so they wrap this in their own markup. Keeping just the description
+    // here is what stops the three drifting apart.
+    var snippet = Model.Drill.Description is { Length: > 0 } d
+        ? (d.Length > 110 ? d[..110].TrimEnd() + "…" : d)
+        : null;
+}
+<div class="grow" style="min-width:0;">
+    <div style="font-weight:650;">@Model.Drill.Title</div>
+
+    @if (snippet is not null)
+    {
+        <div class="hp-muted" style="font-size:.85rem;">@snippet</div>
+    }
+
+    <div class="hp-muted" style="font-size:.78rem;margin-top:.15rem;">
+        @if (Model.HasDiagram)
+        {
+            <text>@(Model.DiagramIsPdf ? "PDF diagram" : "Diagram") · @PlanStorageService.Human(Model.Drill.DiagramBytes)</text>
+        }
+        else
+        {
+            <text>No diagram</text>
+        }
+        @if (Model.HasVideo)
+        {
+            <text> · Video</text>
+        }
+    </div>
+
+    @if (Model.Drill.Tags.Count > 0)
+    {
+        <div style="margin-top:.3rem;">
+            @foreach (var tag in Model.Drill.Tags.OrderBy(t => t.Name))
+            {
+                <span class="hp-pill">@tag.Name</span>
+            }
+        </div>
+    }
+</div>

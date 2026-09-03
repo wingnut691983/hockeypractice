@@ -29,6 +29,29 @@ public class PlanController : TeamScopedController
         if (plan is null) return NotFound();
         if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
 
+        // A drill plan's content lives here, not in a file. The coach's editor is built by a
+        // different action, so leaving this out would show them a complete plan and the team an
+        // empty one — with nothing to hint at the difference.
+        var drills = new List<DrillCard>();
+        if (plan.Kind == PlanKind.Drills)
+        {
+            var entries = await Db.PlanDrills
+                .Include(pd => pd.Drill)
+                .Where(pd => pd.PracticePlanId == plan.Id)
+                .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
+                .ToListAsync();
+
+            // Deliberately no .ThenInclude(d => d.Tags): tags are the coach's filing system and
+            // are never shown to players, so loading them here would be wasted work on the
+            // busiest page in the app.
+            drills = entries.Select(pd => new DrillCard
+            {
+                Drill = pd.Drill!,
+                PlanDrillId = pd.Id,
+                EmbedUrl = LinkExtractionService.EmbedUrlFor(pd.Drill!.VideoUrl)
+            }).ToList();
+        }
+
         // Roster tracking is the coach's view only. A player or parent sees their own badge
         // and nothing about anybody else on the team.
         var viewed = new List<Player>();
@@ -59,6 +82,7 @@ public class PlanController : TeamScopedController
             Ctx = ctx,
             Plan = plan,
             Videos = plan.Links.Where(l => !l.IsHidden).OrderBy(l => l.SortOrder).ToList(),
+            Drills = drills,
             WhenLabel = WhenLabel.For(plan.PracticeDateLocal, ctx.Team.TimeZoneId),
             ViewedByMe = await HasViewedAsync(plan.Id, ctx.Me?.Id, Access.ViewerKeyFor(User)),
             Viewed = viewed,

@@ -16,7 +16,7 @@
     }
 
     <a class="hp-btn hp-btn-accent hp-btn-block" style="margin:1rem 0;"
-       asp-action="NewPlan" asp-route-slug="@slug">+ New practice plan</a>
+       asp-action="ChoosePlanKind" asp-route-slug="@slug">+ New practice plan</a>
 
     <div class="hp-section">Plans</div>
 
@@ -56,7 +56,17 @@
                     <li style="flex-wrap:wrap;">
                         <div class="grow">
                             <div style="font-weight:650;">@card.Plan.Title</div>
-                            <div class="hp-muted">@card.WhenLabel · @card.VideoCount video@(card.VideoCount == 1 ? "" : "s")</div>
+                            <div class="hp-muted">
+                                @card.WhenLabel ·
+                                @if (card.IsDrillPlan)
+                                {
+                                    <text>@card.DrillCount drill@(card.DrillCount == 1 ? "" : "s")</text>
+                                }
+                                else
+                                {
+                                    <text>@card.VideoCount video@(card.VideoCount == 1 ? "" : "s")</text>
+                                }
+                            </div>
                             @if (card.Plan.Tags.Count > 0)
                             {
                                 <div style="margin-top:.3rem;">

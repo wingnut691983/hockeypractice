@@ -20,7 +20,7 @@
     @if (Model.Ctx.IsManager)
     {
         <a class="hp-btn hp-btn-accent hp-btn-block" style="margin-top:1.25rem;"
-           asp-controller="Coach" asp-action="NewPlan" asp-route-slug="@Model.Ctx.Team.Slug">
+           asp-controller="Coach" asp-action="ChoosePlanKind" asp-route-slug="@Model.Ctx.Team.Slug">
             + New practice plan
         </a>
     }

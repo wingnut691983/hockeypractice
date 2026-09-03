@@ -228,7 +228,21 @@ public class SiteAdminController : Controller
 
         var name = team.Name;
 
-        // Cascades handle the child rows; the files on the volume are ours to clean up.
+        // PlanDrills must go first, by hand. A team cascades into BOTH Plans (which cascade on to
+        // PlanDrills) and Drills — but PlanDrill -> Drill is Restrict, deliberately, so a drill
+        // can't be pulled out from under a published plan. SQLite doesn't define which of a
+        // parent's child tables it processes first, so if it reaches Drills while those PlanDrill
+        // rows still exist, the restrict fires and the whole delete aborts with a foreign-key
+        // error. Verified: without this, deleting a team with a drill in use fails outright.
+        var planIds = await _db.Plans.Where(p => p.TeamId == team.Id).Select(p => p.Id).ToListAsync();
+        if (planIds.Count > 0)
+        {
+            _db.PlanDrills.RemoveRange(
+                _db.PlanDrills.Where(pd => planIds.Contains(pd.PracticePlanId)));
+            await _db.SaveChangesAsync();
+        }
+
+        // Cascades handle the remaining child rows; the files on the volume are ours to clean up.
         _db.Teams.Remove(team);
         await _db.SaveChangesAsync();
         _storage.DeleteTeam(teamId);

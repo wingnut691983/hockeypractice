@@ -12,6 +12,9 @@ public class AppDbContext : DbContext
     public DbSet<PracticePlan> Plans => Set<PracticePlan>();
     public DbSet<PlanLink> PlanLinks => Set<PlanLink>();
     public DbSet<PlanTag> PlanTags => Set<PlanTag>();
+    public DbSet<Drill> Drills => Set<Drill>();
+    public DbSet<DrillTag> DrillTags => Set<DrillTag>();
+    public DbSet<PlanDrill> PlanDrills => Set<PlanDrill>();
     public DbSet<PlanView> PlanViews => Set<PlanView>();
     public DbSet<Subscriber> Subscribers => Set<Subscriber>();
 
@@ -40,6 +43,34 @@ public class AppDbContext : DbContext
 
         b.Entity<PlanTag>().HasIndex(t => new { t.PracticePlanId, t.NormalizedName }).IsUnique();
         b.Entity<PlanTag>().HasIndex(t => t.NormalizedName);
+
+        b.Entity<Drill>()
+            .HasOne(d => d.Team).WithMany()
+            .HasForeignKey(d => d.TeamId).OnDelete(DeleteBehavior.Cascade);
+
+        // The library list always filters to one team's unarchived drills.
+        b.Entity<Drill>().HasIndex(d => new { d.TeamId, d.IsArchived });
+
+        b.Entity<DrillTag>()
+            .HasOne(t => t.Drill).WithMany(d => d.Tags)
+            .HasForeignKey(t => t.DrillId).OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<DrillTag>().HasIndex(t => new { t.DrillId, t.NormalizedName }).IsUnique();
+        b.Entity<DrillTag>().HasIndex(t => t.NormalizedName);
+
+        b.Entity<PlanDrill>()
+            .HasOne(pd => pd.PracticePlan).WithMany(p => p.Drills)
+            .HasForeignKey(pd => pd.PracticePlanId).OnDelete(DeleteBehavior.Cascade);
+
+        // Restrict, not Cascade: deleting a drill that a plan uses would tear content out of a
+        // plan already published to the team. The coach is offered Archive instead. Note this is
+        // why SiteAdminController.DeleteTeam must clear PlanDrills explicitly — a team cascades
+        // into BOTH Plans and Drills, and SQLite does not define which it processes first.
+        b.Entity<PlanDrill>()
+            .HasOne(pd => pd.Drill).WithMany()
+            .HasForeignKey(pd => pd.DrillId).OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<PlanDrill>().HasIndex(pd => new { pd.PracticePlanId, pd.SortOrder });
 
         b.Entity<PlanView>()
             .HasOne(v => v.PracticePlan).WithMany(p => p.Views)

@@ -288,6 +288,13 @@ public partial class LinkExtractionService
         return url;
     }
 
+    /// <summary>
+    /// Works out the provider and video id for a URL. Public so a drill's single video link can be
+    /// classified the same way as links pulled out of a PDF, rather than a second set of regexes
+    /// drifting away from these.
+    /// </summary>
+    public static (LinkKind Kind, string? VideoId) ClassifyUrl(string url) => Classify(url);
+
     private static (LinkKind, string?) Classify(string url)
     {
         var yt = YouTubePattern().Match(url);
@@ -326,12 +333,27 @@ public partial class LinkExtractionService
     /// playsinline stops iOS hijacking the whole screen with the native player, and
     /// youtube-nocookie avoids setting tracking cookies on a page teenagers are told to visit.
     /// </summary>
-    public static string? EmbedUrl(PlanLink link) => link.Kind switch
+    public static string? EmbedUrl(PlanLink link) => EmbedUrl(link.Kind, link.VideoId);
+
+    /// <summary>
+    /// Embeddable player URL for an already-classified link, or null when it can't be framed.
+    /// Taking the parts rather than a PlanLink lets a drill's video reuse this without inventing a
+    /// throwaway entity.
+    /// </summary>
+    public static string? EmbedUrl(LinkKind kind, string? videoId) => kind switch
     {
-        LinkKind.YouTube when link.VideoId is not null =>
-            $"https://www.youtube-nocookie.com/embed/{link.VideoId}?autoplay=1&rel=0&playsinline=1&modestbranding=1",
-        LinkKind.Vimeo when link.VideoId is not null =>
-            $"https://player.vimeo.com/video/{link.VideoId}?autoplay=1&playsinline=1",
+        LinkKind.YouTube when videoId is not null =>
+            $"https://www.youtube-nocookie.com/embed/{videoId}?autoplay=1&rel=0&playsinline=1&modestbranding=1",
+        LinkKind.Vimeo when videoId is not null =>
+            $"https://player.vimeo.com/video/{videoId}?autoplay=1&playsinline=1",
         _ => null
     };
+
+    /// <summary>Embeddable player URL for a raw URL, or null when it isn't a video we can frame.</summary>
+    public static string? EmbedUrlFor(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var (kind, videoId) = Classify(url);
+        return EmbedUrl(kind, videoId);
+    }
 }

@@ -36,3 +36,18 @@ public enum LinkKind
     YouTube = 1,
     Vimeo   = 2
 }
+
+/// <summary>
+/// How a plan carries its content. Pdf = 0 so every plan that existed before drills keeps its
+/// meaning without a backfill.
+///
+/// Persisted as int — do not renumber.
+/// </summary>
+public enum PlanKind
+{
+    /// <summary>One uploaded PDF, with video links extracted from it.</summary>
+    Pdf    = 0,
+
+    /// <summary>An ordered list of drills picked from the team's library.</summary>
+    Drills = 1
+}

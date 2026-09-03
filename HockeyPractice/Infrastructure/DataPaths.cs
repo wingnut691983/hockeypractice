@@ -48,6 +48,16 @@ public class DataPaths
     /// <summary>The single PDF for a plan. One file per plan; deleting the directory deletes the plan.</summary>
     public string PlanPdf(int teamId, int planId) => Path.Combine(PlanDirectory(teamId, planId), "plan.pdf");
 
+    public string DrillDirectory(int teamId, int drillId) =>
+        Path.Combine(TeamDirectory(teamId), "drills", drillId.ToString());
+
+    /// <summary>
+    /// A drill's diagram. Unlike PlanPdf the filename is not fixed — a diagram may be an image or
+    /// a PDF, so the name (with its extension) is stored on the Drill row, the way a team logo is.
+    /// </summary>
+    public string DrillDiagram(int teamId, int drillId, string fileName) =>
+        Path.Combine(DrillDirectory(teamId, drillId), fileName);
+
     /// <summary>Total bytes currently used under the persistent root.</summary>
     public long UsedBytes()
     {

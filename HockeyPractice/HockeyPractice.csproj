@@ -13,6 +13,14 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
+    <!-- Shrinks drill diagrams on upload. Pinned to 3.x deliberately: 4.x moved to a paid licence
+         and fails the build with "No Six Labors license found" until you buy one. 3.1.x is the
+         Six Labors Split License — free for individuals and orgs under $1M revenue — and still
+         gets security fixes, which matters for a decoder that parses uploaded files.
+         Must also stay fully managed: Dockerfile.fast publishes on the host and assembles onto a
+         linux/amd64 base, so a package with native per-RID assets would build fine and fail at
+         runtime. Do not "upgrade to latest" without reading this. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
 </Project>

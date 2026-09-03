@@ -61,7 +61,14 @@
             </datalist>
         }
 
+        @* Carries the choice made on the chooser page through a failed submit, so a validation
+           error can't silently turn a drill plan into a PDF one. *@
         @if (Model.IsNew)
+        {
+            <input type="hidden" name="kind" value="@Model.Kind" />
+        }
+
+        @if (Model.IsNew && !Model.IsDrillPlan)
         {
             <div class="hp-field">
                 <label class="hp-label" for="file">Practice plan (PDF)</label>
@@ -98,7 +105,11 @@
             </details>
         }
 
-        @if (!Model.IsNew && Model.Links.Count > 0)
+        @if (!Model.IsNew && Model.IsDrillPlan)
+        {
+            @* Drill management lives below, outside this form — see the note at the bottom. *@
+        }
+        else if (!Model.IsNew && Model.Links.Count > 0)
         {
             <div class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</div>
             <p class="hp-muted" style="margin:0;">
@@ -154,7 +165,7 @@
                 </button>
             </div>
         }
-        else if (!Model.IsNew)
+        else if (!Model.IsNew && !Model.IsDrillPlan)
         {
             <div class="hp-notice">
                 No links were found in this PDF. If you expected videos here, check that the URLs
@@ -170,26 +181,158 @@
         </button>
     </form>
 
+    @* ── Drills ──────────────────────────────────────────────────────────────────────────
+       Everything below is OUTSIDE the form above, and has to stay that way. HTML doesn't allow
+       nested forms: the parser throws the inner <form> away, so an Add or Remove button placed
+       inside would submit the plan-details form instead and appear to do nothing. Replace /
+       Publish / Delete already sit out here for the same reason. *@
+    @if (!Model.IsNew && Model.IsDrillPlan && Model.Plan is not null)
+    {
+        var planId = Model.Plan.Id;
+        var tagFilter = Model.ActiveDrillTag;
+
+        <div class="hp-section">Drills in this plan</div>
+        @if (Model.PlanDrills.Count == 0)
+        {
+            <div class="hp-empty">
+                Nothing here yet.<br />
+                <span class="hp-muted">Add drills from your library below — they'll run in the order you set.</span>
+            </div>
+        }
+        else
+        {
+            <div class="hp-panel">
+                <ul class="hp-list">
+                    @for (var i = 0; i < Model.PlanDrills.Count; i++)
+                    {
+                        var card = Model.PlanDrills[i];
+                        <li style="flex-wrap:wrap;align-items:flex-start;">
+                            <span class="hp-jersey" style="margin-top:.1rem;">@(i + 1)</span>
+                            @await Html.PartialAsync("_DrillRow", card)
+
+                            @* One form, three buttons separated by formaction — the same trick the
+                               "Re-read video names" button uses, and a third of the markup of three
+                               separate forms. *@
+                            <form method="post" class="hp-row" style="gap:.2rem;"
+                                  asp-action="MoveDrill" asp-route-slug="@slug" asp-route-id="@planId"
+                                  asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" name="direction" value="up"
+                                        class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
+                                        @(i == 0 ? "disabled" : "")>&uarr;</button>
+                                <button type="submit" name="direction" value="down"
+                                        class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
+                                        @(i == Model.PlanDrills.Count - 1 ? "disabled" : "")>&darr;</button>
+                                <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm"
+                                        formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter })">
+                                    Remove
+                                </button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div class="hp-section">Add a drill</div>
+
+        <form method="get" asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId"
+              class="hp-row" style="margin:.6rem 0;">
+            <input class="hp-input" type="text" name="drillTag" value="@tagFilter"
+                   placeholder="Filter by drill tag (e.g. breakout)" style="flex:1;" />
+            <button type="submit" class="hp-btn hp-btn-sm">Filter</button>
+        </form>
+
+        @if (Model.AllDrillTags.Count > 0)
+        {
+            <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
+                @foreach (var tag in Model.AllDrillTags)
+                {
+                    <a class="hp-pill @(string.Equals(tagFilter, tag, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                       asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId"
+                       asp-route-drillTag="@tag">@tag</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(tagFilter))
+                {
+                    <a class="hp-muted" style="font-size:.8rem;align-self:center;"
+                       asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId">Clear</a>
+                }
+            </div>
+        }
+
+        @if (Model.Library.Count == 0)
+        {
+            <div class="hp-empty">
+                @if (!string.IsNullOrWhiteSpace(tagFilter))
+                {
+                    <text>No drills with that tag.</text>
+                }
+                else
+                {
+                    <text>
+                        Your drill library is empty.<br />
+                        <span class="hp-muted">Create a drill and it'll appear here, ready to add.</span>
+                    </text>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="hp-panel">
+                <ul class="hp-list">
+                    @foreach (var card in Model.Library)
+                    {
+                        <li style="flex-wrap:wrap;align-items:flex-start;">
+                            @await Html.PartialAsync("_DrillRow", card)
+                            <form method="post" asp-action="AddDrill" asp-route-slug="@slug"
+                                  asp-route-id="@planId" asp-route-drillTag="@tagFilter">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="drillId" value="@card.Drill.Id" />
+                                <button type="submit" class="hp-btn hp-btn-sm">Add</button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @* Carries the way back, so building a plan isn't interrupted by remembering a missing
+           drill halfway through. *@
+        <div class="hp-panel" style="margin-top:.6rem;">
+            <a class="hp-btn hp-btn-quiet" asp-controller="Drill" asp-action="New"
+               asp-route-slug="@slug"
+               asp-route-returnUrl="@(Context.Request.PathBase + Context.Request.Path + Context.Request.QueryString)">
+                + New drill
+            </a>
+            <span class="hp-muted" style="font-size:.8rem;margin-left:.5rem;">
+                Comes straight back here when you've saved it.
+            </span>
+        </div>
+    }
+
     @if (!Model.IsNew && Model.Plan is not null)
     {
         var plan = Model.Plan;
 
-        <div class="hp-section">Replace the PDF</div>
-        <div class="hp-panel">
-            <p class="hp-muted" style="margin-top:0;">
-                Swap in a corrected file. The link players already have keeps working, and
-                who's already read it isn't reset. Links are re-read from the new PDF —
-                anything you've renamed or hidden here is kept where the same link is still
-                in the new file.
-            </p>
-            <form method="post" enctype="multipart/form-data" class="hp-row"
-                  asp-action="ReplaceFile" asp-route-slug="@slug" asp-route-id="@plan.Id">
-                @Html.AntiForgeryToken()
-                <input class="hp-input" type="file" name="file" accept="application/pdf,.pdf"
-                       required style="flex:1;min-width:12rem;" />
-                <button type="submit" class="hp-btn hp-btn-quiet" data-busy="Replacing…">Replace</button>
-            </form>
-        </div>
+        @if (!Model.IsDrillPlan)
+        {
+            <div class="hp-section">Replace the PDF</div>
+            <div class="hp-panel">
+                <p class="hp-muted" style="margin-top:0;">
+                    Swap in a corrected file. The link players already have keeps working, and
+                    who's already read it isn't reset. Links are re-read from the new PDF —
+                    anything you've renamed or hidden here is kept where the same link is still
+                    in the new file.
+                </p>
+                <form method="post" enctype="multipart/form-data" class="hp-row"
+                      asp-action="ReplaceFile" asp-route-slug="@slug" asp-route-id="@plan.Id">
+                    @Html.AntiForgeryToken()
+                    <input class="hp-input" type="file" name="file" accept="application/pdf,.pdf"
+                           required style="flex:1;min-width:12rem;" />
+                    <button type="submit" class="hp-btn hp-btn-quiet" data-busy="Replacing…">Replace</button>
+                </form>
+            </div>
+        }
 
         <div class="hp-section">Publishing</div>
         <div class="hp-panel">
@@ -222,14 +365,25 @@
         </div>
 
         <div class="hp-panel">
-            <div class="hp-muted" style="margin-bottom:.5rem;">
-                @plan.OriginalFileName · @PlanStorageService.Human(plan.ByteSize)
-            </div>
+            @if (!Model.IsDrillPlan)
+            {
+                <div class="hp-muted" style="margin-bottom:.5rem;">
+                    @plan.OriginalFileName · @PlanStorageService.Human(plan.ByteSize)
+                </div>
+            }
             <form method="post" asp-action="DeletePlan" asp-route-slug="@slug" asp-route-id="@plan.Id"
-                  data-confirm="Delete this plan and its PDF? This cannot be undone.">
+                  data-confirm="@(Model.IsDrillPlan
+                      ? "Delete this plan? The drills in it stay in your library. This cannot be undone."
+                      : "Delete this plan and its PDF? This cannot be undone.")">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="hp-btn hp-btn-danger">Delete plan</button>
             </form>
+            @if (Model.IsDrillPlan)
+            {
+                <div class="hp-muted" style="font-size:.78rem;margin-top:.3rem;">
+                    Only the plan goes — every drill stays in your library.
+                </div>
+            }
         </div>
     }
 </div>

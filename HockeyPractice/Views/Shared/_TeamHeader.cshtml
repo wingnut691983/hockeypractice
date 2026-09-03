@@ -182,6 +182,11 @@
             <span class="hp-tab-icon" aria-hidden="true">▤</span>
             <span>Plans</span>
         </a>
+        <a class="hp-tab @(section == "drills" ? "active" : "")"
+           asp-controller="Drill" asp-action="Index" asp-route-slug="@slug">
+            <span class="hp-tab-icon" aria-hidden="true">◎</span>
+            <span>Drills</span>
+        </a>
         <a class="hp-tab @(section == "manage" ? "active" : "")"
            asp-controller="Coach" asp-action="Index" asp-route-slug="@slug">
             <span class="hp-tab-icon" aria-hidden="true">⚙</span>

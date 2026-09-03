@@ -45,6 +45,20 @@ public class PlanEditViewModel
     public string? RetainedNotes { get; init; }
     public string? RetainedTags { get; init; }
 
+    /// <summary>Which kind of plan this is. Chosen at creation and not switched afterwards.</summary>
+    public PlanKind Kind { get; init; } = PlanKind.Pdf;
+    public bool IsDrillPlan => Kind == PlanKind.Drills;
+
+    /// <summary>The drills in this plan, in order.</summary>
+    public List<DrillCard> PlanDrills { get; init; } = new();
+
+    /// <summary>The team's library, filtered by ActiveDrillTag, offered for adding.</summary>
+    public List<DrillCard> Library { get; init; } = new();
+
+    /// <summary>Drill tags — a separate vocabulary from the plan tags above, hence the name.</summary>
+    public List<string> AllDrillTags { get; init; } = new();
+    public string? ActiveDrillTag { get; init; }
+
     /// <summary>Distinct tag names used anywhere on the team, for the tag field's autocomplete.</summary>
     public List<string> AllTags { get; init; } = new();
 

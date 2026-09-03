@@ -81,11 +81,16 @@ public class PlanCard
 {
     public PracticePlan Plan { get; init; } = null!;
     public int VideoCount { get; init; }
+
+    /// <summary>Drills in the plan. A drill plan shows this in place of a video count.</summary>
+    public int DrillCount { get; init; }
+
     public bool ViewedByMe { get; init; }
 
     /// <summary>"Tomorrow, 6:15 PM" for anything close, otherwise an absolute date.</summary>
     public string WhenLabel { get; init; } = string.Empty;
     public bool IsDraft => Plan.Status == PlanStatus.Draft;
+    public bool IsDrillPlan => Plan.Kind == PlanKind.Drills;
 }
 
 public class PlanDetailViewModel
@@ -93,6 +98,16 @@ public class PlanDetailViewModel
     public TeamContext Ctx { get; init; } = null!;
     public PracticePlan Plan { get; init; } = null!;
     public List<PlanLink> Videos { get; init; } = new();
+
+    /// <summary>
+    /// The plan's drills in order, for a drill plan. Filled by PlanController.Details — the coach's
+    /// editor is built by a different action, so forgetting this here shows the coach a complete
+    /// plan and the team an empty one.
+    /// </summary>
+    public List<DrillCard> Drills { get; init; } = new();
+
+    public bool IsDrillPlan => Plan.Kind == PlanKind.Drills;
+
     public string WhenLabel { get; init; } = string.Empty;
     public bool ViewedByMe { get; init; }
 

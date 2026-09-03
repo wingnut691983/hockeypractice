@@ -221,6 +221,48 @@ a.hp-card:active { transform: scale(.99); }
 .hp-card-next .hp-pill { background: color-mix(in srgb, var(--hp-on-next, #fff) 20%, transparent);
                          color: var(--hp-on-next, #fff); }
 
+/* ── Drills in a plan ──────────────────────────────────────
+   Built entirely from the theme tokens, never literal colours: dark mode works by redefining
+   those at :root, so a hardcoded background here would look right all day and be unreadable
+   at night. */
+
+.hp-drill {
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  box-shadow: var(--hp-shadow);
+  padding: 1rem;
+  margin-bottom: .75rem;
+}
+.hp-drill-head { display: flex; align-items: flex-start; gap: .6rem; }
+.hp-drill-num {
+  flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--hp-primary); color: var(--hp-on-primary, #fff);
+  display: grid; place-items: center;
+  font-weight: 800; font-size: .82rem;
+}
+.hp-drill-title {
+  font-size: 1.08rem; font-weight: 750; letter-spacing: -.01em;
+  margin: .15rem 0 0;
+}
+/* pre-wrap so the coach's own line breaks survive. Razor encodes the text, so this is layout
+   only — it can't turn typed markup into live HTML. */
+.hp-drill-body {
+  white-space: pre-wrap;
+  margin-top: .5rem;
+  color: var(--hp-text);
+}
+.hp-drill-diagram {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: .7rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  background: #fff;   /* diagrams are usually line art on white; keep that behind transparency */
+}
+
 /* ── Video strip ───────────────────────────────────────── */
 
 .hp-videos {

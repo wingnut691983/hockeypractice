@@ -1,0 +1,164 @@
+@using HockeyPractice.Services
+@model DrillEditViewModel
+@{
+    ViewBag.Title = (Model.IsNew ? "New drill" : "Edit drill") + " – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+    var slug = Model.Ctx.Team.Slug;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">@(Model.IsNew ? "New drill" : "Edit drill")</h1>
+
+    @if (Model.Notice is not null)
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+
+    @if (!Model.IsNew && Model.UsedInPlans > 0)
+    {
+        <div class="hp-muted" style="margin-top:.4rem;">
+            Used in @Model.UsedInPlans plan@(Model.UsedInPlans == 1 ? "" : "s") — changes here show
+            up in @(Model.UsedInPlans == 1 ? "it" : "all of them").
+        </div>
+    }
+
+    @* enctype matters: without it the browser posts the filename only and the file arrives null,
+       with nothing to indicate anything went wrong. *@
+    <form method="post" enctype="multipart/form-data" class="hp-form" style="margin-top:1rem;"
+          asp-action="@(Model.IsNew ? "Create" : "Update")"
+          asp-route-slug="@slug" asp-route-id="@Model.Drill?.Id">
+        @Html.AntiForgeryToken()
+        @if (!string.IsNullOrEmpty(Model.ReturnUrl))
+        {
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        }
+
+        <div class="hp-field">
+            <label class="hp-label" for="title">Drill name</label>
+            <input class="hp-input" id="title" name="title" required maxlength="140"
+                   value="@Model.TitleValue" placeholder="e.g. D-to-D reversal breakout" />
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="description">How it's run</label>
+            <textarea class="hp-textarea" id="description" name="description" maxlength="4000"
+                      style="min-height:9rem;"
+                      placeholder="Setup, the progression, coaching points…">@Model.DescriptionValue</textarea>
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="tags">Drill tags (comma separated)</label>
+            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingDrillTags"
+                   value="@Model.TagsValue" placeholder="breakout, D-zone, small area" />
+            <span class="hp-muted" style="font-size:.8rem;">
+                How you'll find this drill later when building a plan.
+            </span>
+        </div>
+        @if (Model.AllTags.Count > 0)
+        {
+            <datalist id="existingDrillTags">
+                @foreach (var tag in Model.AllTags) { <option value="@tag"></option> }
+            </datalist>
+        }
+
+        <div class="hp-field">
+            <label class="hp-label" for="videoUrl">Video link (optional)</label>
+            <input class="hp-input" id="videoUrl" name="videoUrl" maxlength="500" inputmode="url"
+                   value="@Model.VideoUrlValue" placeholder="https://youtu.be/…" />
+            <span class="hp-muted" style="font-size:.8rem;">
+                Paste a YouTube or Vimeo link and it plays right inside the plan. Other links open
+                in a new tab. Leave it blank and no video button shows.
+            </span>
+        </div>
+
+        <div class="hp-field">
+            <label class="hp-label" for="diagram">Diagram (optional)</label>
+            @if (Model.Drill?.DiagramFileName is { } existing)
+            {
+                var isPdf = existing.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+                <div class="hp-muted" style="font-size:.82rem;margin-bottom:.35rem;">
+                    Currently: @(isPdf ? "a PDF" : "an image")
+                    (@PlanStorageService.Human(Model.Drill.DiagramBytes)).
+                    <a asp-action="Diagram" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id"
+                       target="_blank" rel="noopener noreferrer">View</a>
+                </div>
+                @if (!isPdf)
+                {
+                    <img class="hp-drill-diagram" style="max-height:14rem;width:auto;margin-bottom:.4rem;"
+                         src="@Url.Action("Diagram", new { slug, id = Model.Drill.Id })"
+                         alt="Current diagram for @Model.Drill.Title" />
+                }
+            }
+            <input class="hp-input" type="file" id="diagram" name="diagram"
+                   accept="image/*,application/pdf,.pdf" />
+            <span class="hp-muted" style="font-size:.8rem;">
+                A photo or screenshot shows right inside the plan, and gets shrunk automatically. A
+                PDF shows as a link players tap to open &mdash; images are easier to read on a phone.
+                @if (Model.Drill?.DiagramFileName is not null)
+                {
+                    <text>Choosing a new file replaces the current one.</text>
+                }
+            </span>
+        </div>
+
+        <button type="submit" class="hp-btn hp-btn-block" data-busy="Saving…">
+            @(Model.IsNew ? "Save drill" : "Save changes")
+        </button>
+    </form>
+
+    @* Outside the form above: nested forms are invalid HTML and the browser drops the inner one,
+       which would make these buttons submit the edit form instead. *@
+    @if (!Model.IsNew && Model.Drill is not null)
+    {
+        <div class="hp-section">This drill</div>
+        <div class="hp-panel">
+            @if (Model.Drill.IsArchived)
+            {
+                <p class="hp-muted" style="margin-top:0;">
+                    Archived — it doesn't show up when building a plan, but plans already using it
+                    are unaffected.
+                </p>
+                <form method="post" asp-action="Unarchive" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn hp-btn-quiet">Put back in the library</button>
+                </form>
+            }
+            else
+            {
+                <p class="hp-muted" style="margin-top:0;">
+                    Archiving hides a drill from the picker without touching the plans that already
+                    use it. That's the safe way to retire one.
+                </p>
+                <form method="post" asp-action="Archive" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn hp-btn-quiet">Archive</button>
+                </form>
+            }
+
+            <form method="post" asp-action="Delete" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id"
+                  style="margin-top:.8rem;"
+                  data-confirm="Delete this drill for good? This can't be undone.">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="hp-btn hp-btn-danger">Delete drill</button>
+            </form>
+            <div class="hp-muted" style="font-size:.78rem;margin-top:.3rem;">
+                @if (Model.UsedInPlans > 0)
+                {
+                    <text>
+                        Used in @Model.UsedInPlans plan@(Model.UsedInPlans == 1 ? "" : "s"), so it
+                        can't be deleted — archive it instead.
+                    </text>
+                }
+                else
+                {
+                    <text>Not used in any plan, so this will remove it and its diagram.</text>
+                }
+            </div>
+        </div>
+    }
+</div>

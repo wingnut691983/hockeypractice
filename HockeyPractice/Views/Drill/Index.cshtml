@@ -1,0 +1,143 @@
+@model DrillListViewModel
+@{
+    ViewBag.Title = "Drills – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+    var slug = Model.Ctx.Team.Slug;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">@(Model.ShowingArchived ? "Archived drills" : "Drills")</h1>
+
+    @if (Model.Notice is not null)
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
+
+    @if (!Model.ShowingArchived)
+    {
+        <p class="hp-muted" style="margin-top:0;">
+            Your reusable drills. Build a practice plan from these instead of drawing one up again.
+        </p>
+
+        <a class="hp-btn hp-btn-accent hp-btn-block" style="margin:1rem 0;"
+           asp-action="New" asp-route-slug="@slug">+ New drill</a>
+    }
+    else
+    {
+        <p class="hp-muted" style="margin-top:0;">
+            These are out of the way but not gone — any plan already using one still shows it.
+        </p>
+        <a class="hp-btn hp-btn-quiet" style="margin:1rem 0;"
+           asp-action="Index" asp-route-slug="@slug">&#8249; Back to drills</a>
+    }
+
+    <form method="get" asp-action="Index" asp-route-slug="@slug" class="hp-row" style="margin:.6rem 0;">
+        @if (Model.ShowingArchived)
+        {
+            <input type="hidden" name="archived" value="true" />
+        }
+        <input class="hp-input" type="text" name="tag" value="@Model.ActiveTag"
+               placeholder="Search drill tags (e.g. breakout)" style="flex:1;" />
+        <button type="submit" class="hp-btn hp-btn-sm">Search</button>
+    </form>
+
+    @if (Model.AllTags.Count > 0)
+    {
+        <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
+            @foreach (var tag in Model.AllTags)
+            {
+                <a class="hp-pill @(string.Equals(Model.ActiveTag, tag, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@tag"
+                   asp-route-archived="@(Model.ShowingArchived ? "true" : null)">@tag</a>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+    {
+        <div class="hp-muted" style="margin-bottom:.6rem;">
+            Showing drills tagged &ldquo;@Model.ActiveTag&rdquo; ·
+            <a asp-action="Index" asp-route-slug="@slug"
+               asp-route-archived="@(Model.ShowingArchived ? "true" : null)">Clear</a>
+        </div>
+    }
+
+    @if (Model.Drills.Count == 0)
+    {
+        <div class="hp-empty">
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+            {
+                <text>No drills with that tag.</text>
+            }
+            else if (Model.ShowingArchived)
+            {
+                <text>Nothing archived.</text>
+            }
+            else
+            {
+                <text>
+                    No drills yet.<br />
+                    <span class="hp-muted">Add one and it's ready to drop into any practice plan.</span>
+                </text>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="hp-panel">
+            <ul class="hp-list">
+                @foreach (var card in Model.Drills)
+                {
+                    <li style="flex-wrap:wrap;align-items:flex-start;">
+                        @await Html.PartialAsync("_DrillRow", card)
+                        <a class="hp-btn hp-btn-quiet hp-btn-sm"
+                           asp-action="Edit" asp-route-slug="@slug" asp-route-id="@card.Drill.Id">Edit</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @* Copying is by value: each team gets its own drill to edit, so tuning one for a younger
+       group can't rewrite what another team already published. *@
+    @if (!Model.ShowingArchived)
+    {
+        <div class="hp-section">Share with another team</div>
+        <div class="hp-panel">
+            @if (Model.CopyTargets.Count == 0)
+            {
+                <p class="hp-muted" style="margin-top:0;">
+                    You're only signed in to manage this team in this browser. Enter another team's
+                    manager code and it'll show up here as somewhere to copy drills to.
+                </p>
+                <a class="hp-btn hp-btn-quiet hp-btn-sm" asp-controller="Home" asp-action="Index">
+                    Go to the teams
+                </a>
+            }
+            else
+            {
+                <p class="hp-muted" style="margin-top:0;">
+                    Copies every drill above into another team you manage, skipping any it already
+                    has. Each team keeps its own copy to edit &mdash; handy at the end of a season.
+                </p>
+                <form method="post" asp-action="CopyAll" asp-route-slug="@slug" class="hp-row"
+                      data-confirm="Copy all of these drills into the team you picked?">
+                    @Html.AntiForgeryToken()
+                    <select class="hp-select" name="targetSlug" style="flex:1;min-width:12rem;">
+                        @foreach (var team in Model.CopyTargets)
+                        {
+                            <option value="@team.Slug">@team.Name</option>
+                        }
+                    </select>
+                    <button type="submit" class="hp-btn" data-busy="Copying…">Copy all</button>
+                </form>
+            }
+        </div>
+
+        <div class="hp-panel" style="margin-top:.6rem;">
+            <a class="hp-muted" asp-action="Index" asp-route-slug="@slug" asp-route-archived="true"
+               style="font-size:.85rem;">View archived drills</a>
+        </div>
+    }
+</div>

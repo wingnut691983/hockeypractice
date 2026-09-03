@@ -3,6 +3,7 @@ using System;
 using HockeyPractice.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,110 +11,14 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HockeyPractice.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903035147_AddPlanKind")]
+    partial class AddPlanKind
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
-
-            modelBuilder.Entity("HockeyPractice.Models.Drill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("CopiedFromDrillId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(4000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("DiagramBytes")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("DiagramFileName")
-                        .HasMaxLength(120)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TeamId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(140)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("VideoUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TeamId", "IsArchived");
-
-                    b.ToTable("Drills");
-                });
-
-            modelBuilder.Entity("HockeyPractice.Models.DrillTag", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("DrillId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NormalizedName");
-
-                    b.HasIndex("DrillId", "NormalizedName")
-                        .IsUnique();
-
-                    b.ToTable("DrillTags");
-                });
-
-            modelBuilder.Entity("HockeyPractice.Models.PlanDrill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("DrillId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("PracticePlanId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DrillId");
-
-                    b.HasIndex("PracticePlanId", "SortOrder");
-
-                    b.ToTable("PlanDrills");
-                });
 
             modelBuilder.Entity("HockeyPractice.Models.PlanLink", b =>
                 {
@@ -423,47 +328,6 @@ namespace HockeyPractice.Migrations
                     b.ToTable("Teams");
                 });
 
-            modelBuilder.Entity("HockeyPractice.Models.Drill", b =>
-                {
-                    b.HasOne("HockeyPractice.Models.Team", "Team")
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Team");
-                });
-
-            modelBuilder.Entity("HockeyPractice.Models.DrillTag", b =>
-                {
-                    b.HasOne("HockeyPractice.Models.Drill", "Drill")
-                        .WithMany("Tags")
-                        .HasForeignKey("DrillId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Drill");
-                });
-
-            modelBuilder.Entity("HockeyPractice.Models.PlanDrill", b =>
-                {
-                    b.HasOne("HockeyPractice.Models.Drill", "Drill")
-                        .WithMany()
-                        .HasForeignKey("DrillId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("HockeyPractice.Models.PracticePlan", "PracticePlan")
-                        .WithMany("Drills")
-                        .HasForeignKey("PracticePlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Drill");
-
-                    b.Navigation("PracticePlan");
-                });
-
             modelBuilder.Entity("HockeyPractice.Models.PlanLink", b =>
                 {
                     b.HasOne("HockeyPractice.Models.PracticePlan", "PracticePlan")
@@ -544,15 +408,8 @@ namespace HockeyPractice.Migrations
                     b.Navigation("Team");
                 });
 
-            modelBuilder.Entity("HockeyPractice.Models.Drill", b =>
-                {
-                    b.Navigation("Tags");
-                });
-
             modelBuilder.Entity("HockeyPractice.Models.PracticePlan", b =>
                 {
-                    b.Navigation("Drills");
-
                     b.Navigation("Links");
 
                     b.Navigation("Tags");

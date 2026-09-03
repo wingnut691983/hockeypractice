@@ -1,0 +1,33 @@
+@model TeamContext
+@{
+    ViewBag.Title = "New plan – " + Model.Team.Name;
+    ViewBag.Team = Model.Team;
+    var slug = Model.Team.Slug;
+}
+@await Html.PartialAsync("_TeamHeader", Model)
+
+<div class="hp-shell">
+    <h1 class="hp-title">New practice plan</h1>
+    <p class="hp-muted" style="margin-top:0;">How do you want to put this one together?</p>
+
+    @* Two links rather than a radio that shows and hides the file input. Nothing to mis-toggle,
+       and each form only ever contains the fields it actually needs. *@
+    <a class="hp-card" style="margin-top:1rem;"
+       asp-action="NewPlan" asp-route-slug="@slug" asp-route-kind="@PlanKind.Drills">
+        <div class="hp-card-title">Build it from drills</div>
+        <div class="hp-card-meta">
+            <span>Pick drills from your library, put them in order, and publish. No file needed.</span>
+        </div>
+    </a>
+
+    <a class="hp-card"
+       asp-action="NewPlan" asp-route-slug="@slug" asp-route-kind="@PlanKind.Pdf">
+        <div class="hp-card-title">Upload a PDF</div>
+        <div class="hp-card-meta">
+            <span>You've already drawn the whole plan up. Video links get read out of the file.</span>
+        </div>
+    </a>
+
+    <a class="hp-btn hp-btn-quiet" style="margin-top:1rem;"
+       asp-action="Index" asp-route-slug="@slug">Cancel</a>
+</div>

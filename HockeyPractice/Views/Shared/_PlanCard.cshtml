@@ -13,7 +13,11 @@
         {
             <span>@Model.Plan.Location</span>
         }
-        @if (Model.VideoCount > 0)
+        @if (Model.IsDrillPlan)
+        {
+            <span>@Model.DrillCount drill@(Model.DrillCount == 1 ? "" : "s")</span>
+        }
+        else if (Model.VideoCount > 0)
         {
             <span>@Model.VideoCount video@(Model.VideoCount == 1 ? "" : "s") to watch</span>
         }

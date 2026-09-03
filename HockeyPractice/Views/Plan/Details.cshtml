@@ -73,28 +73,102 @@
         </div>
     }
 
-    <div class="hp-section">The plan</div>
-    <div class="hp-viewer-wrap">
-        <div class="hp-viewer">
-            <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
+    @if (Model.IsDrillPlan)
+    {
+        <div class="hp-section">The plan</div>
+
+        @if (Model.Drills.Count == 0)
+        {
+            <div class="hp-empty">
+                No drills in this plan yet.<br />
+                <span class="hp-muted">Your coach is still putting it together.</span>
+            </div>
+        }
+        else
+        {
+            <div id="hp-drills">
+                @for (var i = 0; i < Model.Drills.Count; i++)
+                {
+                    var card = Model.Drills[i];
+                    var drill = card.Drill;
+                    var diagramUrl = Url.Action("Diagram", "Drill",
+                        new { slug = Model.Ctx.Team.Slug, id = drill.Id });
+
+                    <div class="hp-drill">
+                        <div class="hp-drill-head">
+                            <span class="hp-drill-num">@(i + 1)</span>
+                            <h2 class="hp-drill-title">@drill.Title</h2>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(drill.Description))
+                        {
+                            <div class="hp-drill-body">@drill.Description</div>
+                        }
+
+                        @if (card.HasDiagram)
+                        {
+                            @if (card.DiagramIsPdf)
+                            {
+                                <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;"
+                                   href="@diagramUrl" target="_blank" rel="noopener noreferrer">
+                                    Open the diagram (PDF)
+                                </a>
+                            }
+                            else
+                            {
+                                @* Real alt text, not alt="": a diagram is content, and an empty alt
+                                   would leave a screen-reader user with nothing at all here. *@
+                                <img class="hp-drill-diagram" src="@diagramUrl" loading="lazy"
+                                     alt="Diagram for @drill.Title" />
+                            }
+                        }
+
+                        @if (card.HasVideo)
+                        {
+                            @* data-embed is what the popup player picks up. Without it (a link we
+                               can't frame) this stays an ordinary link and opens in a new tab. *@
+                            <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;"
+                               href="@drill.VideoUrl"
+                               data-embed="@card.EmbedUrl" data-label="@drill.Title"
+                               target="_blank" rel="noopener noreferrer">
+                                ▶ Watch the drill
+                            </a>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="hp-row" style="margin-top:.8rem;">
+            <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
+                    hidden data-title="@Model.Plan.Title">Share</button>
+        </div>
+    }
+    else
+    {
+        <div class="hp-section">The plan</div>
+        <div class="hp-viewer-wrap">
+            <div class="hp-viewer">
+                <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
+            </div>
+
+            @* Auto-sizing the PDF (below) removes pdf.js's own scroll region so the whole page
+               scrolls as one — but that also means its toolbar, which used to stay pinned at the
+               top of a small fixed box, now scrolls away with everything else in a long plan.
+               This floats independently, reachable no matter how far into the document you've
+               scrolled, and is the ONLY way to zoom now that pinch is deliberately disabled. *@
+            <div class="hp-zoom" id="hp-zoom" hidden>
+                <button type="button" id="hp-zoom-out" aria-label="Zoom out">&#8722;</button>
+                <button type="button" id="hp-zoom-in" aria-label="Zoom in">+</button>
+            </div>
         </div>
 
-        @* Auto-sizing the PDF (below) removes pdf.js's own scroll region so the whole page
-           scrolls as one — but that also means its toolbar, which used to stay pinned at the
-           top of a small fixed box, now scrolls away with everything else in a long plan.
-           This floats independently, reachable no matter how far into the document you've
-           scrolled, and is the ONLY way to zoom now that pinch is deliberately disabled. *@
-        <div class="hp-zoom" id="hp-zoom" hidden>
-            <button type="button" id="hp-zoom-out" aria-label="Zoom out">&#8722;</button>
-            <button type="button" id="hp-zoom-in" aria-label="Zoom in">+</button>
+        <div class="hp-row" style="margin-top:.8rem;">
+            <a class="hp-btn hp-btn-quiet" href="@downloadUrl">Download PDF</a>
+            <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
+                    hidden data-title="@Model.Plan.Title">Share</button>
         </div>
-    </div>
-
-    <div class="hp-row" style="margin-top:.8rem;">
-        <a class="hp-btn hp-btn-quiet" href="@downloadUrl">Download PDF</a>
-        <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
-                hidden data-title="@Model.Plan.Title">Share</button>
-    </div>
+    }
 
     @if (Model.Ctx.IsManager)
     {
@@ -209,7 +283,9 @@
     // Videos play over the plan instead of navigating away. With several drills to watch,
     // a new tab per video leaves a 15-year-old stranded in a stack of tabs and they stop
     // coming back to the plan.
-    var cards = Array.prototype.slice.call(document.querySelectorAll('.hp-video[data-embed]'))
+    // Any element carrying data-embed, not just the .hp-video cards: a drill plan's "Watch the
+    // drill" buttons join the same list, so Previous/Next walks the practice in order.
+    var cards = Array.prototype.slice.call(document.querySelectorAll('[data-embed]'))
         .filter(function (c) { return c.dataset.embed; });
 
     var modal = document.getElementById('hp-player');
@@ -495,6 +571,15 @@
         interceptPdfLinks();   // in case the frame finished before this script ran
         autoSizePdfFrame();
         wireZoomControl();
+    }
+
+    // A drill plan has no PDF frame, so the load event above never fires and nothing would ever
+    // be recorded — the coach's "12 of 17" would sit at zero while looking like it worked. Same
+    // intent as the PDF path: count it once the content is actually on screen, not on page load,
+    // so a bounce isn't a view. record() is guarded, so the two paths can't double-count.
+    var drillList = document.getElementById('hp-drills');
+    if (!pdfFrame && drillList) {
+        setTimeout(record, 2000);
     }
 
     // Native share sheet, for pasting into the team group chat. Hidden where unsupported.
