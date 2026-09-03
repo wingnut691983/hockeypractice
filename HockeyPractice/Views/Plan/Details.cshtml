@@ -87,13 +87,41 @@
         else
         {
             var total = RunTimeTotal.From(Model.Drills);
-            if (total.HasAnything && !string.IsNullOrEmpty(total.Label))
-            {
-                <div class="hp-runtime-total">
-                    <strong>@Model.Drills.Count drill@(Model.Drills.Count == 1 ? "" : "s")</strong>
-                    · @total.Label
-                </div>
-            }
+
+            @* What the practice is made of, before the detail of how to run each piece. A coach
+               glancing at this before stepping on the ice wants the shape of the session and
+               whether it fits the ice time — not to scroll through every diagram to find out. *@
+            <div class="hp-runtime-total">
+                <strong>@Model.Drills.Count drill@(Model.Drills.Count == 1 ? "" : "s")</strong>
+                @if (!string.IsNullOrEmpty(total.Label))
+                {
+                    <text> · @total.Label</text>
+                }
+            </div>
+
+            <ol class="hp-plan-summary">
+                @for (var i = 0; i < Model.Drills.Count; i++)
+                {
+                    var summaryDrill = Model.Drills[i].Drill;
+                    <li>
+                        @* Jumps to the drill below. On a plan with a dozen drills and a diagram
+                           each, scrolling to find the third one is the whole problem. *@
+                        <a href="#hp-drill-@(i + 1)">@summaryDrill.Title</a>
+                        <span class="hp-plan-summary-time">
+                            @if (summaryDrill.RunTimeMinutes is int summaryMins)
+                            {
+                                @HockeyPractice.Infrastructure.RunTime.Human(summaryMins)
+                            }
+                            else
+                            {
+                                @* An em dash rather than a blank, so an unset time reads as
+                                   "not estimated" instead of looking like something failed. *@
+                                <text>&mdash;</text>
+                            }
+                        </span>
+                    </li>
+                }
+            </ol>
 
             <div id="hp-drills">
                 @for (var i = 0; i < Model.Drills.Count; i++)
@@ -101,7 +129,7 @@
                     var card = Model.Drills[i];
                     var drill = card.Drill;
 
-                    <div class="hp-drill">
+                    <div class="hp-drill" id="hp-drill-@(i + 1)">
                         <div class="hp-drill-head">
                             <span class="hp-drill-num">@(i + 1)</span>
                             <h2 class="hp-drill-title">@drill.Title</h2>

@@ -247,6 +247,43 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-runtime-total strong { color: var(--hp-text); }
 
+/* The running order, above the drills themselves. Numbers come from the <ol> so they can't drift
+   out of step with the numbered drills below. */
+.hp-plan-summary {
+  list-style: decimal;
+  margin: 0 0 1.1rem;
+  padding-left: 1.5rem;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius);
+  padding-top: .7rem;
+  padding-bottom: .7rem;
+  padding-right: .9rem;
+}
+.hp-plan-summary li {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  padding: .28rem 0;
+  color: var(--hp-muted);
+}
+.hp-plan-summary li + li { border-top: 1px solid var(--hp-border); }
+.hp-plan-summary a {
+  flex: 1;
+  min-width: 0;
+  font-weight: 650;
+  color: var(--hp-text);
+  text-decoration: none;
+}
+.hp-plan-summary-time {
+  flex-shrink: 0;
+  font-size: .82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Jumping to a drill shouldn't leave it flush against the top of the window. */
+.hp-drill { scroll-margin-top: .8rem; }
+
 .hp-drill-head { display: flex; align-items: flex-start; gap: .6rem; }
 /* Pushed to the right of the drill title, so a player scanning the plan can see how long each
    piece runs without it competing with the name. */

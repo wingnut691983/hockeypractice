@@ -9,3 +9,16 @@ data/
 **/.DS_Store
 *.md
 .claude/
+
+# A framework-dependent publish ships SQLite's native library for every RID .NET knows about —
+# Windows, macOS, Android, MIPS, s390x, the lot. That's 24 MB, of which this container can only
+# ever load one: the base image is mcr.microsoft.com/dotnet/aspnet:8.0, which is Debian on
+# amd64, so linux-x64 (glibc) is the one it needs. NOT linux-musl-x64 — that's for Alpine.
+#
+# Only affects Dockerfile.fast, which copies the host's publish/ output. The canonical Dockerfile
+# publishes inside the build container, where this doesn't apply.
+#
+# Left in, this made the app layer ~45 MB and the registry began timing out the upload with a
+# 524 partway through. Dropping the dead weight roughly halves both the image and the push.
+publish/runtimes/**
+!publish/runtimes/linux-x64/**
