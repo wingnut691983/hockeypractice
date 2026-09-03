@@ -90,7 +90,10 @@
                 </div>
                 @if (!isPdf)
                 {
-                    <img class="hp-drill-diagram" style="max-height:14rem;width:auto;margin-bottom:.4rem;"
+                    @* No width here on purpose. width:auto used to sit in this style and read
+                       like it prevented stretching, when auto is the very condition that lets a
+                       flex parent stretch it — the class handles that with align-self. *@
+                    <img class="hp-drill-diagram" style="max-height:14rem;margin-bottom:.4rem;"
                          src="@Url.Action("Diagram", new { slug, id = Model.Drill.Id })"
                          alt="Current diagram for @Model.Drill.Title" />
                 }

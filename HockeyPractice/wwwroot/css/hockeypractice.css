@@ -261,6 +261,17 @@ a.hp-card:active { transform: scale(.99); }
   border: 1px solid var(--hp-border);
   border-radius: 10px;
   background: #fff;   /* diagrams are usually line art on white; keep that behind transparency */
+
+  /* Both of these keep the picture in proportion, and both are load-bearing.
+     align-self: .hp-field is a COLUMN flex container, so a direct-child image is stretched to
+     the field's full width by the default align-items:stretch. Pair that forced width with a
+     max-height and the browser has two definite dimensions and drops the aspect ratio — a
+     portrait diagram came out visibly squashed. flex-start keeps the width auto so max-width
+     and max-height resolve together and the ratio survives.
+     object-fit: insurance for the same class of mistake later — if something ever does pin both
+     dimensions, letterbox rather than distort. */
+  align-self: flex-start;
+  object-fit: contain;
 }
 
 /* ── Pasted / dropped diagram ──────────────────────────────
@@ -278,6 +289,10 @@ a.hp-card:active { transform: scale(.99); }
   max-width: 100%;
   max-height: 12rem;
   width: auto;
+  height: auto;       /* with max-width and max-height both live, leaving these auto is what
+                         lets the browser scale on the ratio instead of picking one axis */
+  align-self: flex-start;
+  object-fit: contain;
   border-radius: 8px;
   background: #fff;   /* diagrams are line art on white; keep that behind transparency */
 }
