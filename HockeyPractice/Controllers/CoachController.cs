@@ -274,7 +274,10 @@ public class CoachController : TeamScopedController
         });
         await Db.SaveChangesAsync();
 
-        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+        // Back to the same row in the library, not the top of the page. Building a plan means
+        // adding several drills in a row, and being thrown back to the top after each one means
+        // scrolling to find your place again every single time.
+        return BackToPlan(slug, id, drillTag, $"lib-{drill.Id}");
     }
 
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/remove")]
@@ -292,7 +295,8 @@ public class CoachController : TeamScopedController
         Db.PlanDrills.Remove(entry);
         await Db.SaveChangesAsync();
 
-        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+        // The row itself is gone, so aim at the list rather than a now-missing anchor.
+        return BackToPlan(slug, id, drillTag, "hp-plan-drills");
     }
 
     /// <summary>
@@ -319,13 +323,15 @@ public class CoachController : TeamScopedController
 
         var neighbour = direction == "up" ? index - 1 : index + 1;
         if (neighbour < 0 || neighbour >= ordered.Count)
-            return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+            return BackToPlan(slug, id, drillTag, $"pd-{planDrillId}");
 
         (ordered[index].SortOrder, ordered[neighbour].SortOrder) =
             (ordered[neighbour].SortOrder, ordered[index].SortOrder);
 
         await Db.SaveChangesAsync();
-        return RedirectToAction(nameof(EditPlan), new { slug, id, drillTag });
+
+        // Follow the row that moved, so the coach's eye stays on it through a run of reorders.
+        return BackToPlan(slug, id, drillTag, $"pd-{planDrillId}");
     }
 
     [HttpPost("plans/{id:int}")]
@@ -793,6 +799,16 @@ public class CoachController : TeamScopedController
 
     private static bool IsSpotifyPlaylistUrl(string value) =>
         SpotifyPlaylistUrlPattern.IsMatch(value);
+
+    /// <summary>
+    /// Back to the plan editor, scrolled to the thing that was just acted on.
+    ///
+    /// RedirectToAction can't carry a fragment, and without one every add, move or remove lands
+    /// at the top of a long page — which is precisely the page a coach spends the most time
+    /// scrolling through.
+    /// </summary>
+    private IActionResult BackToPlan(string slug, int id, string? drillTag, string anchor) =>
+        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag }) + "#" + anchor);
 
     /// <summary>The plan's drills, in order. Ties on SortOrder break on Id so the order is stable.</summary>
     private async Task<List<DrillCard>> PlanDrillsAsync(int planId)

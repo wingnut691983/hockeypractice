@@ -93,7 +93,23 @@
         <div class="hp-field">
             <label class="hp-label" for="diagram">Pictures (optional)</label>
 
-            <input class="hp-input" type="file" id="diagram" name="diagrams" multiple
+            @* The file input used to be the whole box, so clicking anywhere near it — including
+               when you only meant to aim a paste — threw open the file dialog. It's now hidden
+               behind an explicit button, and the box itself is a focusable paste target. The
+               input keeps its name and stays inside the form, so a hidden file input still
+               posts its files exactly as before. *@
+            <div class="hp-pastebox" id="hp-pastebox" tabindex="0" role="button"
+                 aria-describedby="hp-pastebox-hint">
+                <span class="hp-pastebox-main">Click here, then paste a picture</span>
+                <span class="hp-pastebox-sub" id="hp-pastebox-hint">
+                    Cmd/Ctrl + V &mdash; or drag one onto the page
+                </span>
+                <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-pick">
+                    Choose files instead
+                </button>
+            </div>
+
+            <input type="file" id="diagram" name="diagrams" multiple hidden
                    accept="image/*,application/pdf,.pdf" />
 
             @* Filled in by the paste/drop script. Hidden until something is actually staged, so a
@@ -240,6 +256,8 @@
     var form = document.getElementById('hp-drill-form');
     if (!input || !form) return;
 
+    var pastebox = document.getElementById('hp-pastebox');
+    var pick = document.getElementById('hp-pick');
     var preview = document.getElementById('hp-paste-preview');
     var thumb = document.getElementById('hp-paste-thumb');
     var chip = document.getElementById('hp-paste-chip');
@@ -378,6 +396,30 @@
         input.value = '';
         hidePreview();
     });
+
+    // Only this button opens the file dialog. Clicking the box around it just arms it for a
+    // paste — which is the whole point of separating the two.
+    if (pick) {
+        pick.addEventListener('click', function (e) {
+            e.stopPropagation();   // don't also re-focus the box behind it
+            input.click();
+        });
+    }
+
+    if (pastebox) {
+        // Focusing gives a visible "ready" state. Paste itself is still bound to the document,
+        // so a coach who pastes without clicking here first is not punished for it — the box
+        // makes the gesture discoverable rather than mandatory.
+        pastebox.addEventListener('click', function () { pastebox.focus(); });
+
+        // A focusable div isn't a button to a keyboard or screen reader unless Enter and Space
+        // do something. Both open the picker, which is the only action available here.
+        pastebox.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            input.click();
+        });
+    }
 
     // Coming back via the Back button restores the page from the bfcache, but a file put into the
     // input by script does not reliably come back with it. Without this the preview would still be

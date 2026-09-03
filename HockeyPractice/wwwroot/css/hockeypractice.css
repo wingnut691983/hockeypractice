@@ -308,8 +308,11 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-plan-summary-foot.over { color: var(--hp-danger); border-color: var(--hp-danger); }
 .hp-plan-summary-foot strong { color: inherit; }
-/* Jumping to a drill shouldn't leave it flush against the top of the window. */
-.hp-drill { scroll-margin-top: .8rem; }
+/* Jumping to a drill shouldn't leave it flush against the top of the window. Same for the plan
+   editor's rows, which are landed on after every add, move and remove. */
+.hp-drill,
+.hp-list > li[id],
+.hp-section[id] { scroll-margin-top: 1rem; }
 
 .hp-drill-head { display: flex; align-items: flex-start; gap: .6rem; }
 /* Pushed to the right of the drill title, so a player scanning the plan can see how long each
@@ -374,6 +377,30 @@ a.hp-card:active { transform: scale(.99); }
   gap: .35rem;
   align-items: flex-start;
 }
+
+/* The paste target. Deliberately NOT the file input: clicking this arms a paste, and only the
+   button inside it opens the file dialog. */
+.hp-pastebox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: 1rem .8rem;
+  text-align: center;
+  background: var(--hp-surface-2);
+  border: 1px dashed var(--hp-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.hp-pastebox:focus,
+.hp-pastebox:focus-visible {
+  outline: 2px solid var(--hp-primary);
+  outline-offset: 1px;
+  border-color: var(--hp-primary);
+  border-style: solid;
+}
+.hp-pastebox-main { font-weight: 650; font-size: .9rem; color: var(--hp-text); }
+.hp-pastebox-sub { font-size: .78rem; color: var(--hp-muted); }
 
 /* ── Pasted / dropped diagram ──────────────────────────────
    Confirmation that a paste actually landed. Tokens only, so dark mode follows. */
