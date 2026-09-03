@@ -281,6 +281,33 @@ a.hp-card:active { transform: scale(.99); }
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* The clock reading as each drill starts. Tabular figures and a fixed width so the column lines
+   up down the page — a ragged clock is hard to read at a glance on the bench. */
+.hp-plan-summary-clock {
+  flex-shrink: 0;
+  min-width: 3.6rem;
+  font-variant-numeric: tabular-nums;
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--hp-primary-text);
+  white-space: nowrap;
+}
+/* Past the end of the ice time. Called out rather than left to be spotted, since it's the whole
+   reason for showing the clock. */
+.hp-plan-summary-clock.over { color: var(--hp-danger); }
+
+.hp-plan-summary-foot {
+  margin: -.6rem 0 1.1rem;
+  padding: .5rem .75rem;
+  font-size: .82rem;
+  color: var(--hp-muted);
+  background: var(--hp-surface-2);
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+}
+.hp-plan-summary-foot.over { color: var(--hp-danger); border-color: var(--hp-danger); }
+.hp-plan-summary-foot strong { color: inherit; }
 /* Jumping to a drill shouldn't leave it flush against the top of the window. */
 .hp-drill { scroll-margin-top: .8rem; }
 

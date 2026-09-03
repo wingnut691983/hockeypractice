@@ -99,11 +99,29 @@
                 }
             </div>
 
+            var starts = HockeyPractice.Infrastructure.RunTime.StartTimes(
+                Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+
             <ol class="hp-plan-summary">
                 @for (var i = 0; i < Model.Drills.Count; i++)
                 {
                     var summaryDrill = Model.Drills[i].Drill;
+                    var start = starts[i];
+
+                    @* What the clock reads when this drill starts, counting down from a full
+                       practice. Going negative is deliberate and useful — it says the plan
+                       overruns the ice time and by how much, so the coach knows what to trim. *@
                     <li>
+                        <span class="hp-plan-summary-clock @(start < 0 ? "over" : "")">
+                            @if (start is int startMins)
+                            {
+                                @HockeyPractice.Infrastructure.RunTime.Clock(startMins)
+                            }
+                            else
+                            {
+                                <text>&mdash;</text>
+                            }
+                        </span>
                         @* Jumps to the drill below. On a plan with a dozen drills and a diagram
                            each, scrolling to find the third one is the whole problem. *@
                         <a href="#hp-drill-@(i + 1)">@summaryDrill.Title</a>
@@ -122,6 +140,37 @@
                     </li>
                 }
             </ol>
+
+            var endsAt = starts.Count > 0 && starts[^1] is int lastStart
+                && Model.Drills[^1].Drill.RunTimeMinutes is int lastLen
+                    ? lastStart - lastLen
+                    : (int?)null;
+            @if (endsAt is int finish)
+            {
+                <div class="hp-plan-summary-foot @(finish < 0 ? "over" : "")">
+                    @if (finish < 0)
+                    {
+                        @* "the 80:00 practice", not "the 1 hr 20 min practice" — the clock is how
+                           a coach thinks about the slot, and it matches the column above. *@
+                        <text>
+                            Runs <strong>@HockeyPractice.Infrastructure.RunTime.Human(-finish) over</strong>
+                            the @HockeyPractice.Infrastructure.RunTime.Clock(HockeyPractice.Infrastructure.RunTime.PracticeMinutes)
+                            practice — trim one of the drills.
+                        </text>
+                    }
+                    else if (finish > 0)
+                    {
+                        <text>
+                            Finishes with <strong>@HockeyPractice.Infrastructure.RunTime.Clock(finish)</strong>
+                            left on the clock.
+                        </text>
+                    }
+                    else
+                    {
+                        <text>Fills the practice exactly.</text>
+                    }
+                </div>
+            }
 
             <div id="hp-drills">
                 @for (var i = 0; i < Model.Drills.Count; i++)
