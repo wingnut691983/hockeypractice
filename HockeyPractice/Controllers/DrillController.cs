@@ -68,7 +68,7 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Create(string slug, string title, string? description,
-        string? videoUrl, string? runTimeMinutes, string? tags, IFormFile? diagram,
+        string? videoUrl, string? runTimeMinutes, string? tags, List<IFormFile>? diagrams,
         string? returnUrl)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -97,20 +97,12 @@ public class DrillController : TeamScopedController
             Db.DrillTags.Add(new DrillTag { DrillId = drill.Id, Name = name, NormalizedName = norm });
 
         var notice = "Drill saved.";
-        if (diagram is { Length: > 0 })
+        var rejected = await AddDiagramsAsync(ctx.Team.Id, drill, diagrams);
+        if (rejected is not null)
         {
-            var saved = await _storage.SaveDiagramAsync(ctx.Team.Id, drill.Id, diagram);
-            if (saved.Ok)
-            {
-                drill.DiagramFileName = saved.FileName;
-                drill.DiagramBytes = saved.Bytes;
-            }
-            else
-            {
-                // Keep the drill rather than discarding everything the coach typed over a bad
-                // file — unlike a plan, a drill is perfectly useful without a diagram.
-                notice = $"Drill saved, but the diagram wasn't: {saved.Error}";
-            }
+            // Keep the drill rather than discarding everything the coach typed over a bad file —
+            // unlike a plan, a drill is perfectly useful without a diagram.
+            notice = $"Drill saved, but {rejected}";
         }
 
         await Db.SaveChangesAsync();
@@ -126,7 +118,7 @@ public class DrillController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var drill = await Db.Drills.Include(d => d.Tags)
+        var drill = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
@@ -145,12 +137,12 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Update(string slug, int id, string title, string? description,
-        string? videoUrl, string? runTimeMinutes, string? tags, IFormFile? diagram)
+        string? videoUrl, string? runTimeMinutes, string? tags, List<IFormFile>? diagrams)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var drill = await Db.Drills.Include(d => d.Tags)
+        var drill = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
@@ -167,26 +159,11 @@ public class DrillController : TeamScopedController
         SyncTags(drill, tags);
 
         var notice = $"Saved \"{drill.Title}\".";
-        var diagramFailed = false;
-        if (diagram is { Length: > 0 })
-        {
-            var saved = await _storage.SaveDiagramAsync(ctx!.Team.Id, drill.Id, diagram);
-            if (saved.Ok)
-            {
-                var previous = drill.DiagramFileName;
-                drill.DiagramFileName = saved.FileName;
-                drill.DiagramBytes = saved.Bytes;
-
-                // Remove the file it replaced, so a swapped diagram doesn't quietly hold quota.
-                if (previous is not null && previous != saved.FileName)
-                    _storage.DeleteDiagram(ctx.Team.Id, drill.Id, previous);
-            }
-            else
-            {
-                diagramFailed = true;
-                notice = $"Saved, but the new diagram wasn't accepted: {saved.Error}";
-            }
-        }
+        // New pictures ADD to the drill now rather than replacing what's there — a progression
+        // builds up over several visits. Removing one is its own explicit action.
+        var rejected = await AddDiagramsAsync(ctx!.Team.Id, drill, diagrams);
+        var diagramFailed = rejected is not null;
+        if (diagramFailed) notice = $"Saved, but {rejected}";
 
         await Db.SaveChangesAsync();
 
@@ -197,6 +174,33 @@ public class DrillController : TeamScopedController
         return diagramFailed
             ? RedirectToAction(nameof(Edit), new { slug, id, notice })
             : RedirectToAction(nameof(Index), new { slug, notice });
+    }
+
+    /// <summary>
+    /// Detaches one picture from a drill. Its own action rather than part of saving, because
+    /// uploads now add to a drill instead of replacing what's there — so removing has to be
+    /// something the coach asks for explicitly.
+    /// </summary>
+    [HttpPost("{id:int}/diagram/{diagramId:int}/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveDiagram(string slug, int id, int diagramId)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var diagram = await Db.DrillDiagrams
+            .FirstOrDefaultAsync(d => d.Id == diagramId && d.DrillId == id
+                                      && d.Drill!.TeamId == ctx!.Team.Id);
+        if (diagram is null) return NotFound();
+
+        Db.DrillDiagrams.Remove(diagram);
+        await Db.SaveChangesAsync();
+
+        // Row first, then the file: an orphaned file wastes quota, but a row pointing at a file
+        // that no longer exists renders as a broken image on the players' plan.
+        _storage.DeleteDiagram(ctx!.Team.Id, id, diagram.FileName);
+
+        return RedirectToAction(nameof(Edit), new { slug, id, notice = "Picture removed." });
     }
 
     [HttpPost("{id:int}/archive")]
@@ -248,7 +252,7 @@ public class DrillController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var drill = await Db.Drills.Include(d => d.Tags)
+        var drill = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
@@ -295,7 +299,7 @@ public class DrillController : TeamScopedController
         if (_storage.IsFull())
             return RedirectToAction(nameof(Index), new { slug, notice = "Storage is nearly full — nothing was copied." });
 
-        var source = await Db.Drills.Include(d => d.Tags)
+        var source = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == ctx!.Team.Id && !d.IsArchived)
             .OrderBy(d => d.Title)
             .ToListAsync();
@@ -331,20 +335,22 @@ public class DrillController : TeamScopedController
     /// Serves a drill's diagram. Player level, because players need it to read a published plan —
     /// and ownership-checked, so one team's slug can never reach another team's drill.
     /// </summary>
-    [HttpGet("{id:int}/diagram")]
-    public async Task<IActionResult> Diagram(string slug, int id)
+    [HttpGet("{id:int}/diagram/{diagramId:int}")]
+    public async Task<IActionResult> Diagram(string slug, int id, int diagramId)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
-        var drill = await Db.Drills.FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
-        if (drill?.DiagramFileName is null) return NotFound();
-        if (!_storage.DiagramExists(ctx!.Team.Id, drill.Id, drill.DiagramFileName)) return NotFound();
+        // Joined through the drill so a diagram id from another team can't be fetched by
+        // pairing it with a slug the viewer does have access to.
+        var diagram = await Db.DrillDiagrams
+            .FirstOrDefaultAsync(d => d.Id == diagramId && d.DrillId == id
+                                      && d.Drill!.TeamId == ctx!.Team.Id);
+        if (diagram is null) return NotFound();
+        if (!_storage.DiagramExists(ctx!.Team.Id, id, diagram.FileName)) return NotFound();
 
-        var path = _storage.DiagramPath(ctx.Team.Id, drill.Id, drill.DiagramFileName);
-        var contentType = drill.DiagramFileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
-            ? "application/pdf"
-            : "image/webp";
+        var path = _storage.DiagramPath(ctx.Team.Id, id, diagram.FileName);
+        var contentType = diagram.IsPdf ? "application/pdf" : "image/webp";
 
         // PhysicalFile, not File(stream): it sets ETag and Last-Modified and handles range
         // requests, so a diagram isn't re-downloaded on every page view.
@@ -397,14 +403,14 @@ public class DrillController : TeamScopedController
                 DrillId = copy.Id, Name = tag.Name, NormalizedName = tag.NormalizedName
             });
 
-        if (drill.DiagramFileName is { } fileName)
+        foreach (var diagram in drill.Diagrams.OrderBy(d => d.Id))
         {
-            var copied = _storage.CopyDiagram(fromTeamId, drill.Id, toTeamId, copy.Id, fileName);
+            var copied = _storage.CopyDiagram(fromTeamId, drill.Id, toTeamId, copy.Id, diagram.FileName);
             if (copied is not null)
-            {
-                copy.DiagramFileName = copied;
-                copy.DiagramBytes = drill.DiagramBytes;
-            }
+                Db.DrillDiagrams.Add(new DrillDiagram
+                {
+                    DrillId = copy.Id, FileName = copied, Bytes = diagram.Bytes
+                });
         }
     }
 
@@ -452,7 +458,7 @@ public class DrillController : TeamScopedController
     {
         var needle = tag?.Trim().ToLowerInvariant();
 
-        var query = Db.Drills.Include(d => d.Tags)
+        var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == teamId && d.IsArchived == archived);
 
         if (!string.IsNullOrEmpty(needle))
@@ -527,6 +533,59 @@ public class DrillController : TeamScopedController
         return null;
     }
 
+    /// <summary>
+    /// Saves each uploaded picture onto the drill, in the order they were chosen. Returns a
+    /// message describing what was refused, or null when everything landed.
+    ///
+    /// Partial success is the normal outcome to plan for: one bad file among four shouldn't cost
+    /// the coach the other three, so the good ones are kept and the message names what didn't
+    /// make it.
+    /// </summary>
+    private async Task<string?> AddDiagramsAsync(int teamId, Drill drill, List<IFormFile>? files)
+    {
+        var incoming = (files ?? new List<IFormFile>()).Where(f => f.Length > 0).ToList();
+        if (incoming.Count == 0) return null;
+
+        var existing = await Db.DrillDiagrams.CountAsync(d => d.DrillId == drill.Id);
+        var room = MaxDiagrams - existing;
+        if (room <= 0)
+            return $"a drill can hold {MaxDiagrams} pictures and this one is full. " +
+                   "Remove one before adding another.";
+
+        string? firstError = null;
+        var added = 0;
+        var skippedForRoom = 0;
+
+        foreach (var file in incoming)
+        {
+            if (added >= room) { skippedForRoom++; continue; }
+
+            var saved = await _storage.SaveDiagramAsync(teamId, drill.Id, file);
+            if (saved.Ok)
+            {
+                Db.DrillDiagrams.Add(new DrillDiagram
+                {
+                    DrillId = drill.Id, FileName = saved.FileName!, Bytes = saved.Bytes
+                });
+                added++;
+            }
+            else
+            {
+                firstError ??= saved.Error;
+            }
+        }
+
+        if (firstError is not null)
+            return added > 0
+                ? $"{added} picture{(added == 1 ? "" : "s")} added and the rest weren't: {firstError}"
+                : $"the picture wasn't added: {firstError}";
+
+        if (skippedForRoom > 0)
+            return $"only {added} fitted — a drill holds {MaxDiagrams} pictures.";
+
+        return null;
+    }
+
     /// <summary>Minutes, or null when the coach hasn't estimated it. Validated before this runs.</summary>
     private static int? ParseRunTime(string? raw) =>
         !string.IsNullOrWhiteSpace(raw) && int.TryParse(raw.Trim(), out var minutes)
@@ -553,6 +612,11 @@ public class DrillController : TeamScopedController
             if (!existing.Contains(norm))
                 Db.DrillTags.Add(new DrillTag { DrillId = drill.Id, Name = name, NormalizedName = norm });
     }
+
+    /// <summary>Pictures one drill can hold. Enough for a multi-stage progression, low enough
+    /// that a library can't quietly eat the volume. Public so the form can state the limit
+    /// rather than hard-coding a number that could drift away from the check.</summary>
+    public const int MaxDiagrams = 6;
 
     private const int MaxTagsPerDrill = 15;
 

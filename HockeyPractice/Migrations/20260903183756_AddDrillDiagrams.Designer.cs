@@ -3,6 +3,7 @@ using System;
 using HockeyPractice.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HockeyPractice.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903183756_AddDrillDiagrams")]
+    partial class AddDrillDiagrams
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
@@ -31,6 +34,13 @@ namespace HockeyPractice.Migrations
 
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("DiagramBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DiagramFileName")
+                        .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsArchived")

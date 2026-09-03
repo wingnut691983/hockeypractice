@@ -36,7 +36,7 @@ public class PlanController : TeamScopedController
         if (plan.Kind == PlanKind.Drills)
         {
             var entries = await Db.PlanDrills
-                .Include(pd => pd.Drill)
+                .Include(pd => pd.Drill).ThenInclude(d => d!.Diagrams)
                 .Where(pd => pd.PracticePlanId == plan.Id)
                 .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
                 .ToListAsync();

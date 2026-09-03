@@ -91,27 +91,9 @@
         </div>
 
         <div class="hp-field">
-            <label class="hp-label" for="diagram">Diagram (optional)</label>
-            @if (Model.Drill?.DiagramFileName is { } existing)
-            {
-                var isPdf = existing.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
-                <div class="hp-muted" style="font-size:.82rem;margin-bottom:.35rem;">
-                    Currently: @(isPdf ? "a PDF" : "an image")
-                    (@PlanStorageService.Human(Model.Drill.DiagramBytes)).
-                    <a asp-action="Diagram" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id"
-                       target="_blank" rel="noopener noreferrer">View</a>
-                </div>
-                @if (!isPdf)
-                {
-                    @* No width here on purpose. width:auto used to sit in this style and read
-                       like it prevented stretching, when auto is the very condition that lets a
-                       flex parent stretch it — the class handles that with align-self. *@
-                    <img class="hp-drill-diagram" style="max-height:14rem;margin-bottom:.4rem;"
-                         src="@Url.Action("Diagram", new { slug, id = Model.Drill.Id })"
-                         alt="Current diagram for @Model.Drill.Title" />
-                }
-            }
-            <input class="hp-input" type="file" id="diagram" name="diagram"
+            <label class="hp-label" for="diagram">Pictures (optional)</label>
+
+            <input class="hp-input" type="file" id="diagram" name="diagrams" multiple
                    accept="image/*,application/pdf,.pdf" />
 
             @* Filled in by the paste/drop script. Hidden until something is actually staged, so a
@@ -121,9 +103,7 @@
                string literal breaks the moment it contains an apostrophe, and a script that fails
                to parse fails silently. *@
             <div class="hp-paste-preview" id="hp-paste-preview" hidden
-                 data-ready-label="@(Model.Drill?.DiagramFileName is not null
-                     ? "Ready to save — this replaces the current diagram"
-                     : "Ready to save")">
+                 data-ready-label="Ready to save">
                 <img id="hp-paste-thumb" alt="The diagram about to be saved" hidden />
                 <span class="hp-paste-chip" id="hp-paste-chip" hidden></span>
                 <div class="hp-paste-note">
@@ -137,13 +117,15 @@
             </div>
 
             <span class="hp-muted" style="font-size:.8rem;">
-                A photo or screenshot shows right inside the plan, and gets shrunk automatically. A
+                Photos and screenshots show right inside the plan, and get shrunk automatically. A
                 PDF shows as a link players tap to open &mdash; images are easier to read on a phone.
-                You can also <strong>paste a screenshot</strong> straight in, or drag an image onto
-                this page.
-                @if (Model.Drill?.DiagramFileName is not null)
+                You can pick several at once, <strong>paste screenshots</strong> straight in, or
+                drag them onto this page. Up to
+                @HockeyPractice.Controllers.DrillController.MaxDiagrams per drill, in the order you
+                add them.
+                @if (Model.Drill is not null && Model.Drill.Diagrams.Count > 0)
                 {
-                    <text>Anything new replaces the current one.</text>
+                    <text>New ones are added to the list above, not swapped in.</text>
                 }
             </span>
         </div>
@@ -154,7 +136,49 @@
     </form>
 
     @* Outside the form above: nested forms are invalid HTML and the browser drops the inner one,
-       which would make these buttons submit the edit form instead. *@
+       which would make these buttons submit the edit form instead. Keeping the Remove buttons out
+       here also means clicking one doesn't re-upload a picture staged in the form and then throw
+       it away — which on rink wifi would be a slow way to achieve nothing. *@
+    @if (!Model.IsNew && Model.Drill is { } d && d.Diagrams.Count > 0)
+    {
+        <div class="hp-section">Pictures on this drill</div>
+        <div class="hp-panel">
+            <p class="hp-muted" style="margin-top:0;font-size:.82rem;">
+                Shown to players in this order &mdash; the order they were added.
+            </p>
+            <div class="hp-diagram-grid">
+                @foreach (var picture in d.Diagrams.OrderBy(x => x.Id))
+                {
+                    var url = Url.Action("Diagram", new { slug, id = d.Id, diagramId = picture.Id });
+                    <div class="hp-diagram-item">
+                        @if (picture.IsPdf)
+                        {
+                            <a class="hp-paste-chip" href="@url" target="_blank" rel="noopener noreferrer">
+                                PDF
+                            </a>
+                        }
+                        else
+                        {
+                            <a href="@url" target="_blank" rel="noopener noreferrer">
+                                <img class="hp-drill-diagram" style="max-height:9rem;margin-top:0;"
+                                     src="@url" alt="Picture on @d.Title" />
+                            </a>
+                        }
+                        <div class="hp-muted" style="font-size:.75rem;">
+                            @PlanStorageService.Human(picture.Bytes)
+                        </div>
+                        <form method="post" asp-action="RemoveDiagram" asp-route-slug="@slug"
+                              asp-route-id="@d.Id" asp-route-diagramId="@picture.Id"
+                              data-confirm="Remove this picture from the drill?">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
     @if (!Model.IsNew && Model.Drill is not null)
     {
         <div class="hp-section">This drill</div>
@@ -234,8 +258,15 @@
         if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     }
 
-    function showPreview(file) {
+    function showPreview() {
         releaseUrl();
+
+        var staged = input.files ? Array.prototype.slice.call(input.files) : [];
+        if (!staged.length) { hidePreview(); return; }
+
+        // Preview the most recent one — a strip of thumbnails would crowd the form, and the count
+        // beside it is what actually answers "did all four land?".
+        var file = staged[staged.length - 1];
         var isImage = file.type && file.type.indexOf('image/') === 0;
 
         if (isImage) {
@@ -250,7 +281,10 @@
             thumb.hidden = true;
         }
 
-        label.textContent = preview.dataset.readyLabel || 'Ready to save';
+        var base = preview.dataset.readyLabel || 'Ready to save';
+        label.textContent = staged.length === 1
+            ? base
+            : staged.length + ' pictures ready to save';
         preview.hidden = false;
     }
 
@@ -262,16 +296,23 @@
         thumb.removeAttribute('src');
     }
 
-    function accept(file) {
-        if (!file || !canInject()) return false;
+    // Adds to what's already staged rather than replacing it. A drill can hold several pictures,
+    // so pasting a second screenshot has to build the set up — replacing would silently discard
+    // the first and there'd be nothing on screen to say so.
+    function accept(newFiles) {
+        var incoming = (newFiles || []).filter(function (f) { return f; });
+        if (!incoming.length || !canInject()) return false;
+
         try {
             var dt = new DataTransfer();
-            dt.items.add(file);
+            var existing = input.files ? Array.prototype.slice.call(input.files) : [];
+            existing.concat(incoming).forEach(function (f) { dt.items.add(f); });
             input.files = dt.files;
         } catch (e) {
             return false;   // leave whatever the picker already had alone
         }
-        showPreview(file);
+
+        showPreview();
         return true;
     }
 
@@ -282,12 +323,13 @@
         var items = e.clipboardData && e.clipboardData.items;
         if (!items) return;
 
+        var found = [];
         for (var i = 0; i < items.length; i++) {
             if (items[i].kind !== 'file') continue;
             var file = items[i].getAsFile();
-            if (file && accept(file)) e.preventDefault();
-            return;
+            if (file) found.push(file);
         }
+        if (found.length && accept(found)) e.preventDefault();
     });
 
     // ── Drag and drop ────────────────────────────────────────────────
@@ -326,14 +368,11 @@
         form.classList.remove('hp-dropping');
 
         var files = e.dataTransfer.files;
-        if (files && files.length) accept(files[0]);
+        if (files && files.length) accept(Array.prototype.slice.call(files));
     });
 
     // Choosing a file by hand after pasting must win, and must be what the preview shows.
-    input.addEventListener('change', function () {
-        if (input.files && input.files.length) showPreview(input.files[0]);
-        else hidePreview();
-    });
+    input.addEventListener('change', showPreview);
 
     clear.addEventListener('click', function () {
         input.value = '';

@@ -798,7 +798,7 @@ public class CoachController : TeamScopedController
     private async Task<List<DrillCard>> PlanDrillsAsync(int planId)
     {
         var entries = await Db.PlanDrills
-            .Include(pd => pd.Drill)
+            .Include(pd => pd.Drill).ThenInclude(d => d!.Diagrams)
             .Where(pd => pd.PracticePlanId == planId)
             .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
             .ToListAsync();
@@ -816,7 +816,7 @@ public class CoachController : TeamScopedController
     {
         var needle = tag?.Trim().ToLowerInvariant();
 
-        var query = Db.Drills.Include(d => d.Tags)
+        var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == teamId && !d.IsArchived);
 
         if (!string.IsNullOrEmpty(needle))

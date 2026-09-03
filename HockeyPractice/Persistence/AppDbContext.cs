@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<PlanTag> PlanTags => Set<PlanTag>();
     public DbSet<Drill> Drills => Set<Drill>();
     public DbSet<DrillTag> DrillTags => Set<DrillTag>();
+    public DbSet<DrillDiagram> DrillDiagrams => Set<DrillDiagram>();
     public DbSet<PlanDrill> PlanDrills => Set<PlanDrill>();
     public DbSet<PlanView> PlanViews => Set<PlanView>();
     public DbSet<Subscriber> Subscribers => Set<Subscriber>();
@@ -54,6 +55,12 @@ public class AppDbContext : DbContext
         b.Entity<DrillTag>()
             .HasOne(t => t.Drill).WithMany(d => d.Tags)
             .HasForeignKey(t => t.DrillId).OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<DrillDiagram>()
+            .HasOne(d => d.Drill).WithMany(x => x.Diagrams)
+            .HasForeignKey(d => d.DrillId).OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<DrillDiagram>().HasIndex(d => d.DrillId);
 
         b.Entity<DrillTag>().HasIndex(t => new { t.DrillId, t.NormalizedName }).IsUnique();
         b.Entity<DrillTag>().HasIndex(t => t.NormalizedName);

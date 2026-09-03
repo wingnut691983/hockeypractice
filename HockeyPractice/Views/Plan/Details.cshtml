@@ -100,8 +100,6 @@
                 {
                     var card = Model.Drills[i];
                     var drill = card.Drill;
-                    var diagramUrl = Url.Action("Diagram", "Drill",
-                        new { slug = Model.Ctx.Team.Slug, id = drill.Id });
 
                     <div class="hp-drill">
                         <div class="hp-drill-head">
@@ -118,12 +116,17 @@
                             <div class="hp-drill-body">@drill.Description</div>
                         }
 
-                        @if (card.HasDiagram)
+                        @foreach (var picture in card.Diagrams)
                         {
-                            @if (card.DiagramIsPdf)
+                            var pictureUrl = Url.Action("Diagram", "Drill", new
+                            {
+                                slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id
+                            });
+
+                            if (picture.IsPdf)
                             {
                                 <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;"
-                                   href="@diagramUrl" target="_blank" rel="noopener noreferrer">
+                                   href="@pictureUrl" target="_blank" rel="noopener noreferrer">
                                     Open the diagram (PDF)
                                 </a>
                             }
@@ -131,7 +134,7 @@
                             {
                                 @* Real alt text, not alt="": a diagram is content, and an empty alt
                                    would leave a screen-reader user with nothing at all here. *@
-                                <img class="hp-drill-diagram" src="@diagramUrl" loading="lazy"
+                                <img class="hp-drill-diagram" src="@pictureUrl" loading="lazy"
                                      alt="Diagram for @drill.Title" />
                             }
                         }

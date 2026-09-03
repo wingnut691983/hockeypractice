@@ -27,14 +27,10 @@ public class Drill
     public string? Description { get; set; }
 
     /// <summary>
-    /// Diagram filename including its extension, or null when there is none. Stores the extension
-    /// (unlike DataPaths.PlanPdf's fixed "plan.pdf") because a diagram may be an image or a PDF.
+    /// The drill's diagrams, in the order they were added. A progression usually needs one per
+    /// stage, so this is a collection rather than a single attachment.
     /// </summary>
-    [MaxLength(120)]
-    public string? DiagramFileName { get; set; }
-
-    /// <summary>Stored size of the diagram, shown to the coach so quota use is visible per drill.</summary>
-    public long DiagramBytes { get; set; }
+    public List<DrillDiagram> Diagrams { get; set; } = new();
 
     /// <summary>
     /// Roughly how long the drill takes to run, in minutes. Summed across a plan so a coach can

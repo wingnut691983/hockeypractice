@@ -13,11 +13,13 @@ public class DrillCard
     /// <summary>Set only when this card is a drill inside a plan — the row to reorder or remove.</summary>
     public int? PlanDrillId { get; init; }
 
-    public bool HasDiagram => !string.IsNullOrEmpty(Drill.DiagramFileName);
+    /// <summary>The drill's diagrams in upload order — the order they should be read in.</summary>
+    public List<DrillDiagram> Diagrams =>
+        Drill.Diagrams.OrderBy(d => d.Id).ToList();
 
-    /// <summary>True when the diagram is a PDF, which shows as a link rather than inline.</summary>
-    public bool DiagramIsPdf =>
-        Drill.DiagramFileName is { } name && name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+    public bool HasDiagram => Drill.Diagrams.Count > 0;
+    public int DiagramCount => Drill.Diagrams.Count;
+    public long DiagramBytes => Drill.Diagrams.Sum(d => d.Bytes);
 
     /// <summary>
     /// Player URL when the video can be framed, null when it can't (or there's no video). Resolved

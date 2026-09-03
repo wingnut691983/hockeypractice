@@ -298,6 +298,19 @@ a.hp-card:active { transform: scale(.99); }
   object-fit: contain;
 }
 
+/* A drill's pictures on the edit form: side by side on a desktop, stacking on a phone. */
+.hp-diagram-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: .8rem;
+}
+.hp-diagram-item {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  align-items: flex-start;
+}
+
 /* ── Pasted / dropped diagram ──────────────────────────────
    Confirmation that a paste actually landed. Tokens only, so dark mode follows. */
 

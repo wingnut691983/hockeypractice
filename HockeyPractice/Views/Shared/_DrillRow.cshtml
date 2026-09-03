@@ -24,11 +24,11 @@
         }
         @if (Model.HasDiagram)
         {
-            <text>@(Model.DiagramIsPdf ? "PDF diagram" : "Diagram") · @PlanStorageService.Human(Model.Drill.DiagramBytes)</text>
+            <text>@Model.DiagramCount picture@(Model.DiagramCount == 1 ? "" : "s") · @PlanStorageService.Human(Model.DiagramBytes)</text>
         }
         else
         {
-            <text>No diagram</text>
+            <text>No pictures</text>
         }
         @if (Model.HasVideo)
         {
