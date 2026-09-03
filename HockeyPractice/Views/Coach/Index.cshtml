@@ -19,6 +19,30 @@
        asp-action="NewPlan" asp-route-slug="@slug">+ New practice plan</a>
 
     <div class="hp-section">Plans</div>
+
+    <form method="get" asp-action="Index" asp-route-slug="@slug" class="hp-row" style="margin:.6rem 0;">
+        <input class="hp-input" type="text" name="tag" value="@Model.ActiveTag"
+               placeholder="Search tags (e.g. backcheck)" style="flex:1;" />
+        <button type="submit" class="hp-btn hp-btn-sm">Search</button>
+    </form>
+    @if (Model.AllTags.Count > 0)
+    {
+        <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
+            @foreach (var t in Model.AllTags)
+            {
+                <a class="hp-pill @(string.Equals(Model.ActiveTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@t">@t</a>
+            }
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+    {
+        <div class="hp-muted" style="margin-bottom:.6rem;">
+            Showing plans tagged &ldquo;@Model.ActiveTag&rdquo; ·
+            <a asp-action="Index" asp-route-slug="@slug">Clear</a>
+        </div>
+    }
+
     @if (Model.Plans.Count == 0)
     {
         <div class="hp-empty">No plans yet.</div>
@@ -29,10 +53,20 @@
             <ul class="hp-list">
                 @foreach (var card in Model.Plans)
                 {
-                    <li>
+                    <li style="flex-wrap:wrap;">
                         <div class="grow">
                             <div style="font-weight:650;">@card.Plan.Title</div>
                             <div class="hp-muted">@card.WhenLabel · @card.VideoCount video@(card.VideoCount == 1 ? "" : "s")</div>
+                            @if (card.Plan.Tags.Count > 0)
+                            {
+                                <div style="margin-top:.3rem;">
+                                    @foreach (var t in card.Plan.Tags.OrderBy(x => x.Name))
+                                    {
+                                        <a class="hp-pill" asp-action="Index" asp-route-slug="@slug"
+                                           asp-route-tag="@t.Name">@t.Name</a>
+                                    }
+                                </div>
+                            }
                         </div>
                         @if (card.IsDraft)
                         {

@@ -33,4 +33,5 @@ public class PracticePlan
 
     public List<PlanLink> Links { get; set; } = new();
     public List<PlanView> Views { get; set; } = new();
+    public List<PlanTag> Tags { get; set; } = new();
 }

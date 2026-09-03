@@ -168,11 +168,20 @@ a.hp-card:active { transform: scale(.99); }
 
 /* Fixed brand colour, not themed — same reasoning as .hp-pill-draft/.hp-pill-viewed: this
    marks a fixed external meaning (Spotify), not team identity, so it doesn't follow
-   --hp-primary/--hp-accent. Only the small label is tinted; the card body stays on the
-   normal surface so it doesn't visually compete with .hp-card-next for "most important
-   card on the page". */
-.hp-card-spotify-label { color: #1DB954; }
-@media (prefers-color-scheme: dark) { .hp-card-spotify-label { color: #2fe070; } }
+   --hp-primary/--hp-accent. Styled like .hp-card-next (unmissable, own gradient, white text)
+   since it's a standing fixture above every plan, not a plan itself — but on a dark-to-light
+   green gradient rather than the team's colours, so the two "important card" treatments read
+   as different things. Both gradient stops are kept dark enough (luminance <= ~0.21) that white
+   text clears WCAG AA's 4.5:1 contrast ratio at every point, including the lighter end —
+   plain Spotify green (#1DB954) is too bright for white text and was rejected for that reason. */
+.hp-card-spotify {
+  border: 0;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #0b3d1f 0%, #268049 100%);
+  color: #fff;
+}
+.hp-card-spotify .hp-card-when { color: #fff; opacity: .92; }
+.hp-card-spotify .hp-card-meta { color: #fff; opacity: .82; }
 
 .hp-card-when {
   font-size: .82rem;
@@ -200,9 +209,15 @@ a.hp-card:active { transform: scale(.99); }
   border-radius: 999px;
   background: var(--hp-surface-2);
   color: var(--hp-muted);
+  text-decoration: none;
 }
 .hp-pill-draft   { background: #fdf0d5; color: #8a5a00; }
 .hp-pill-viewed  { background: #e3f5eb; color: var(--hp-success); }
+/* --hp-on-primary (not --hp-primary-text) — the latter is an "ink" tuned for team-colour text
+   on a plain surface, not for text on top of a --hp-primary background; the two paired together
+   would read as low-contrast. --hp-on-primary is what this codebase already uses whenever a
+   --hp-primary background needs readable text on it (e.g. .hp-menu[open] .hp-menu-trigger). */
+.hp-pill.active  { background: var(--hp-primary); color: var(--hp-on-primary, #fff); }
 .hp-card-next .hp-pill { background: color-mix(in srgb, var(--hp-on-next, #fff) 20%, transparent);
                          color: var(--hp-on-next, #fff); }
 

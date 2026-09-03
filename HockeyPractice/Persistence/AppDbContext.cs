@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<Player> Players => Set<Player>();
     public DbSet<PracticePlan> Plans => Set<PracticePlan>();
     public DbSet<PlanLink> PlanLinks => Set<PlanLink>();
+    public DbSet<PlanTag> PlanTags => Set<PlanTag>();
     public DbSet<PlanView> PlanViews => Set<PlanView>();
     public DbSet<Subscriber> Subscribers => Set<Subscriber>();
 
@@ -32,6 +33,13 @@ public class AppDbContext : DbContext
         b.Entity<PlanLink>()
             .HasOne(l => l.PracticePlan).WithMany(p => p.Links)
             .HasForeignKey(l => l.PracticePlanId).OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<PlanTag>()
+            .HasOne(t => t.PracticePlan).WithMany(p => p.Tags)
+            .HasForeignKey(t => t.PracticePlanId).OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<PlanTag>().HasIndex(t => new { t.PracticePlanId, t.NormalizedName }).IsUnique();
+        b.Entity<PlanTag>().HasIndex(t => t.NormalizedName);
 
         b.Entity<PlanView>()
             .HasOne(v => v.PracticePlan).WithMany(p => p.Views)

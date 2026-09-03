@@ -28,7 +28,7 @@ public class TeamContext
     /// <summary>Access here was taken through the admin panel, not the team's own code.</summary>
     public bool ViaSiteAdmin { get; init; }
 
-    /// <summary>Viewer answered the who-are-you question with "I'm a parent".</summary>
+    /// <summary>Viewer answered the who-are-you question with "I am a non-player".</summary>
     public bool IsParent { get; init; }
 
     /// <summary>Other teams this device can reach — drives the switcher once there's more than one.</summary>

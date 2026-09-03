@@ -49,6 +49,18 @@
                       maxlength="2000">@(Model.Plan?.CoachNotes ?? Model.RetainedNotes)</textarea>
         </div>
 
+        <div class="hp-field">
+            <label class="hp-label" for="tags">Tags (skills, drill names — comma separated)</label>
+            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingTags"
+                   value="@Model.TagsValue" placeholder="backcheck, breakout, PP entry" />
+        </div>
+        @if (Model.AllTags.Count > 0)
+        {
+            <datalist id="existingTags">
+                @foreach (var t in Model.AllTags) { <option value="@t"></option> }
+            </datalist>
+        }
+
         @if (Model.IsNew)
         {
             <div class="hp-field">

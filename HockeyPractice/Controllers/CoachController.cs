@@ -37,13 +37,18 @@ public class CoachController : TeamScopedController
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string slug, string? notice)
+    public async Task<IActionResult> Index(string slug, string? notice, string? tag)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var plans = await Db.Plans
-            .Where(p => p.TeamId == ctx!.Team.Id)
+        var needle = tag?.Trim().ToLowerInvariant();
+
+        var plansQuery = Db.Plans.Include(p => p.Tags).Where(p => p.TeamId == ctx!.Team.Id);
+        if (!string.IsNullOrEmpty(needle))
+            plansQuery = plansQuery.Where(p => p.Tags.Any(t => t.NormalizedName.Contains(needle)));
+
+        var plans = await plansQuery
             .Select(p => new { Plan = p, Videos = p.Links.Count(l => !l.IsHidden) })
             .OrderByDescending(x => x.Plan.PracticeDateLocal)
             .ToListAsync();
@@ -64,6 +69,8 @@ public class CoachController : TeamScopedController
                         .CountAsync(s => s.TeamId == ctx!.Team.Id && s.ConfirmedUtc != null),
             UsedBytes = _storage.UsedBytes(),
             QuotaBytes = _storage.QuotaBytes,
+            AllTags = await DistinctTagsAsync(ctx!.Team.Id),
+            ActiveTag = tag,
             Notice = notice
         });
     }
@@ -92,7 +99,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> NewPlan(string slug, string title, DateTime practiceDate,
-        string? location, string? coachNotes, IFormFile? file)
+        string? location, string? coachNotes, IFormFile? file, string? tags)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -108,7 +115,8 @@ public class CoachController : TeamScopedController
                 // A default(DateTime) from failed binding renders as year 1 — fall back.
                 DefaultDate = practiceDate == default ? NextPracticeSlot(ctx!.Team.TimeZoneId) : practiceDate,
                 MaxUploadBytes = _storage.QuotaBytes,
-                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes
+                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes,
+                RetainedTags = tags
             });
         }
 
@@ -136,7 +144,8 @@ public class CoachController : TeamScopedController
             {
                 Ctx = ctx, DefaultDate = practiceDate, Error = saved.Error,
                 MaxUploadBytes = _storage.QuotaBytes,
-                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes
+                RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes,
+                RetainedTags = tags
             });
         }
 
@@ -156,6 +165,9 @@ public class CoachController : TeamScopedController
             Db.PlanLinks.Add(link);
         }
 
+        foreach (var (name, norm) in ParseTags(tags))
+            Db.PlanTags.Add(new PlanTag { PracticePlanId = plan.Id, Name = name, NormalizedName = norm });
+
         await Db.SaveChangesAsync();
         _log.LogInformation("Plan {PlanId} uploaded for team {TeamId} ({Bytes} bytes)",
             plan.Id, ctx.Team.Id, saved.Bytes);
@@ -169,7 +181,7 @@ public class CoachController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var plan = await Db.Plans.Include(p => p.Links)
+        var plan = await Db.Plans.Include(p => p.Links).Include(p => p.Tags)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
@@ -181,6 +193,7 @@ public class CoachController : TeamScopedController
             Links = plan.Links.OrderBy(l => l.SortOrder).ToList(),
             DefaultDate = plan.PracticeDateLocal,
             MaxUploadBytes = _storage.QuotaBytes,
+            AllTags = await DistinctTagsAsync(ctx!.Team.Id),
             Notice = notice
         });
     }
@@ -189,12 +202,12 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPlan(string slug, int id, string title,
         DateTime practiceDate, string? location, string? coachNotes,
-        int[]? linkId, string[]? linkLabel, int[]? visibleLinkId)
+        int[]? linkId, string[]? linkLabel, int[]? visibleLinkId, string? tags)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var plan = await Db.Plans.Include(p => p.Links)
+        var plan = await Db.Plans.Include(p => p.Links).Include(p => p.Tags)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
@@ -229,6 +242,24 @@ public class CoachController : TeamScopedController
                 link.SortOrder = i;
             }
         }
+
+        var parsed = ParseTags(tags);
+        var parsedNorms = parsed.Select(p => p.Normalized).ToHashSet();
+
+        // Diff rather than delete-all-and-reinsert: a coach usually edits tags by adding one to
+        // an existing set, not rewriting the whole list, so most saves have old and new rows
+        // sharing a NormalizedName. Deleting and re-adding those in the same SaveChanges call
+        // risks the delete and insert landing in an order that trips the
+        // {PracticePlanId, NormalizedName} unique index — EF Core doesn't guarantee
+        // delete-before-insert for unrelated sibling rows with no FK between them. Only touching
+        // what actually changed makes that collision impossible, since a row that stays tagged
+        // is never removed in the first place.
+        Db.PlanTags.RemoveRange(plan.Tags.Where(t => !parsedNorms.Contains(t.NormalizedName)));
+
+        var existingNorms = plan.Tags.Select(t => t.NormalizedName).ToHashSet();
+        foreach (var (name, norm) in parsed)
+            if (!existingNorms.Contains(norm))
+                Db.PlanTags.Add(new PlanTag { PracticePlanId = plan.Id, Name = name, NormalizedName = norm });
 
         await Db.SaveChangesAsync();
         return RedirectToAction(nameof(EditPlan), new { slug, id });
@@ -613,6 +644,48 @@ public class CoachController : TeamScopedController
 
     private static bool IsSpotifyPlaylistUrl(string value) =>
         SpotifyPlaylistUrlPattern.IsMatch(value);
+
+    private const int MaxTagsPerPlan = 15;
+
+    private static string NormalizeTag(string name) =>
+        string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
+
+    private static List<(string Name, string Normalized)> ParseTags(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return [];
+        var seen = new HashSet<string>();
+        var result = new List<(string, string)>();
+        foreach (var piece in raw.Split(','))
+        {
+            var trimmed = piece.Trim();
+            if (trimmed.Length == 0) continue;
+            if (trimmed.Length > 40) trimmed = trimmed[..40];
+            var norm = NormalizeTag(trimmed);
+            if (norm.Length == 0 || !seen.Add(norm)) continue;   // dedupe, keep first-seen casing
+            result.Add((trimmed, norm));
+            if (result.Count >= MaxTagsPerPlan) break;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Distinct tag names for a team, one representative (first-seen) casing per normalized
+    /// form, sorted. Grouped in memory rather than via EF GroupBy — SQLite's translator for
+    /// "first row per group" is fragile, and a team realistically has a few dozen tag rows
+    /// total, so pulling a flat projection and grouping client-side is simpler and just as fast.
+    /// </summary>
+    private async Task<List<string>> DistinctTagsAsync(int teamId)
+    {
+        var rows = await Db.PlanTags
+            .Where(t => t.PracticePlan!.TeamId == teamId)
+            .Select(t => new { t.Id, t.Name, t.NormalizedName })
+            .ToListAsync();
+
+        return rows.GroupBy(t => t.NormalizedName)
+            .Select(g => g.OrderBy(t => t.Id).First().Name)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     private static string SafeFileName(string raw)
     {

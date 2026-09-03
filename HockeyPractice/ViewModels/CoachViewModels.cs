@@ -16,6 +16,11 @@ public class ManageViewModel
 
     public string? ViewCode { get; init; }
     public string? Notice { get; init; }
+
+    /// <summary>Distinct tag names used anywhere on the team, for the browse row and search box.</summary>
+    public List<string> AllTags { get; init; } = new();
+    /// <summary>The tag currently filtering the list, if any (from the search box or a clicked chip).</summary>
+    public string? ActiveTag { get; init; }
 }
 
 public class PlanEditViewModel
@@ -38,6 +43,15 @@ public class PlanEditViewModel
     public string? RetainedTitle { get; init; }
     public string? RetainedLocation { get; init; }
     public string? RetainedNotes { get; init; }
+    public string? RetainedTags { get; init; }
+
+    /// <summary>Distinct tag names used anywhere on the team, for the tag field's autocomplete.</summary>
+    public List<string> AllTags { get; init; } = new();
+
+    /// <summary>The comma-joined value the tags input should show — the plan's saved tags, or
+    /// whatever the coach had typed if this is a re-render after a validation failure.</summary>
+    public string TagsValue => Plan?.Tags is { Count: > 0 } t
+        ? string.Join(", ", t.OrderBy(x => x.Name).Select(x => x.Name)) : RetainedTags ?? "";
 
     public string? Notice { get; init; }
 }
