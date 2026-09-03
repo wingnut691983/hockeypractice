@@ -37,6 +37,16 @@ public class Drill
     public long DiagramBytes { get; set; }
 
     /// <summary>
+    /// Roughly how long the drill takes to run, in minutes. Summed across a plan so a coach can
+    /// see whether the practice fits the ice time they've booked.
+    ///
+    /// Nullable on purpose: an estimate the coach hasn't made yet is different from zero minutes,
+    /// and a plan total has to be able to say it is missing some drills rather than quietly
+    /// under-reporting.
+    /// </summary>
+    public int? RunTimeMinutes { get; set; }
+
+    /// <summary>
     /// Optional link to a video of the drill. YouTube and Vimeo links play in the plan's own popup
     /// player; anything else opens in a new tab. No link means no button at all.
     /// </summary>

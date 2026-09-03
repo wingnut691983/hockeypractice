@@ -53,6 +53,19 @@
         </div>
 
         <div class="hp-field">
+            <label class="hp-label" for="runTimeMinutes">Approx. run time (minutes)</label>
+            @* type=number with inputmode=numeric so a phone shows the digit pad. The real bounds
+               check is server-side; min/max here just steer the spinner. *@
+            <input class="hp-input" type="number" id="runTimeMinutes" name="runTimeMinutes"
+                   min="1" max="@HockeyPractice.Infrastructure.RunTime.MaxMinutes" step="1"
+                   inputmode="numeric" value="@Model.RunTimeValue" placeholder="e.g. 12" />
+            <span class="hp-muted" style="font-size:.8rem;">
+                Added up across a plan so you can see whether practice fits your ice time. Leave
+                blank if you're not sure &mdash; the total will say how many are unset.
+            </span>
+        </div>
+
+        <div class="hp-field">
             <label class="hp-label" for="tags">Drill tags (comma separated)</label>
             <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingDrillTags"
                    value="@Model.TagsValue" placeholder="breakout, D-zone, small area" />

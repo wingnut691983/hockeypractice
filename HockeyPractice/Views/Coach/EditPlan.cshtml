@@ -209,6 +209,20 @@
         }
         else
         {
+            var total = RunTimeTotal.From(Model.PlanDrills);
+            if (total.HasAnything)
+            {
+                <div class="hp-runtime-total">
+                    <strong>@Model.PlanDrills.Count drill@(Model.PlanDrills.Count == 1 ? "" : "s")</strong>
+                    @if (!string.IsNullOrEmpty(total.Label))
+                    {
+                        <text> · @total.Label</text>
+                    }
+                </div>
+            }
+        }
+        @if (Model.PlanDrills.Count > 0)
+        {
             <div class="hp-panel">
                 <ul class="hp-list">
                     @for (var i = 0; i < Model.PlanDrills.Count; i++)

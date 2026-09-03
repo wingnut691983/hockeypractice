@@ -18,6 +18,10 @@
     }
 
     <div class="hp-muted" style="font-size:.78rem;margin-top:.15rem;">
+        @if (Model.Drill.RunTimeMinutes is int mins)
+        {
+            <text>@HockeyPractice.Infrastructure.RunTime.Human(mins) · </text>
+        }
         @if (Model.HasDiagram)
         {
             <text>@(Model.DiagramIsPdf ? "PDF diagram" : "Diagram") · @PlanStorageService.Human(Model.Drill.DiagramBytes)</text>

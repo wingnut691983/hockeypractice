@@ -28,6 +28,29 @@ public class DrillCard
     public bool HasVideo => !string.IsNullOrWhiteSpace(Drill.VideoUrl);
 }
 
+/// <summary>
+/// How long a set of drills runs. Carries the count of drills with no estimate alongside the
+/// sum, so the total can say what it is missing instead of silently under-reporting.
+/// </summary>
+public class RunTimeTotal
+{
+    public int Minutes { get; init; }
+    public int MissingCount { get; init; }
+
+    public bool HasAnything => Minutes > 0 || MissingCount > 0;
+    public string Label => HockeyPractice.Infrastructure.RunTime.PlanTotal(Minutes, MissingCount);
+
+    public static RunTimeTotal From(IEnumerable<DrillCard> cards)
+    {
+        var list = cards.ToList();
+        return new RunTimeTotal
+        {
+            Minutes = list.Sum(c => c.Drill.RunTimeMinutes ?? 0),
+            MissingCount = list.Count(c => c.Drill.RunTimeMinutes is null)
+        };
+    }
+}
+
 public class DrillListViewModel
 {
     public TeamContext Ctx { get; init; } = null!;
@@ -69,11 +92,13 @@ public class DrillEditViewModel
     public string? RetainedTitle { get; init; }
     public string? RetainedDescription { get; init; }
     public string? RetainedVideoUrl { get; init; }
+    public string? RetainedRunTime { get; init; }
     public string? RetainedTags { get; init; }
 
     public string TitleValue => RetainedTitle ?? Drill?.Title ?? "";
     public string DescriptionValue => RetainedDescription ?? Drill?.Description ?? "";
     public string VideoUrlValue => RetainedVideoUrl ?? Drill?.VideoUrl ?? "";
+    public string RunTimeValue => RetainedRunTime ?? Drill?.RunTimeMinutes?.ToString() ?? "";
 
     public string TagsValue => RetainedTags
         ?? (Drill?.Tags is { Count: > 0 } t

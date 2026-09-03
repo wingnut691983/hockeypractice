@@ -1,4 +1,5 @@
 using HockeyPractice.Persistence;
+using HockeyPractice.Infrastructure;
 using HockeyPractice.Models;
 using HockeyPractice.Services;
 using HockeyPractice.ViewModels;
@@ -67,21 +68,24 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Create(string slug, string title, string? description,
-        string? videoUrl, string? tags, IFormFile? diagram, string? returnUrl)
+        string? videoUrl, string? runTimeMinutes, string? tags, IFormFile? diagram,
+        string? returnUrl)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var error = ValidateFields(title, videoUrl);
+        var error = ValidateFields(title, videoUrl, runTimeMinutes);
         if (error is not null)
-            return await RedisplayAsync(ctx!, null, error, title, description, videoUrl, tags, returnUrl);
+            return await RedisplayAsync(ctx!, null, error, title, description, videoUrl,
+                runTimeMinutes, tags, returnUrl);
 
         var drill = new Drill
         {
             TeamId = ctx!.Team.Id,
             Title = title.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-            VideoUrl = string.IsNullOrWhiteSpace(videoUrl) ? null : videoUrl.Trim()
+            VideoUrl = string.IsNullOrWhiteSpace(videoUrl) ? null : videoUrl.Trim(),
+            RunTimeMinutes = ParseRunTime(runTimeMinutes)
         };
 
         // Saved first so the drill has an id to key its directory off — same two-phase write the
@@ -141,7 +145,7 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Update(string slug, int id, string title, string? description,
-        string? videoUrl, string? tags, IFormFile? diagram)
+        string? videoUrl, string? runTimeMinutes, string? tags, IFormFile? diagram)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -150,13 +154,15 @@ public class DrillController : TeamScopedController
             .FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
-        var error = ValidateFields(title, videoUrl);
+        var error = ValidateFields(title, videoUrl, runTimeMinutes);
         if (error is not null)
-            return await RedisplayAsync(ctx!, drill, error, title, description, videoUrl, tags, null);
+            return await RedisplayAsync(ctx!, drill, error, title, description, videoUrl,
+                runTimeMinutes, tags, null);
 
         drill.Title = title.Trim();
         drill.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         drill.VideoUrl = string.IsNullOrWhiteSpace(videoUrl) ? null : videoUrl.Trim();
+        drill.RunTimeMinutes = ParseRunTime(runTimeMinutes);
 
         SyncTags(drill, tags);
 
@@ -378,6 +384,7 @@ public class DrillController : TeamScopedController
             Title = drill.Title,
             Description = drill.Description,
             VideoUrl = drill.VideoUrl,
+            RunTimeMinutes = drill.RunTimeMinutes,
             CopiedFromDrillId = drill.Id
         };
 
@@ -474,7 +481,8 @@ public class DrillController : TeamScopedController
     }
 
     private async Task<IActionResult> RedisplayAsync(TeamContext ctx, Drill? drill, string error,
-        string? title, string? description, string? videoUrl, string? tags, string? returnUrl)
+        string? title, string? description, string? videoUrl, string? runTimeMinutes,
+        string? tags, string? returnUrl)
     {
         ViewBag.NavSection = "drills";
         return View("Edit", new DrillEditViewModel
@@ -487,11 +495,12 @@ public class DrillController : TeamScopedController
             RetainedTitle = title,
             RetainedDescription = description,
             RetainedVideoUrl = videoUrl,
+            RetainedRunTime = runTimeMinutes,
             RetainedTags = tags
         });
     }
 
-    private static string? ValidateFields(string? title, string? videoUrl)
+    private static string? ValidateFields(string? title, string? videoUrl, string? runTimeMinutes)
     {
         if (string.IsNullOrWhiteSpace(title)) return "Give the drill a name.";
 
@@ -505,8 +514,24 @@ public class DrillController : TeamScopedController
             }
         }
 
+        // Bound rather than just parsed. A stray "90 minutes" or a slipped keypress would
+        // otherwise land in a plan total and quietly make the practice look hours long.
+        if (!string.IsNullOrWhiteSpace(runTimeMinutes))
+        {
+            if (!int.TryParse(runTimeMinutes.Trim(), out var minutes))
+                return "Run time needs to be a number of minutes, like 12.";
+            if (minutes < 1 || minutes > RunTime.MaxMinutes)
+                return $"Run time should be between 1 and {RunTime.MaxMinutes} minutes.";
+        }
+
         return null;
     }
+
+    /// <summary>Minutes, or null when the coach hasn't estimated it. Validated before this runs.</summary>
+    private static int? ParseRunTime(string? raw) =>
+        !string.IsNullOrWhiteSpace(raw) && int.TryParse(raw.Trim(), out var minutes)
+            ? minutes
+            : null;
 
     /// <summary>
     /// Brings a drill's tags in line with what was typed, touching only what changed.
