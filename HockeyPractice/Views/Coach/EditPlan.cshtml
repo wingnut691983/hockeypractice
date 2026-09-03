@@ -51,7 +51,7 @@
 
         <div class="hp-field">
             <label class="hp-label" for="tags">Tags (skills, drill names — comma separated)</label>
-            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingTags"
+            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingTags" data-taglist="existingTags"
                    value="@Model.TagsValue" placeholder="backcheck, breakout, PP entry" />
         </div>
         @if (Model.AllTags.Count > 0)

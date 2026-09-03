@@ -75,6 +75,66 @@
             menu.open = false;
         });
     });
+
+    // ── Suggestions on a comma-separated tag field ──────────────────────
+    // A <datalist> matches against the WHOLE value of its input, not the bit you're currently
+    // typing. On a comma-separated field that means suggestions work for the first tag and then
+    // stop dead: once the box reads "breakout, " nothing matches any option, so the second tag
+    // gets free-typed and the vocabulary drifts — "backcheck" and "back check" as two tags.
+    //
+    // Fix: rebuild the options as "everything you've typed so far + candidate", so the browser's
+    // own matching keeps working for every tag after the first. Picking one then appends a comma
+    // so the next suggestion is one keystroke away rather than needing a comma typed first.
+    document.querySelectorAll('input[data-taglist]').forEach(function (input) {
+        var list = document.getElementById(input.getAttribute('data-taglist'));
+        if (!list) return;
+
+        var all = Array.prototype.slice.call(list.options).map(function (o) { return o.value; });
+        if (!all.length) return;
+
+        function refresh() {
+            var value = input.value;
+            var parts = value.split(',');
+
+            // Everything before the last comma is settled; the last piece is being typed, so it
+            // must stay suggestable — otherwise typing a tag in full hides the very option that
+            // would complete it.
+            var settled = parts.slice(0, -1).map(function (p) { return p.trim().toLowerCase(); });
+            var cut = value.lastIndexOf(',');
+            var prefix = cut === -1 ? '' : value.slice(0, cut + 1) + ' ';
+
+            list.innerHTML = '';
+            all.forEach(function (tag) {
+                if (settled.indexOf(tag.toLowerCase()) !== -1) return;   // already in the box
+                var option = document.createElement('option');
+                option.value = prefix + tag;
+                list.appendChild(option);
+            });
+
+            return prefix;
+        }
+
+        input.addEventListener('input', function (e) {
+            var before = input.value;
+            var prefix = refresh();
+
+            // Only when the browser says this came from picking a suggestion. Matching on the
+            // text alone looked equivalent and was not: typing a tag that merely STARTS with an
+            // existing one got a comma injected mid-word, so reaching for "backchecking" past
+            // an existing "backcheck" produced "backcheck, ing". Browsers that don't report
+            // inputType simply don't get the shortcut, and a typed comma still works.
+            if (e && e.inputType !== 'insertReplacementText') return;
+
+            var picked = all.some(function (tag) { return before === prefix + tag; });
+            if (picked) {
+                input.value = before + ', ';
+                refresh();
+            }
+        });
+
+        input.addEventListener('focus', refresh);
+        refresh();
+    });
 })();
 </script>
     @await RenderSectionAsync("Scripts", required: false)
