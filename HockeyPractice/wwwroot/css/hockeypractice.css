@@ -616,6 +616,29 @@ a.hp-card:active { transform: scale(.99); }
   width: 100%;
 }
 .hp-textarea { min-height: 6rem; resize: vertical; }
+/* Date and time inputs, which iOS does not lay out like the others.
+   Safari renders them as native controls sized to their own content, and they refuse to shrink
+   to the container the way a text input does, so on a phone the practice date box ends up wider
+   than every other field and pushes the page sideways. Turning the native appearance off makes
+   them size like an ordinary input; tapping still opens the system picker.
+   The pseudo-element is the value text inside the control, which Safari centres and pads on its
+   own, leaving the date sitting oddly against every other left-aligned field.
+   Not reproducible in desktop Chrome, which already lays these out correctly at 358px in a
+   358px field, so this is aimed at Safari and deliberately changes nothing elsewhere. */
+.hp-input[type="date"],
+.hp-input[type="time"],
+.hp-input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+.hp-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
 .hp-input:focus, .hp-select:focus, .hp-textarea:focus {
   outline: 2px solid var(--hp-primary);
   outline-offset: 1px;
