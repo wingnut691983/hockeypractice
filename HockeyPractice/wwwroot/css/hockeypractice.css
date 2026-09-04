@@ -398,6 +398,27 @@ a.hp-card:active { transform: scale(.99); }
 /* Aligns with the inputs rather than their labels, which sit above. */
 .hp-searchfilters-go { flex: 0 0 auto; min-height: var(--hp-tap); }
 
+/* "You are filtering, and here is how to stop."
+   This was muted grey body text with a plain-link Clear, and it got missed: a coach looking at a
+   short or empty list read it as nothing being there rather than as a filter being on. It now
+   carries the accent rail the coach-notes panel uses, full-strength text, the search terms in the
+   team colour, and Clear as an actual button. */
+.hp-filter-active {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .6rem;
+  margin: 0 0 .8rem;
+  padding: .55rem .75rem;
+  background: var(--hp-surface-2);
+  border-left: 4px solid var(--hp-accent);
+  border-radius: 8px;
+  font-size: .88rem;
+  color: var(--hp-text);
+}
+.hp-filter-active strong { color: var(--hp-accent-text); }
+
 /* ── Tag chips ─────────────────────────────────────────────
    The tags already on a drill or plan. Empty renders as nothing at all rather than an empty
    box, so a drill with no tags doesn't look like something failed to load. */

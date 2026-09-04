@@ -30,26 +30,6 @@
         ActiveTag = Model.ActiveTag,
         KnownTags = Model.AllTags
     })
-    @if (!string.IsNullOrWhiteSpace(Model.ActiveTag) || !string.IsNullOrWhiteSpace(Model.ActiveName))
-    {
-        <div class="hp-muted" style="margin-bottom:.6rem;">
-            Showing plans
-            @if (!string.IsNullOrWhiteSpace(Model.ActiveName))
-            {
-                <text>named like &ldquo;@Model.ActiveName&rdquo;</text>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.ActiveName) && !string.IsNullOrWhiteSpace(Model.ActiveTag))
-            {
-                <text>and</text>
-            }
-            @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
-            {
-                <text>tagged &ldquo;@Model.ActiveTag&rdquo;</text>
-            }
-            ·
-            <a asp-action="Index" asp-route-slug="@slug">Clear</a>
-        </div>
-    }
 
     @if (Model.Plans.Count == 0)
     {

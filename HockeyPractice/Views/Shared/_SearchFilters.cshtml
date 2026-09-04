@@ -3,6 +3,17 @@
     var nameId = Model.Id + "-name";
     var tagId = Model.Id + "-tag";
     var listId = Model.Id + "-tags";
+    var things = Model.Noun.ToLowerInvariant() + "s";
+
+    // Clear drops the two filters and keeps everything else, so clearing a search on the archived
+    // view doesn't also throw you back to the working library.
+    // PathBase, not just Path: UsePathBase strips the prefix, so a bare Path would build a link
+    // that works locally and 404s in production.
+    var clearQuery = Model.Preserve.Count > 0
+        ? "?" + string.Join("&", Model.Preserve.Select(kv =>
+            $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"))
+        : "";
+    var clearHref = Context.Request.PathBase + Context.Request.Path + clearQuery;
 }
 
 @* Both boxes in one form so a single Search applies both. The hidden values carry whatever else
@@ -47,3 +58,32 @@
         Use either box on its own, or both together to narrow the results. An empty box is ignored.
     </span>
 </form>
+
+@* Lives with the boxes rather than in each page, so a page cannot end up filtering with nothing
+   on screen to say so and no way to undo it. Deliberately not muted grey: this explains why the
+   list is short or empty, which is the moment a coach is most likely to think the app is broken. *@
+@if (Model.AnyActive)
+{
+    <div class="hp-filter-active">
+        <span>
+            Showing only @things
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveName))
+            {
+                <text>named like <strong>&ldquo;@Model.ActiveName&rdquo;</strong></text>
+            }
+            @* The spaces inside the tags are load-bearing: Razor eats the whitespace between
+               adjacent blocks, which ran the words together as "andtagged". *@
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveName) && !string.IsNullOrWhiteSpace(Model.ActiveTag))
+            {
+                <text> and </text>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+            {
+                <text>tagged <strong>&ldquo;@Model.ActiveTag&rdquo;</strong></text>
+            }
+        </span>
+        @* A button rather than a text link: it is an action, and as a plain link in muted text it
+           was being missed entirely. *@
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@clearHref">Clear filters</a>
+    </div>
+}
