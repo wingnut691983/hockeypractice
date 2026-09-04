@@ -123,7 +123,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> NewPlan(string slug, string title, DateTime practiceDate,
-        string? location, string? coachNotes, IFormFile? file, string? tags,
+        string? location, string? coachNotes, IFormFile? file, List<string>? tags,
         PlanKind kind = PlanKind.Pdf)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -338,7 +338,7 @@ public class CoachController : TeamScopedController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPlan(string slug, int id, string title,
         DateTime practiceDate, string? location, string? coachNotes,
-        int[]? linkId, string[]? linkLabel, int[]? visibleLinkId, string? tags)
+        int[]? linkId, string[]? linkLabel, int[]? visibleLinkId, List<string>? tags)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -859,26 +859,35 @@ public class CoachController : TeamScopedController
             .ToList();
     }
 
-    private const int MaxTagsPerPlan = 15;
+    public const int MaxTags = 15;
 
     private static string NormalizeTag(string name) =>
         string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 
-    private static List<(string Name, string Normalized)> ParseTags(string? raw)
+    private static List<(string Name, string Normalized)> ParseTags(List<string>? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return [];
+        if (raw is null) return [];
+
         var seen = new HashSet<string>();
         var result = new List<(string, string)>();
-        foreach (var piece in raw.Split(','))
+
+        // Tags arrive as discrete values now, one per chip, rather than one delimited string.
+        // That removes the delimiter entirely — a tag containing a comma used to be silently
+        // split in two — but everything else still has to hold: trim, cap the length, drop
+        // blanks, and dedupe case-insensitively keeping the casing that came first.
+        foreach (var piece in raw)
         {
-            var trimmed = piece.Trim();
+            var trimmed = (piece ?? string.Empty).Trim();
             if (trimmed.Length == 0) continue;
             if (trimmed.Length > 40) trimmed = trimmed[..40];
+
             var norm = NormalizeTag(trimmed);
-            if (norm.Length == 0 || !seen.Add(norm)) continue;   // dedupe, keep first-seen casing
+            if (norm.Length == 0 || !seen.Add(norm)) continue;
+
             result.Add((trimmed, norm));
-            if (result.Count >= MaxTagsPerPlan) break;
+            if (result.Count >= MaxTags) break;
         }
+
         return result;
     }
 

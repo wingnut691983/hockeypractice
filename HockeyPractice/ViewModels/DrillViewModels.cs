@@ -53,6 +53,31 @@ public class RunTimeTotal
     }
 }
 
+/// <summary>
+/// Everything the shared tag editor needs. Used by both the drill form and the plan form, which
+/// tag different things but pick tags the same way.
+/// </summary>
+public class TagEditorModel
+{
+    /// <summary>Form field name. Every chip posts under this, one value each.</summary>
+    public string Name { get; init; } = "tags";
+
+    /// <summary>Unique on the page — two editors on one page would otherwise collide on ids.</summary>
+    public string Id { get; init; } = "tags";
+
+    public string Label { get; init; } = "Tags";
+    public string? Hint { get; init; }
+    public string Placeholder { get; init; } = "";
+
+    /// <summary>Tags already on this drill or plan, shown as chips.</summary>
+    public List<string> Current { get; init; } = new();
+
+    /// <summary>Every tag the team has used, offered as suggestions.</summary>
+    public List<string> Known { get; init; } = new();
+
+    public int Max { get; init; } = 15;
+}
+
 public class DrillListViewModel
 {
     public TeamContext Ctx { get; init; } = null!;
@@ -95,17 +120,17 @@ public class DrillEditViewModel
     public string? RetainedDescription { get; init; }
     public string? RetainedVideoUrl { get; init; }
     public string? RetainedRunTime { get; init; }
-    public string? RetainedTags { get; init; }
+    public List<string>? RetainedTags { get; init; }
 
     public string TitleValue => RetainedTitle ?? Drill?.Title ?? "";
     public string DescriptionValue => RetainedDescription ?? Drill?.Description ?? "";
     public string VideoUrlValue => RetainedVideoUrl ?? Drill?.VideoUrl ?? "";
     public string RunTimeValue => RetainedRunTime ?? Drill?.RunTimeMinutes?.ToString() ?? "";
 
-    public string TagsValue => RetainedTags
-        ?? (Drill?.Tags is { Count: > 0 } t
-            ? string.Join(", ", t.OrderBy(x => x.Name).Select(x => x.Name))
-            : "");
+    /// <summary>The tags to show as chips — what was typed if a save bounced, else what's saved.</summary>
+    public List<string> TagsValue => RetainedTags
+        ?? Drill?.Tags.OrderBy(x => x.Name).Select(x => x.Name).ToList()
+        ?? new List<string>();
 
     /// <summary>How many plans use this drill — shown so the coach knows what a change affects.</summary>
     public int UsedInPlans { get; init; }

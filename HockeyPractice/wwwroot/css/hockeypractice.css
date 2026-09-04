@@ -378,6 +378,48 @@ a.hp-card:active { transform: scale(.99); }
   align-items: flex-start;
 }
 
+/* ── Tag chips ─────────────────────────────────────────────
+   The tags already on a drill or plan. Empty renders as nothing at all rather than an empty
+   box, so a drill with no tags doesn't look like something failed to load. */
+.hp-tagchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.hp-tagchips:not(:empty) { margin-bottom: .5rem; }
+
+.hp-tagchip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .25rem .35rem .25rem .6rem;
+  border-radius: 999px;
+  background: var(--hp-surface-2);
+  border: 1px solid var(--hp-border);
+  font-size: .82rem;
+  font-weight: 650;
+  color: var(--hp-text);
+}
+.hp-tagchip-text { overflow-wrap: anywhere; }
+
+/* Small, but still a real touch target — 24px square rather than the bare glyph, which on a
+   phone would be almost impossible to hit without also hitting the chip next to it. */
+.hp-tagchip-x {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hp-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.hp-tagchip-x:hover,
+.hp-tagchip-x:focus-visible { background: var(--hp-danger); color: #fff; }
+
 /* The paste target. Deliberately NOT the file input: clicking this arms a paste, and only the
    button inside it opens the file dialog. */
 .hp-pastebox {

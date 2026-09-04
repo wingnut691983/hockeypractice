@@ -1,0 +1,50 @@
+@model TagEditorModel
+@{
+    var listId = Model.Id + "-known";
+    var chipsId = Model.Id + "-chips";
+    var inputId = Model.Id + "-entry";
+}
+
+@* Tags are picked one at a time and shown as chips, not typed as one comma-separated string.
+   The old field stopped suggesting anything after the first tag and grew unreadable as the
+   vocabulary did; worse, a delimited field can't hold a tag containing a comma. Each chip posts
+   its own value under the same name, so there's no delimiter to get wrong. *@
+<div class="hp-field">
+    <label class="hp-label" for="@inputId">@Model.Label</label>
+
+    <div class="hp-tagchips" id="@chipsId" data-max="@Model.Max" data-name="@Model.Name">
+        @foreach (var tag in Model.Current)
+        {
+            <span class="hp-tagchip">
+                <input type="hidden" name="@Model.Name" value="@tag" />
+                <span class="hp-tagchip-text">@tag</span>
+                @* type="button" or it submits the form instead of removing a chip. *@
+                <button type="button" class="hp-tagchip-x" data-tagremove
+                        aria-label="Remove tag @tag">&times;</button>
+            </span>
+        }
+    </div>
+
+    <div class="hp-row" style="gap:.4rem;align-items:stretch;">
+        @* Deliberately shares the chips' field name. If a coach types a tag and hits Save without
+           pressing Add, it still posts rather than being silently dropped — and it means the
+           field degrades to "one tag per save" if the script never runs. The script clears this
+           box when it makes a chip, so nothing is ever submitted twice. *@
+        <input class="hp-input" type="text" id="@inputId" name="@Model.Name" list="@listId"
+               placeholder="@Model.Placeholder" maxlength="40" autocomplete="off"
+               data-tagentry="@chipsId" style="flex:1;min-width:9rem;" />
+        <button type="button" class="hp-btn hp-btn-sm" data-tagadd="@inputId">Add tag</button>
+    </div>
+
+    @if (Model.Known.Count > 0)
+    {
+        <datalist id="@listId">
+            @foreach (var known in Model.Known) { <option value="@known"></option> }
+        </datalist>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Hint))
+    {
+        <span class="hp-muted" style="font-size:.8rem;">@Model.Hint</span>
+    }
+</div>

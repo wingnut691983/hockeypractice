@@ -49,17 +49,17 @@
                       maxlength="2000">@(Model.Plan?.CoachNotes ?? Model.RetainedNotes)</textarea>
         </div>
 
-        <div class="hp-field">
-            <label class="hp-label" for="tags">Tags (skills, drill names — comma separated)</label>
-            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingTags" data-taglist="existingTags"
-                   value="@Model.TagsValue" placeholder="backcheck, breakout, PP entry" />
-        </div>
-        @if (Model.AllTags.Count > 0)
+        @await Html.PartialAsync("_TagEditor", new TagEditorModel
         {
-            <datalist id="existingTags">
-                @foreach (var t in Model.AllTags) { <option value="@t"></option> }
-            </datalist>
-        }
+            Name = "tags",
+            Id = "plantags",
+            Label = "Tags (skills, drill names)",
+            Placeholder = "Type a tag, or pick an existing one",
+            Hint = "Used to find this plan again later. Press Enter or Add tag to add each one.",
+            Current = Model.TagsValue,
+            Known = Model.AllTags,
+            Max = HockeyPractice.Controllers.CoachController.MaxTags
+        })
 
         @* Carries the choice made on the chooser page through a failed submit, so a validation
            error can't silently turn a drill plan into a PDF one. *@

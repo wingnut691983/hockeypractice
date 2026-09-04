@@ -43,7 +43,7 @@ public class PlanEditViewModel
     public string? RetainedTitle { get; init; }
     public string? RetainedLocation { get; init; }
     public string? RetainedNotes { get; init; }
-    public string? RetainedTags { get; init; }
+    public List<string>? RetainedTags { get; init; }
 
     /// <summary>Which kind of plan this is. Chosen at creation and not switched afterwards.</summary>
     public PlanKind Kind { get; init; } = PlanKind.Pdf;
@@ -62,10 +62,10 @@ public class PlanEditViewModel
     /// <summary>Distinct tag names used anywhere on the team, for the tag field's autocomplete.</summary>
     public List<string> AllTags { get; init; } = new();
 
-    /// <summary>The comma-joined value the tags input should show — the plan's saved tags, or
-    /// whatever the coach had typed if this is a re-render after a validation failure.</summary>
-    public string TagsValue => Plan?.Tags is { Count: > 0 } t
-        ? string.Join(", ", t.OrderBy(x => x.Name).Select(x => x.Name)) : RetainedTags ?? "";
+    /// <summary>The tags to show as chips — what was typed if a save bounced, else what's saved.</summary>
+    public List<string> TagsValue => RetainedTags
+        ?? Plan?.Tags.OrderBy(x => x.Name).Select(x => x.Name).ToList()
+        ?? new List<string>();
 
     public string? Notice { get; init; }
 }

@@ -65,20 +65,18 @@
             </span>
         </div>
 
-        <div class="hp-field">
-            <label class="hp-label" for="tags">Drill tags (comma separated)</label>
-            <input class="hp-input" id="tags" name="tags" maxlength="600" list="existingDrillTags" data-taglist="existingDrillTags"
-                   value="@Model.TagsValue" placeholder="breakout, D-zone, small area" />
-            <span class="hp-muted" style="font-size:.8rem;">
-                How you'll find this drill later when building a plan.
-            </span>
-        </div>
-        @if (Model.AllTags.Count > 0)
+        @await Html.PartialAsync("_TagEditor", new TagEditorModel
         {
-            <datalist id="existingDrillTags">
-                @foreach (var tag in Model.AllTags) { <option value="@tag"></option> }
-            </datalist>
-        }
+            Name = "tags",
+            Id = "drilltags",
+            Label = "Drill tags",
+            Placeholder = "Type a tag, or pick an existing one",
+            Hint = "How you'll find this drill later when building a plan. Press Enter or Add tag "
+                 + "to add each one.",
+            Current = Model.TagsValue,
+            Known = Model.AllTags,
+            Max = HockeyPractice.Controllers.DrillController.MaxTags
+        })
 
         <div class="hp-field">
             <label class="hp-label" for="videoUrl">Video link (optional)</label>

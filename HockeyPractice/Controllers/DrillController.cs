@@ -68,7 +68,7 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Create(string slug, string title, string? description,
-        string? videoUrl, string? runTimeMinutes, string? tags, List<IFormFile>? diagrams,
+        string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams,
         string? returnUrl)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -137,7 +137,7 @@ public class DrillController : TeamScopedController
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Update(string slug, int id, string title, string? description,
-        string? videoUrl, string? runTimeMinutes, string? tags, List<IFormFile>? diagrams)
+        string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -488,7 +488,7 @@ public class DrillController : TeamScopedController
 
     private async Task<IActionResult> RedisplayAsync(TeamContext ctx, Drill? drill, string error,
         string? title, string? description, string? videoUrl, string? runTimeMinutes,
-        string? tags, string? returnUrl)
+        List<string>? tags, string? returnUrl)
     {
         ViewBag.NavSection = "drills";
         return View("Edit", new DrillEditViewModel
@@ -600,7 +600,7 @@ public class DrillController : TeamScopedController
     /// re-inserting those in one SaveChanges risks the two landing in an order that trips the
     /// {DrillId, NormalizedName} unique index.
     /// </summary>
-    private void SyncTags(Drill drill, string? tags)
+    private void SyncTags(Drill drill, List<string>? tags)
     {
         var parsed = ParseTags(tags);
         var wanted = parsed.Select(p => p.Normalized).ToHashSet();
@@ -618,29 +618,33 @@ public class DrillController : TeamScopedController
     /// rather than hard-coding a number that could drift away from the check.</summary>
     public const int MaxDiagrams = 6;
 
-    private const int MaxTagsPerDrill = 15;
+    public const int MaxTags = 15;
 
     private static string NormalizeTag(string name) =>
         string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
 
-    private static List<(string Name, string Normalized)> ParseTags(string? raw)
+    private static List<(string Name, string Normalized)> ParseTags(List<string>? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) return [];
+        if (raw is null) return [];
 
         var seen = new HashSet<string>();
         var result = new List<(string, string)>();
 
-        foreach (var piece in raw.Split(','))
+        // Tags arrive as discrete values now, one per chip, rather than one delimited string.
+        // That removes the delimiter entirely — a tag containing a comma used to be silently
+        // split in two — but everything else still has to hold: trim, cap the length, drop
+        // blanks, and dedupe case-insensitively keeping the casing that came first.
+        foreach (var piece in raw)
         {
-            var trimmed = piece.Trim();
+            var trimmed = (piece ?? string.Empty).Trim();
             if (trimmed.Length == 0) continue;
             if (trimmed.Length > 40) trimmed = trimmed[..40];
 
             var norm = NormalizeTag(trimmed);
-            if (norm.Length == 0 || !seen.Add(norm)) continue;   // dedupe, keep first-seen casing
+            if (norm.Length == 0 || !seen.Add(norm)) continue;
 
             result.Add((trimmed, norm));
-            if (result.Count >= MaxTagsPerDrill) break;
+            if (result.Count >= MaxTags) break;
         }
 
         return result;

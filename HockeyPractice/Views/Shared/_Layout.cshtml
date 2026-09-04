@@ -76,64 +76,100 @@
         });
     });
 
-    // ── Suggestions on a comma-separated tag field ──────────────────────
-    // A <datalist> matches against the WHOLE value of its input, not the bit you're currently
-    // typing. On a comma-separated field that means suggestions work for the first tag and then
-    // stop dead: once the box reads "breakout, " nothing matches any option, so the second tag
-    // gets free-typed and the vocabulary drifts — "backcheck" and "back check" as two tags.
-    //
-    // Fix: rebuild the options as "everything you've typed so far + candidate", so the browser's
-    // own matching keeps working for every tag after the first. Picking one then appends a comma
-    // so the next suggestion is one keystroke away rather than needing a comma typed first.
-    document.querySelectorAll('input[data-taglist]').forEach(function (input) {
-        var list = document.getElementById(input.getAttribute('data-taglist'));
-        if (!list) return;
+    // ── Tag chips ───────────────────────────────────────────────────────
+    // Tags are added one at a time and shown as chips. The previous comma-separated box stopped
+    // suggesting anything after the first tag, because a <datalist> matches the whole value of
+    // its input rather than the piece being typed — and a single long string gets unreadable
+    // once a team has built up a real vocabulary.
+    document.querySelectorAll('input[data-tagentry]').forEach(function (entry) {
+        var chips = document.getElementById(entry.getAttribute('data-tagentry'));
+        if (!chips) return;
 
-        var all = Array.prototype.slice.call(list.options).map(function (o) { return o.value; });
-        if (!all.length) return;
+        var name = chips.getAttribute('data-name') || 'tags';
+        var max = parseInt(chips.getAttribute('data-max'), 10) || 15;
+        var list = entry.getAttribute('list') ? document.getElementById(entry.getAttribute('list')) : null;
+        var known = list ? Array.prototype.slice.call(list.options).map(function (o) { return o.value; }) : [];
 
-        function refresh() {
-            var value = input.value;
-            var parts = value.split(',');
-
-            // Everything before the last comma is settled; the last piece is being typed, so it
-            // must stay suggestable — otherwise typing a tag in full hides the very option that
-            // would complete it.
-            var settled = parts.slice(0, -1).map(function (p) { return p.trim().toLowerCase(); });
-            var cut = value.lastIndexOf(',');
-            var prefix = cut === -1 ? '' : value.slice(0, cut + 1) + ' ';
-
-            list.innerHTML = '';
-            all.forEach(function (tag) {
-                if (settled.indexOf(tag.toLowerCase()) !== -1) return;   // already in the box
-                var option = document.createElement('option');
-                option.value = prefix + tag;
-                list.appendChild(option);
-            });
-
-            return prefix;
+        function current() {
+            return Array.prototype.slice.call(chips.querySelectorAll('input[type="hidden"]'))
+                .map(function (i) { return i.value; });
         }
 
-        input.addEventListener('input', function (e) {
-            var before = input.value;
-            var prefix = refresh();
+        function add(raw) {
+            var value = (raw || '').trim();
+            if (!value) return;
 
-            // Only when the browser says this came from picking a suggestion. Matching on the
-            // text alone looked equivalent and was not: typing a tag that merely STARTS with an
-            // existing one got a comma injected mid-word, so reaching for "backchecking" past
-            // an existing "backcheck" produced "backcheck, ing". Browsers that don't report
-            // inputType simply don't get the shortcut, and a typed comma still works.
-            if (e && e.inputType !== 'insertReplacementText') return;
+            // Snap to the spelling the team already uses. Typing "breakout" where "Breakout"
+            // exists should join that tag, not start a near-duplicate beside it — which is the
+            // whole reason for suggesting existing tags in the first place.
+            var match = known.filter(function (k) { return k.toLowerCase() === value.toLowerCase(); })[0];
+            if (match) value = match;
 
-            var picked = all.some(function (tag) { return before === prefix + tag; });
-            if (picked) {
-                input.value = before + ', ';
-                refresh();
+            var already = current().some(function (v) { return v.toLowerCase() === value.toLowerCase(); });
+            if (already) { entry.value = ''; return; }
+
+            if (current().length >= max) {
+                entry.value = '';
+                return;
             }
+
+            var chip = document.createElement('span');
+            chip.className = 'hp-tagchip';
+
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = name;
+            hidden.value = value;
+
+            var text = document.createElement('span');
+            text.className = 'hp-tagchip-text';
+            text.textContent = value;
+
+            var remove = document.createElement('button');
+            remove.type = 'button';          // a bare button would submit the form
+            remove.className = 'hp-tagchip-x';
+            remove.setAttribute('data-tagremove', '');
+            remove.setAttribute('aria-label', 'Remove tag ' + value);
+            remove.innerHTML = '&times;';
+
+            chip.appendChild(hidden);
+            chip.appendChild(text);
+            chip.appendChild(remove);
+            chips.appendChild(chip);
+
+            entry.value = '';
+        }
+
+        // Enter must add a tag, NOT submit the form — which is what it would do by default and
+        // would save the drill half-tagged.
+        entry.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            add(entry.value);
         });
 
-        input.addEventListener('focus', refresh);
-        refresh();
+        // Picking from the suggestion list commits straight away; there's nothing to add to a
+        // chosen tag, so making the coach press Add as well is a keystroke for nothing.
+        entry.addEventListener('input', function (e) {
+            if (e && e.inputType === 'insertReplacementText') add(entry.value);
+        });
+
+        entry.addEventListener('blur', function () { add(entry.value); });
+
+        var addButton = document.querySelector('[data-tagadd="' + entry.id + '"]');
+        if (addButton) {
+            addButton.addEventListener('click', function () {
+                add(entry.value);
+                entry.focus();
+            });
+        }
+
+        chips.addEventListener('click', function (e) {
+            var button = e.target.closest ? e.target.closest('[data-tagremove]') : null;
+            if (!button) return;
+            var chip = button.parentNode;
+            if (chip && chip.parentNode) chip.parentNode.removeChild(chip);
+        });
     });
 })();
 </script>
