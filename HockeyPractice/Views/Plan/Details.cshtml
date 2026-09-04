@@ -39,9 +39,11 @@
        a control they can't use. *@
     @if (Model.Ctx.IsManager)
     {
-        <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-bottom:.8rem;"
-           asp-controller="Coach" asp-action="EditPlan"
-           asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
+        <div class="hp-plan-actions">
+            <a class="hp-btn hp-btn-quiet hp-btn-sm"
+               asp-controller="Coach" asp-action="EditPlan"
+               asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
+        </div>
     }
 
     @if (!string.IsNullOrWhiteSpace(Model.Plan.CoachNotes))

@@ -378,6 +378,15 @@ a.hp-card:active { transform: scale(.99); }
   align-items: flex-start;
 }
 
+/* The Edit button above a plan's content.
+   A block wrapper rather than the bare button, because .hp-btn is inline-flex: as an
+   inline-level box its margin does not collapse with the following section's, so the button's
+   own gap and the heading's 1.9rem top margin stacked into a large empty band. The wrapper owns
+   the spacing, and the heading that follows has its own trimmed to suit. */
+.hp-plan-actions { margin: .2rem 0 0; }
+.hp-plan-actions + .hp-section { margin-top: 1.1rem; }
+.hp-plan-actions + .hp-panel { margin-top: .9rem; }
+
 /* ── Tag chips ─────────────────────────────────────────────
    The tags already on a drill or plan. Empty renders as nothing at all rather than an empty
    box, so a drill with no tags doesn't look like something failed to load. */
