@@ -20,32 +20,60 @@
 
     <div class="hp-section">Plans</div>
 
-    <form method="get" asp-action="Index" asp-route-slug="@slug" class="hp-row" style="margin:.6rem 0;">
-        <input class="hp-input" type="text" name="tag" value="@Model.ActiveTag"
-               placeholder="Search tags (e.g. backcheck)" style="flex:1;" />
-        <button type="submit" class="hp-btn hp-btn-sm">Search</button>
-    </form>
+    @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
+    {
+        Id = "plansearch",
+        Noun = "Plan",
+        NameField = "name",
+        TagField = "tag",
+        ActiveName = Model.ActiveName,
+        ActiveTag = Model.ActiveTag,
+        KnownTags = Model.AllTags
+    })
     @if (Model.AllTags.Count > 0)
     {
         <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
             @foreach (var t in Model.AllTags)
             {
                 <a class="hp-pill @(string.Equals(Model.ActiveTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
-                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@t">@t</a>
+                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@t"
+                   asp-route-name="@Model.ActiveName">@t</a>
             }
         </div>
     }
-    @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+    @if (!string.IsNullOrWhiteSpace(Model.ActiveTag) || !string.IsNullOrWhiteSpace(Model.ActiveName))
     {
         <div class="hp-muted" style="margin-bottom:.6rem;">
-            Showing plans tagged &ldquo;@Model.ActiveTag&rdquo; ·
+            Showing plans
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveName))
+            {
+                <text>named like &ldquo;@Model.ActiveName&rdquo;</text>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveName) && !string.IsNullOrWhiteSpace(Model.ActiveTag))
+            {
+                <text>and</text>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveTag))
+            {
+                <text>tagged &ldquo;@Model.ActiveTag&rdquo;</text>
+            }
+            ·
             <a asp-action="Index" asp-route-slug="@slug">Clear</a>
         </div>
     }
 
     @if (Model.Plans.Count == 0)
     {
-        <div class="hp-empty">No plans yet.</div>
+        <div class="hp-empty">
+            @if (!string.IsNullOrWhiteSpace(Model.ActiveTag) || !string.IsNullOrWhiteSpace(Model.ActiveName))
+            {
+                <text>Nothing matches those filters.</text>
+            }
+            else
+            {
+                <text>No plans yet.</text>
+            }
+        </div>
     }
     else
     {

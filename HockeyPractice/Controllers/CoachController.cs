@@ -37,14 +37,15 @@ public class CoachController : TeamScopedController
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string slug, string? notice, string? tag)
+    public async Task<IActionResult> Index(string slug, string? notice, string? tag, string? name)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
         var needle = tag?.Trim().ToLowerInvariant();
 
-        var plansQuery = Db.Plans.Include(p => p.Tags).Where(p => p.TeamId == ctx!.Team.Id);
+        var plansQuery = Db.Plans.Include(p => p.Tags).Where(p => p.TeamId == ctx!.Team.Id)
+            .MatchingTitle(name);
         if (!string.IsNullOrEmpty(needle))
             plansQuery = plansQuery.Where(p => p.Tags.Any(t => t.NormalizedName.Contains(needle)));
 
@@ -77,6 +78,7 @@ public class CoachController : TeamScopedController
             QuotaBytes = _storage.QuotaBytes,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
             ActiveTag = tag,
+            ActiveName = name,
             Notice = notice
         });
     }
@@ -212,7 +214,8 @@ public class CoachController : TeamScopedController
     }
 
     [HttpGet("plans/{id:int}")]
-    public async Task<IActionResult> EditPlan(string slug, int id, string? notice, string? drillTag)
+    public async Task<IActionResult> EditPlan(string slug, int id, string? notice, string? drillTag,
+        string? drillName)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -235,12 +238,13 @@ public class CoachController : TeamScopedController
                 ? await PlanDrillsAsync(plan.Id)
                 : new List<DrillCard>(),
             Library = plan.Kind == PlanKind.Drills
-                ? await DrillLibraryAsync(ctx.Team.Id, drillTag)
+                ? await DrillLibraryAsync(ctx.Team.Id, drillTag, drillName)
                 : new List<DrillCard>(),
             AllDrillTags = plan.Kind == PlanKind.Drills
                 ? await DistinctDrillTagsAsync(ctx.Team.Id)
                 : new List<string>(),
-            ActiveDrillTag = drillTag
+            ActiveDrillTag = drillTag,
+            ActiveDrillName = drillName
         };
 
         ViewBag.NavSection = "manage";
@@ -251,7 +255,8 @@ public class CoachController : TeamScopedController
 
     [HttpPost("plans/{id:int}/drills/add")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddDrill(string slug, int id, int drillId, string? drillTag)
+    public async Task<IActionResult> AddDrill(string slug, int id, int drillId, string? drillTag,
+        string? drillName)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -274,12 +279,13 @@ public class CoachController : TeamScopedController
         });
         await Db.SaveChangesAsync();
 
-        return BackToPlan(slug, id, drillTag);
+        return BackToPlan(slug, id, drillTag, drillName);
     }
 
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/remove")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RemoveDrill(string slug, int id, int planDrillId, string? drillTag)
+    public async Task<IActionResult> RemoveDrill(string slug, int id, int planDrillId, string? drillTag,
+        string? drillName)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -292,7 +298,7 @@ public class CoachController : TeamScopedController
         Db.PlanDrills.Remove(entry);
         await Db.SaveChangesAsync();
 
-        return BackToPlan(slug, id, drillTag);
+        return BackToPlan(slug, id, drillTag, drillName);
     }
 
     /// <summary>
@@ -302,7 +308,7 @@ public class CoachController : TeamScopedController
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/move")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MoveDrill(string slug, int id, int planDrillId,
-        string direction, string? drillTag)
+        string direction, string? drillTag, string? drillName)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -319,13 +325,13 @@ public class CoachController : TeamScopedController
 
         var neighbour = direction == "up" ? index - 1 : index + 1;
         if (neighbour < 0 || neighbour >= ordered.Count)
-            return BackToPlan(slug, id, drillTag);
+            return BackToPlan(slug, id, drillTag, drillName);
 
         (ordered[index].SortOrder, ordered[neighbour].SortOrder) =
             (ordered[neighbour].SortOrder, ordered[index].SortOrder);
 
         await Db.SaveChangesAsync();
-        return BackToPlan(slug, id, drillTag);
+        return BackToPlan(slug, id, drillTag, drillName);
     }
 
     [HttpPost("plans/{id:int}")]
@@ -802,8 +808,8 @@ public class CoachController : TeamScopedController
     /// same place. RedirectToAction can't carry a fragment, and without one they all land at the
     /// top of a long page instead.
     /// </summary>
-    private IActionResult BackToPlan(string slug, int id, string? drillTag) =>
-        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag }) + "#hp-plan-drills");
+    private IActionResult BackToPlan(string slug, int id, string? drillTag, string? drillName) =>
+        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag, drillName }) + "#hp-plan-drills");
 
     /// <summary>The plan's drills, in order. Ties on SortOrder break on Id so the order is stable.</summary>
     private async Task<List<DrillCard>> PlanDrillsAsync(int planId)
@@ -823,15 +829,12 @@ public class CoachController : TeamScopedController
     }
 
     /// <summary>The team's pickable drills — archived ones are deliberately left out.</summary>
-    private async Task<List<DrillCard>> DrillLibraryAsync(int teamId, string? tag)
+    private async Task<List<DrillCard>> DrillLibraryAsync(int teamId, string? tag, string? name)
     {
-        var needle = tag?.Trim().ToLowerInvariant();
-
         var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
-            .Where(d => d.TeamId == teamId && !d.IsArchived);
-
-        if (!string.IsNullOrEmpty(needle))
-            query = query.Where(d => d.Tags.Any(t => t.NormalizedName.Contains(needle)));
+            .Where(d => d.TeamId == teamId && !d.IsArchived)
+            .MatchingTag(tag)
+            .MatchingName(name);
 
         var drills = await query.OrderBy(d => d.Title).ToListAsync();
         return drills.Select(d => new DrillCard { Drill = d }).ToList();

@@ -78,6 +78,38 @@ public class TagEditorModel
     public int Max { get; init; } = 15;
 }
 
+/// <summary>
+/// The name and tag search boxes. Used by the drill library, the plan editor's picker and the
+/// plan list, so all three explain themselves the same way.
+/// </summary>
+public class SearchFiltersModel
+{
+    /// <summary>Form field names. They differ between pages, hence not hard-coded.</summary>
+    public string NameField { get; init; } = "name";
+    public string TagField { get; init; } = "tag";
+
+    /// <summary>Unique on the page, so ids and label targets can't collide.</summary>
+    public string Id { get; init; } = "search";
+
+    /// <summary>"Drill" or "Plan", so the name label reads correctly in both places.</summary>
+    public string Noun { get; init; } = "Drill";
+
+    public string? ActiveName { get; init; }
+    public string? ActiveTag { get; init; }
+
+    /// <summary>The team's tags, offered as the tag picklist.</summary>
+    public List<string> KnownTags { get; init; } = new();
+
+    /// <summary>
+    /// Extra values the form must carry so submitting a search doesn't drop them, such as the
+    /// plan id or the archived flag. Rendered as hidden inputs.
+    /// </summary>
+    public Dictionary<string, string> Preserve { get; init; } = new();
+
+    public bool AnyActive =>
+        !string.IsNullOrWhiteSpace(ActiveName) || !string.IsNullOrWhiteSpace(ActiveTag);
+}
+
 public class DrillListViewModel
 {
     public TeamContext Ctx { get; init; } = null!;
@@ -85,6 +117,7 @@ public class DrillListViewModel
 
     public List<string> AllTags { get; init; } = new();
     public string? ActiveTag { get; init; }
+    public string? ActiveName { get; init; }
 
     /// <summary>Showing the archived drills rather than the working library.</summary>
     public bool ShowingArchived { get; init; }

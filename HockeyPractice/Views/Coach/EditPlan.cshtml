@@ -198,6 +198,7 @@
     {
         var planId = Model.Plan.Id;
         var tagFilter = Model.ActiveDrillTag;
+        var nameFilter = Model.ActiveDrillName;
 
         <div class="hp-section" id="hp-plan-drills">Drills in this plan</div>
         @if (Model.PlanDrills.Count == 0)
@@ -237,7 +238,8 @@
                                separate forms. *@
                             <form method="post" class="hp-row" style="gap:.2rem;"
                                   asp-action="MoveDrill" asp-route-slug="@slug" asp-route-id="@planId"
-                                  asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter">
+                                  asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter"
+                                  asp-route-drillName="@nameFilter">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" name="direction" value="up"
                                         class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
@@ -246,7 +248,7 @@
                                         class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
                                         @(i == Model.PlanDrills.Count - 1 ? "disabled" : "")>&darr;</button>
                                 <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm"
-                                        formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter })">
+                                        formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter, drillName = nameFilter })">
                                     Remove
                                 </button>
                             </form>
@@ -258,12 +260,16 @@
 
         <div class="hp-section">Add a drill</div>
 
-        <form method="get" asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId"
-              class="hp-row" style="margin:.6rem 0;">
-            <input class="hp-input" type="text" name="drillTag" value="@tagFilter"
-                   placeholder="Filter by drill tag (e.g. breakout)" style="flex:1;" />
-            <button type="submit" class="hp-btn hp-btn-sm">Filter</button>
-        </form>
+        @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
+        {
+            Id = "pickersearch",
+            Noun = "Drill",
+            NameField = "drillName",
+            TagField = "drillTag",
+            ActiveName = nameFilter,
+            ActiveTag = tagFilter,
+            KnownTags = Model.AllDrillTags
+        })
 
         @if (Model.AllDrillTags.Count > 0)
         {
@@ -272,9 +278,9 @@
                 {
                     <a class="hp-pill @(string.Equals(tagFilter, tag, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
                        asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId"
-                       asp-route-drillTag="@tag">@tag</a>
+                       asp-route-drillTag="@tag" asp-route-drillName="@nameFilter">@tag</a>
                 }
-                @if (!string.IsNullOrWhiteSpace(tagFilter))
+                @if (!string.IsNullOrWhiteSpace(tagFilter) || !string.IsNullOrWhiteSpace(nameFilter))
                 {
                     <a class="hp-muted" style="font-size:.8rem;align-self:center;"
                        asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId">Clear</a>
@@ -285,9 +291,9 @@
         @if (Model.Library.Count == 0)
         {
             <div class="hp-empty">
-                @if (!string.IsNullOrWhiteSpace(tagFilter))
+                @if (!string.IsNullOrWhiteSpace(tagFilter) || !string.IsNullOrWhiteSpace(nameFilter))
                 {
-                    <text>No drills with that tag.</text>
+                    <text>Nothing matches those filters.</text>
                 }
                 else
                 {
@@ -307,7 +313,8 @@
                         <li style="flex-wrap:wrap;align-items:flex-start;">
                             @await Html.PartialAsync("_DrillRow", card)
                             <form method="post" asp-action="AddDrill" asp-route-slug="@slug"
-                                  asp-route-id="@planId" asp-route-drillTag="@tagFilter">
+                                  asp-route-id="@planId" asp-route-drillTag="@tagFilter"
+                                  asp-route-drillName="@nameFilter">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="drillId" value="@card.Drill.Id" />
                                 <button type="submit" class="hp-btn hp-btn-sm">Add</button>

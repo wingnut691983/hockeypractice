@@ -21,6 +21,7 @@ public class ManageViewModel
     public List<string> AllTags { get; init; } = new();
     /// <summary>The tag currently filtering the list, if any (from the search box or a clicked chip).</summary>
     public string? ActiveTag { get; init; }
+    public string? ActiveName { get; init; }
 }
 
 public class PlanEditViewModel
@@ -58,6 +59,7 @@ public class PlanEditViewModel
     /// <summary>Drill tags — a separate vocabulary from the plan tags above, hence the name.</summary>
     public List<string> AllDrillTags { get; init; } = new();
     public string? ActiveDrillTag { get; init; }
+    public string? ActiveDrillName { get; init; }
 
     /// <summary>Distinct tag names used anywhere on the team, for the tag field's autocomplete.</summary>
     public List<string> AllTags { get; init; } = new();

@@ -1,0 +1,49 @@
+@model SearchFiltersModel
+@{
+    var nameId = Model.Id + "-name";
+    var tagId = Model.Id + "-tag";
+    var listId = Model.Id + "-tags";
+}
+
+@* Both boxes in one form so a single Search applies both. The hidden values carry whatever else
+   the page needs (the plan id, the archived flag), which would otherwise be dropped the moment a
+   search is submitted. *@
+<form method="get" class="hp-searchfilters" style="margin:.6rem 0;">
+    @foreach (var keep in Model.Preserve)
+    {
+        <input type="hidden" name="@keep.Key" value="@keep.Value" />
+    }
+
+    <div class="hp-searchfilters-row">
+        <div class="hp-field" style="flex:1;min-width:9rem;">
+            <label class="hp-label" for="@nameId">@Model.Noun name</label>
+            <input class="hp-input" type="text" id="@nameId" name="@Model.NameField"
+                   value="@Model.ActiveName" placeholder="e.g. breakout" autocomplete="off" />
+        </div>
+
+        @* A picklist rather than free text: the tags are a known, finite set, so guessing at them
+           in a plain box is the wrong shape. The arrow opens the lot, typing narrows it. A
+           datalist suggests without restricting, so a tag typed by hand still filters. *@
+        <div class="hp-field" style="flex:1;min-width:9rem;">
+            <label class="hp-label" for="@tagId">Tag</label>
+            <input class="hp-input" type="text" id="@tagId" name="@Model.TagField" list="@listId"
+                   value="@Model.ActiveTag" placeholder="Pick or type a tag" autocomplete="off" />
+        </div>
+
+        <button type="submit" class="hp-btn hp-btn-sm hp-searchfilters-go">Search</button>
+    </div>
+
+    @if (Model.KnownTags.Count > 0)
+    {
+        <datalist id="@listId">
+            @foreach (var tag in Model.KnownTags) { <option value="@tag"></option> }
+        </datalist>
+    }
+
+    @* How the two interact, stated once here rather than three times across the pages that use
+       this. Always visible rather than a title tooltip: this is used on phones, where a hover
+       tooltip never appears at all. *@
+    <span class="hp-muted" style="font-size:.8rem;">
+        Use either box on its own, or both together to narrow the results. An empty box is ignored.
+    </span>
+</form>

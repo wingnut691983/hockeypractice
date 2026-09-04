@@ -28,13 +28,13 @@ public class DrillController : TeamScopedController
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string slug, string? tag, bool archived = false,
-        string? notice = null)
+    public async Task<IActionResult> Index(string slug, string? tag, string? name,
+        bool archived = false, string? notice = null)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var drills = await QueryLibraryAsync(ctx!.Team.Id, tag, archived);
+        var drills = await QueryLibraryAsync(ctx!.Team.Id, tag, name, archived);
 
         ViewBag.NavSection = "drills";
         return View(new DrillListViewModel
@@ -43,6 +43,7 @@ public class DrillController : TeamScopedController
             Drills = drills,
             AllTags = await DistinctTagsAsync(ctx.Team.Id),
             ActiveTag = tag,
+            ActiveName = name,
             ShowingArchived = archived,
             CopyTargets = await CopyTargetsAsync(ctx.Team.Id),
             Notice = notice
@@ -454,15 +455,15 @@ public class DrillController : TeamScopedController
             .ToListAsync();
     }
 
-    private async Task<List<DrillCard>> QueryLibraryAsync(int teamId, string? tag, bool archived)
+    private async Task<List<DrillCard>> QueryLibraryAsync(int teamId, string? tag, string? name,
+        bool archived)
     {
-        var needle = tag?.Trim().ToLowerInvariant();
-
+        // Each filter is applied only when it has something in it, so an empty box is ignored
+        // rather than matching nothing, and the two combine to narrow when both are set.
         var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
-            .Where(d => d.TeamId == teamId && d.IsArchived == archived);
-
-        if (!string.IsNullOrEmpty(needle))
-            query = query.Where(d => d.Tags.Any(t => t.NormalizedName.Contains(needle)));
+            .Where(d => d.TeamId == teamId && d.IsArchived == archived)
+            .MatchingTag(tag)
+            .MatchingName(name);
 
         var drills = await query.OrderBy(d => d.Title).ToListAsync();
 

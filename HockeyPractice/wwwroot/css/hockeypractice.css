@@ -386,6 +386,18 @@ a.hp-card:active { transform: scale(.99); }
 .hp-plan-actions + .hp-section { margin-top: 1.1rem; }
 .hp-plan-actions + .hp-panel { margin-top: .9rem; }
 
+/* The name and tag search boxes. Side by side where there's room, stacked on a phone, with the
+   button dropping onto its own line rather than being squeezed to nothing. */
+.hp-searchfilters { display: flex; flex-direction: column; gap: .35rem; }
+.hp-searchfilters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: flex-end;
+}
+/* Aligns with the inputs rather than their labels, which sit above. */
+.hp-searchfilters-go { flex: 0 0 auto; min-height: var(--hp-tap); }
+
 /* ── Tag chips ─────────────────────────────────────────────
    The tags already on a drill or plan. Empty renders as nothing at all rather than an empty
    box, so a drill with no tags doesn't look like something failed to load. */
