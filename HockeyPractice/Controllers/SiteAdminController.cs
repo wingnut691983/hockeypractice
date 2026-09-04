@@ -1,3 +1,4 @@
+using HockeyPractice.Infrastructure;
 using HockeyPractice.Persistence;
 using HockeyPractice.Models;
 using HockeyPractice.Services;
@@ -18,18 +19,40 @@ namespace HockeyPractice.Controllers;
 [Route("admin")]
 public class SiteAdminController : Controller
 {
+    /// <summary>Typed back before a restore runs. Uppercase and unlike anything else on the page,
+    /// so it cannot be produced by autofill or by mashing Enter.</summary>
+    private const string ConfirmWord = "REPLACE";
+
+    /// <summary>
+    /// Ceiling on an uploaded backup. Kestrel caps request bodies at 30 MB by default, which a
+    /// real database will outgrow, so this raises it deliberately rather than letting the restore
+    /// start failing with an unexplained 413 one season from now. It stays well under the 1 GiB
+    /// volume; the free-space check is what actually decides whether a given file fits.
+    /// </summary>
+    private const long MaxRestoreBytes = 200L * 1024 * 1024;
+
     private readonly AppDbContext _db;
     private readonly TeamAccessService _access;
     private readonly PlanStorageService _storage;
+    private readonly DatabaseBackupService _backup;
+    private readonly MaintenanceState _maintenance;
+    private readonly DataPaths _paths;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<SiteAdminController> _log;
     private readonly string? _adminCodeHash;
 
     public SiteAdminController(AppDbContext db, TeamAccessService access,
-        PlanStorageService storage, IConfiguration config, ILogger<SiteAdminController> log)
+        PlanStorageService storage, DatabaseBackupService backup, MaintenanceState maintenance,
+        DataPaths paths, IHostApplicationLifetime lifetime, IConfiguration config,
+        ILogger<SiteAdminController> log)
     {
         _db = db;
         _access = access;
         _storage = storage;
+        _backup = backup;
+        _maintenance = maintenance;
+        _paths = paths;
+        _lifetime = lifetime;
         _log = log;
 
         var code = config["SITE_ADMIN_CODE"];
@@ -250,6 +273,172 @@ public class SiteAdminController : Controller
         return RedirectToAction(nameof(Index), new { notice = $"Deleted {name} and all its plans." });
     }
 
+    // ── Backup and restore ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Turns writes off, or back on. The pause is what makes a restore safe, and it lifts itself
+    /// after <see cref="MaintenanceState.Window"/> so forgetting about it cannot leave a coach
+    /// unable to post Thursday's plan.
+    /// </summary>
+    [HttpPost("maintenance")]
+    [ValidateAntiForgeryToken]
+    public IActionResult Maintenance(string action)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        if (action == "resume")
+        {
+            _maintenance.Resume();
+            _log.LogInformation("Site admin resumed writes");
+            return RedirectToAction(nameof(Index), new { notice = "Saving is back on for everyone." });
+        }
+
+        _maintenance.Pause();
+        _log.LogWarning("Site admin paused writes for {Minutes} minutes",
+            (int)MaintenanceState.Window.TotalMinutes);
+
+        return RedirectToAction(nameof(Index), new
+        {
+            notice = $"Saving is paused for everyone for {(int)MaintenanceState.Window.TotalMinutes} " +
+                     "minutes. Reading plans still works. It comes back on by itself, or press " +
+                     "Resume saving when you are done."
+        });
+    }
+
+    /// <summary>
+    /// Streams a consistent copy of the database to the browser.
+    ///
+    /// A POST rather than a link, so it carries an antiforgery token like every other action here
+    /// and cannot be set off by a stray URL. It does not require the pause: the snapshot is taken
+    /// inside a read transaction, so it is coherent whether or not anyone is writing. Requiring a
+    /// pause for a routine backup would only teach people to skip backups.
+    /// </summary>
+    [HttpPost("backup/download")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DownloadBackup(CancellationToken ct)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        // The snapshot lands beside the live database before it is streamed, so a volume with no
+        // room left cannot produce one. Better to say so than to fail partway and hand over a
+        // truncated file that looks like a backup.
+        if (_storage.IsFull())
+            return View("Index", await BuildAsync(null,
+                "Storage is too full to write a snapshot. Delete some old plans first."));
+
+        string snapshot;
+        try
+        {
+            snapshot = await _backup.SnapshotAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError("Could not snapshot the database: {Type}: {Error}",
+                ex.GetType().FullName, ex.Message);
+            return View("Index", await BuildAsync(null,
+                "Could not take a copy of the database. The log has the detail."));
+        }
+
+        _log.LogInformation("Site admin downloaded a database backup ({Bytes} bytes)",
+            new FileInfo(snapshot).Length);
+
+        // DeleteOnClose: the framework streams the file and disposes the handle, and the snapshot
+        // goes with it. Without this a full copy of the database piles up on the volume on every
+        // download, and the volume is the same 1 GiB everything else lives on.
+        var stream = new FileStream(snapshot, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 64 * 1024, FileOptions.DeleteOnClose);
+
+        return File(stream, "application/vnd.sqlite3",
+            $"hockeypractice-{DateTime.UtcNow:yyyy-MM-dd-HHmm}.db");
+    }
+
+    /// <summary>
+    /// Replaces the live database with an uploaded one, then restarts so the app reopens it
+    /// cleanly and applies any schema changes the backup predates.
+    ///
+    /// The most destructive action on the site, so it is fenced three ways: writes must already
+    /// be paused, the word has to be typed, and the file has to prove it is a database this build
+    /// can actually run against. The database it replaces is kept, which is the only way back
+    /// from restoring the wrong file.
+    /// </summary>
+    [HttpPost("backup/restore")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(MaxRestoreBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxRestoreBytes)]
+    public async Task<IActionResult> RestoreBackup(IFormFile? backup, string? confirm,
+        CancellationToken ct)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        if (!_maintenance.IsPaused)
+            return View("Index", await BuildAsync(null,
+                "Pause saving first. Replacing the database while people are still writing to it " +
+                "would throw away whatever they were in the middle of."));
+
+        if (!string.Equals(confirm?.Trim(), ConfirmWord, StringComparison.OrdinalIgnoreCase))
+            return View("Index", await BuildAsync(null,
+                $"Type {ConfirmWord} to confirm. This replaces every team, plan and drill on the " +
+                "site with whatever is in the file."));
+
+        if (backup is null || backup.Length == 0)
+            return View("Index", await BuildAsync(null, "Choose a backup file to upload."));
+
+        // The uploaded file has to fit beside the one it replaces, because the old one is kept.
+        var headroom = Math.Max(0, _storage.QuotaBytes - _storage.UsedBytes());
+        if (backup.Length > headroom)
+            return View("Index", await BuildAsync(null,
+                $"That file is {PlanStorageService.Human(backup.Length)} and there is only " +
+                $"{PlanStorageService.Human(headroom)} free. Delete some old plans first."));
+
+        // Staged on the volume rather than validated in memory: it has to land on the same
+        // filesystem to be moved into place atomically, and it may be larger than is sensible to
+        // hold in RAM.
+        var staged = Path.Combine(_paths.Root, $"restore-{Guid.NewGuid():N}.db");
+        try
+        {
+            await using (var destination = System.IO.File.Create(staged))
+            await using (var source = backup.OpenReadStream())
+            {
+                await source.CopyToAsync(destination, ct);
+            }
+
+            // GetMigrations is every schema change this build knows about. A backup carrying one
+            // it does not is from a newer version and gets refused rather than half-loaded.
+            var check = await _backup.ValidateAsync(staged, _db.Database.GetMigrations(), ct);
+            if (!check.Ok)
+            {
+                TryDelete(staged);
+                return View("Index", await BuildAsync(null, check.Error));
+            }
+
+            _backup.Swap(staged);
+        }
+        catch (IOException ex)
+        {
+            TryDelete(staged);
+            _log.LogError("Restore failed while moving files: {Error}", ex.Message);
+            return View("Index", await BuildAsync(null,
+                "Could not write the file to storage, so nothing was changed."));
+        }
+
+        // Restart rather than carry on against a swapped file. A fresh process reopens the
+        // database, runs any migrations the backup predates, and leaves nothing anywhere still
+        // holding the old one. Delayed so this response reaches the browser first.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            _lifetime.StopApplication();
+        });
+
+        return View("Restored");
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+        catch (IOException) { /* best effort; the staged copy is disposable */ }
+    }
+
     private async Task<AdminViewModel> BuildAsync(string? notice, string? error = null)
     {
         var teams = await _db.Teams
@@ -269,7 +458,13 @@ public class SiteAdminController : Controller
             Error = error,
             Configured = _adminCodeHash is not null,
             UsedBytes = _storage.UsedBytes(),
-            QuotaBytes = _storage.QuotaBytes
+            QuotaBytes = _storage.QuotaBytes,
+            WritesPaused = _maintenance.IsPaused,
+            PauseMinutesLeft = _maintenance.MinutesLeft,
+            DatabaseBytes = _backup.DatabaseBytes,
+            ReplacedBytes = _backup.ReplacedBytes,
+            ReplacedAtUtc = _backup.ReplacedAtUtc,
+            ReplacedPath = _backup.ReplacedDatabase
         };
     }
 

@@ -106,6 +106,25 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
   change as content overflows it, so a `ResizeObserver` on it never fires as pages render in.
   `#viewer` is the plain block-flow div pdf.js actually stacks pages into; that's what grows
   with content and what has to be observed. Got this wrong once already — see `Details.cshtml`.
+- **The backup download is the whole site's secrets in one file.** It carries every team's
+  plaintext player code and every subscriber's email. It's gated behind the site-admin code
+  and nothing else, which is the same gate as deleting a team, so that gate is now load-bearing
+  in a second way. It also does *not* include uploaded PDFs or drill pictures, which are files
+  on the volume rather than rows: restore a backup from before a plan was deleted and the plan
+  comes back pointing at a PDF that isn't there.
+- **Restoring replaces the database and then deliberately exits the process.** A fresh start is
+  what reopens the file, applies any migrations the backup predates, and leaves nothing holding
+  the old one. Don't "improve" this into a hot swap: `Migrate()` only runs at startup, so a hot
+  swap would silently refuse every backup older than the current schema, which is exactly when
+  you need a restore most.
+- **Pausing writes is in-memory and per-process** (`MaintenanceState`), with a 30-minute
+  deadline. Both are deliberate: a pause that survived a restart could outlive the person who
+  set it, and the failure that actually hurts is a site stuck read-only with nobody left who
+  knows why. A second replica would need this moved onto the volume before it meant anything.
+- **SQLite sidecars belong to the filename, not the file.** `-wal` and `-shm` are named after
+  the database path, so one left beside a path that later holds a *different* database gets
+  replayed into it. `DatabaseBackupService.Swap` checkpoints first, then clears the sidecars of
+  both the live file and the kept copy. Every file move in there has to keep that invariant.
 - **Storage is capped at 1 GiB with no resize path.** Roughly 2,500 PDF-only plans. The upload
   guard and usage meter on the manage page are correctness features, not polish.
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org

@@ -1,3 +1,4 @@
+@inject HockeyPractice.Infrastructure.MaintenanceState Maintenance
 @{
     var team = ViewBag.Team as Team;
     var title = ViewBag.Title as string ?? "EBHockey Plans";
@@ -20,6 +21,18 @@
     <link rel="icon" href="~/favicon.ico" />
 </head>
 <body>
+    @* Everyone sees this, not just the admin who set it. A coach whose save is about to be
+       refused should find out before typing out a plan, not after. Cheap to render: the state
+       is a field in memory, never a query. *@
+    @if (Maintenance.IsPaused)
+    {
+        <div class="hp-warn hp-warn-banner">
+            Being backed up, so nothing can be saved for the next
+            @Maintenance.MinutesLeft minute@(Maintenance.MinutesLeft == 1 ? "" : "s").
+            Reading plans works as usual.
+        </div>
+    }
+
     @RenderBody()
 
     @* A quiet, always-reachable path to /admin. Safe to show unconditionally: the login
@@ -47,6 +60,8 @@
         // tap meant a duplicate plan. Disable after the browser captures the form data (next
         // tick), so named submit buttons — the roster picker relies on them — still post.
         var buttons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+        var labels = [];
+        buttons.forEach(function (b) { labels.push(b.textContent); });
         setTimeout(function () {
             buttons.forEach(function (b) {
                 b.disabled = true;
@@ -54,6 +69,19 @@
                 if (busy) b.textContent = busy;
             });
         }, 0);
+
+        // A form whose reply is a file download leaves the page exactly where it was, so none of
+        // the things that normally revive these buttons ever happen: no navigation, and no
+        // pageshow either. Without this the button sits there dead reading "Preparing...",
+        // which looks like the download failed when it actually succeeded.
+        if (form.hasAttribute('data-download')) {
+            setTimeout(function () {
+                buttons.forEach(function (b, i) {
+                    b.disabled = false;
+                    b.textContent = labels[i];
+                });
+            }, 5000);
+        }
     });
 
     // Back/forward cache restores the page with buttons still disabled — re-enable.

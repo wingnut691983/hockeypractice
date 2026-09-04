@@ -667,9 +667,26 @@ a.hp-card:active { transform: scale(.99); }
   border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
   overflow-wrap: anywhere;
 }
+/* Amber rather than the blue notice or the red error: a pause is neither routine news nor
+   something that went wrong, and it needs to read as "temporary, on purpose". */
+.hp-warn {
+  background: #fff6e0; color: #6b4c14;
+  border: 1px solid #f0d79a;
+  border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
+}
+
+/* The site-wide version sits above the page rather than inside it, so it lands the same way on
+   every page without each one having to make room. */
+.hp-warn-banner {
+  border-radius: 0; border-width: 0 0 1px;
+  text-align: center; font-size: .85rem;
+  padding: .55rem .8rem;
+}
+
 @media (prefers-color-scheme: dark) {
   .hp-error  { background: #3a1f1c; color: #ffb4a8; border-color: #5c2f28; }
   .hp-notice { background: #16273b; color: #a9cdf5; border-color: #26405e; }
+  .hp-warn   { background: #38300f; color: #f5d894; border-color: #58491c; }
   .hp-pill-draft  { background: #3a2f14; color: #ffd489; }
   .hp-pill-viewed { background: #16301f; color: #7fe0ac; }
 }

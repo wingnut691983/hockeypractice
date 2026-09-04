@@ -51,6 +51,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection("Site"));
 builder.Services.AddScoped<TeamAccessService>();
 builder.Services.AddScoped<PlanStorageService>();
+builder.Services.AddSingleton<DatabaseBackupService>();
+
+// Singleton because the pause has to mean the same thing to every request at once. It lives in
+// memory, so a restart clears it, which is the failure direction to want: a site that can get
+// stuck open, never one stuck read-only with nobody left who knows why.
+builder.Services.AddSingleton<MaintenanceState>();
 builder.Services.AddSingleton<LinkExtractionService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<VideoTitleService>();
@@ -140,6 +146,12 @@ contentTypes.Mappings[".icc"]  = "application/vnd.iccprofile";
 contentTypes.Mappings[".bcmap"] = "application/octet-stream";
 
 app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
+
+// Refuses anything that could change data while a backup is being taken or restored. After
+// UsePathBase, so its allowlist can be written against plain paths; after static files, so the
+// stylesheet and the pdf.js assets never reach it. Reads pass through untouched.
+app.UseMiddleware<MaintenanceMiddleware>();
+
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();

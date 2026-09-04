@@ -1,0 +1,35 @@
+@{ ViewBag.Title = "Database restored"; }
+@*
+    Shown instead of the usual redirect, because there is nothing to redirect to for a few
+    seconds: the app is on its way down so it can reopen the restored file. This page touches
+    no data of its own, which is the point.
+*@
+<div class="hp-rail"></div>
+<div class="hp-shell">
+    <h1 class="hp-title">Restored</h1>
+
+    <div class="hp-notice">
+        The backup is now the live database. The site is restarting so it can load it.
+    </div>
+
+    <div class="hp-panel">
+        <p style="margin-top:0;">
+            Give it about twenty seconds, then reload. Saving switches itself back on when the
+            site comes up, so there is nothing to un-pause.
+        </p>
+        <p class="hp-muted" style="font-size:.85rem;">
+            The database it replaced was kept, so restoring the wrong file is recoverable.
+            Uploaded PDFs and drill pictures are not inside the database: if this backup is from
+            before a plan was deleted, the plan comes back but its PDF does not.
+        </p>
+        <a class="hp-btn" asp-action="Index">Reload site admin</a>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // The one page where an automatic reload is the right thing: the app is deliberately down,
+    // and the answer to "is it back yet" is worth more than leaving someone to guess.
+    setTimeout(function () { window.location.reload(); }, 20000);
+</script>
+}

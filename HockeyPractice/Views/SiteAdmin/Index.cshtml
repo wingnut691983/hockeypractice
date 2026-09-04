@@ -142,6 +142,120 @@
         </form>
     </div>
 
+    <div class="hp-section">Backup</div>
+    <div class="hp-panel">
+        <p class="hp-muted" style="margin-top:0;">
+            The download is the whole site in one file: every team, plan, drill, roster and view
+            history, plus the codes. Treat it like the codes themselves. It does
+            <strong>not</strong> include uploaded PDFs or drill pictures, which are files on the
+            volume rather than rows in the database.
+        </p>
+
+        @if (Model.WritesPaused)
+        {
+            <div class="hp-warn">
+                <strong>Saving is paused for everyone.</strong>
+                It switches back on by itself in
+                @Model.PauseMinutesLeft minute@(Model.PauseMinutesLeft == 1 ? "" : "s"),
+                or press Resume saving. Reading plans still works.
+            </div>
+        }
+
+        <div class="hp-row" style="margin-top:.6rem;">
+            @if (Model.WritesPaused)
+            {
+                <form method="post" asp-action="Maintenance">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="action" value="resume" />
+                    <button type="submit" class="hp-btn">Resume saving</button>
+                </form>
+                <form method="post" asp-action="Maintenance">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="action" value="pause" />
+                    <button type="submit" class="hp-btn hp-btn-quiet">Give it another 30 minutes</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-action="Maintenance"
+                      data-confirm="Pause saving for everyone? Coaches will not be able to save anything until you resume or 30 minutes pass.">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="action" value="pause" />
+                    <button type="submit" class="hp-btn hp-btn-quiet">Pause saving (30 min)</button>
+                </form>
+            }
+
+            @* data-download: the reply is a file, so the page never navigates and the shared
+               submit-disabling in the layout would leave this button dead. *@
+            <form method="post" asp-action="DownloadBackup" data-download>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="hp-btn" data-busy="Preparing…">
+                    Download database
+                </button>
+            </form>
+        </div>
+
+        <p class="hp-muted" style="font-size:.8rem;margin:.6rem 0 0;">
+            The database is @PlanStorageService.Human(Model.DatabaseBytes). You do not have to
+            pause to download: the copy is taken all at once, so it is consistent even if someone
+            saves while it runs. Pausing is there for when you want the files on the volume to
+            match it too, and it is required before restoring.
+        </p>
+
+        <details style="margin-top:.8rem;">
+            <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">
+                Restore from a backup file
+            </summary>
+
+            <div class="hp-warn" style="margin-top:.6rem;">
+                <strong>This replaces everything.</strong> Every team, plan, drill and roster on
+                the site is swapped for whatever is in the file, and anything added since that
+                backup was taken is gone. The site restarts to load it, which takes about twenty
+                seconds.
+            </div>
+
+            <form method="post" asp-action="RestoreBackup" enctype="multipart/form-data"
+                  class="hp-form" style="margin-top:.6rem;"
+                  data-confirm="Replace the live database with this file? Everything currently on the site is replaced.">
+                @Html.AntiForgeryToken()
+                <div class="hp-field">
+                    <label class="hp-label" for="backup">Backup file</label>
+                    <input class="hp-input" type="file" id="backup" name="backup" accept=".db" required />
+                    <span class="hp-muted" style="font-size:.8rem;">
+                        A file downloaded from this button, from this version of the site or an
+                        older one. A backup from a newer version is refused.
+                    </span>
+                </div>
+                <div class="hp-field">
+                    <label class="hp-label" for="confirm">Type REPLACE to confirm</label>
+                    <input class="hp-input" id="confirm" name="confirm" required autocomplete="off"
+                           placeholder="REPLACE" style="max-width:14rem;" />
+                </div>
+                <button type="submit" class="hp-btn hp-btn-danger" data-busy="Restoring…">
+                    Replace the database
+                </button>
+                @if (!Model.WritesPaused)
+                {
+                    <span class="hp-muted" style="font-size:.8rem;">
+                        Pause saving first. Restoring while people are still writing would throw
+                        away whatever they are in the middle of.
+                    </span>
+                }
+            </form>
+
+            @if (Model.ReplacedAtUtc is { } replacedAt)
+            {
+                <p class="hp-muted" style="font-size:.78rem;margin:.6rem 0 0;">
+                    The last restore kept the database it replaced, holding everything up to
+                    @replacedAt.ToString("d MMM yyyy HH:mm") UTC
+                    (@PlanStorageService.Human(Model.ReplacedBytes)), at
+                    <span class="hp-mono">@Model.ReplacedPath</span>. That is the way back from
+                    restoring the wrong file, but only one is kept: the next restore overwrites it.
+                </p>
+            }
+        </details>
+    </div>
+
     <div class="hp-section">Storage</div>
     <div class="hp-panel hp-muted">
         @PlanStorageService.Human(Model.UsedBytes) of @PlanStorageService.Human(Model.QuotaBytes) used

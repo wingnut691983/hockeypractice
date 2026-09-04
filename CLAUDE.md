@@ -21,6 +21,12 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
 - **Uploads are never served from `wwwroot`.** They stream through a controller action so the team-code
   gate applies.
 - **Storage is capped at 1 GiB with no resize path.** The upload guard is a correctness requirement.
+- **Backup/restore lives in `DatabaseBackupService`.** Copies are taken with `VACUUM INTO` (never a
+  file copy); restoring swaps the file and then exits the process on purpose, because `Migrate()`
+  only runs at startup and that is what lets an older backup be restored at all. `-wal`/`-shm` are
+  named after the database path, so they must be checkpointed and cleared on every move.
+- **Pausing writes (`MaintenanceState`) is in-memory, per-process, and expires after 30 minutes.**
+  It can get stuck open, never stuck shut. A second replica would need it moved to `DATA_DIR`.
 - **Site admin is a separate axis from team access, not the top of the same ladder.** It grants
   manager access (create teams, issue codes, or explicitly "take" a team) but never has it by
   default. See README's "What I'd flag" before changing `TeamAccessService`.
