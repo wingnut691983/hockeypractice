@@ -35,18 +35,12 @@
 
     @RenderBody()
 
-    @* A quiet, always-reachable path to /admin. Safe to show unconditionally: the login
-       there is code-gated server-side and reveals nothing by itself. Hiding this link
-       entirely (as an earlier version did) meant the only way to reach it was already
-       knowing the URL — which broke first-time setup, since the claim needed to make the
-       link "visible" can only be obtained by visiting the page the link would have shown. *@
     <footer class="hp-footer">
         <p class="hp-footer-feedback">
             Comments or feedback?
             <a href="mailto:bensoneh@outlook.com">Contact us</a>
         </p>
         <div class="hp-footer-links">
-            <a asp-controller="SiteAdmin" asp-action="Index">Site admin</a>
             <a class="hp-footer-badge"
                href="https://upturtle.com/?utm_source=ebhockeyplan&amp;utm_medium=page-button&amp;utm_campaign=construction-page&amp;utm_content=hosted-with-upturtle"
                target="_blank" rel="noopener">Hosted on UpTurtle</a>
