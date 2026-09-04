@@ -131,36 +131,36 @@ public class DrillListViewModel
     public string? Notice { get; init; }
 }
 
-/// <summary>Why a drill can or cannot be shared with the chosen team, decided per drill.</summary>
-public enum ShareStatus
+/// <summary>Why a drill can or cannot be copied to the chosen team, decided per drill.</summary>
+public enum CopyStatus
 {
     /// <summary>Not in the target team yet. The only status that gets a working checkbox.</summary>
     Ready,
 
     /// <summary>The target already holds a copy of this exact drill, renamed there or not.</summary>
-    AlreadyShared,
+    AlreadyCopied,
 
     /// <summary>The target has a drill by this name that did not come from here.</summary>
     NameClash
 }
 
-public class ShareCandidate
+public class CopyCandidate
 {
     public DrillCard Card { get; init; } = null!;
-    public ShareStatus Status { get; init; }
+    public CopyStatus Status { get; init; }
 
     /// <summary>The name the copy goes by in the target team, when it has been renamed there.
-    /// Worth showing: otherwise "already shared" looks wrong next to a drill they can't find.</summary>
+    /// Worth showing: otherwise "already copied" looks wrong next to a drill they can't find.</summary>
     public string? RenamedTo { get; init; }
 
-    public bool CanShare => Status == ShareStatus.Ready;
+    public bool CanCopy => Status == CopyStatus.Ready;
 }
 
 /// <summary>
-/// The bulk share page: pick a team, then pick drills. The team comes first because the whole
+/// The bulk copy page: pick a team, then pick drills. The team comes first because the whole
 /// value of the list is showing what that team already has.
 /// </summary>
-public class DrillShareViewModel
+public class DrillCopyViewModel
 {
     public TeamContext Ctx { get; init; } = null!;
 
@@ -170,7 +170,7 @@ public class DrillShareViewModel
     /// <summary>The chosen team, or null while none is picked yet.</summary>
     public TeamLink? Target { get; init; }
 
-    public List<ShareCandidate> Candidates { get; init; } = new();
+    public List<CopyCandidate> Candidates { get; init; } = new();
 
     public List<string> AllTags { get; init; } = new();
     public string? ActiveTag { get; init; }
@@ -179,9 +179,9 @@ public class DrillShareViewModel
     public string? Notice { get; init; }
     public string? Error { get; init; }
 
-    public int ReadyCount => Candidates.Count(c => c.CanShare);
-    public int AlreadyCount => Candidates.Count(c => c.Status == ShareStatus.AlreadyShared);
-    public int ClashCount => Candidates.Count(c => c.Status == ShareStatus.NameClash);
+    public int ReadyCount => Candidates.Count(c => c.CanCopy);
+    public int AlreadyCount => Candidates.Count(c => c.Status == CopyStatus.AlreadyCopied);
+    public int ClashCount => Candidates.Count(c => c.Status == CopyStatus.NameClash);
 }
 
 public class DrillEditViewModel
@@ -221,12 +221,12 @@ public class DrillEditViewModel
     /// <summary>How many plans use this drill — shown so the coach knows what a change affects.</summary>
     public int UsedInPlans { get; init; }
 
-    /// <summary>Teams this browser manages that this drill can be shared with.</summary>
-    public List<TeamLink> ShareTargets { get; init; } = new();
+    /// <summary>Teams this browser manages that this drill can be copied to.</summary>
+    public List<TeamLink> CopyTargets { get; init; } = new();
 
     /// <summary>
-    /// Names of the teams already holding a copy of this drill. Shown so sharing again is an
+    /// Names of the teams already holding a copy of this drill. Shown so copying again is an
     /// informed decision rather than a guess, since the attempt would be refused anyway.
     /// </summary>
-    public List<string> SharedWith { get; init; } = new();
+    public List<string> CopiedTo { get; init; } = new();
 }

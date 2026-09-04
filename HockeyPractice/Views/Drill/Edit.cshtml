@@ -194,20 +194,20 @@
 
     @* Outside the edit form for the same reason the Remove buttons are: a nested form is invalid
        HTML and the browser drops the inner one, so this would submit the edit instead. *@
-    @if (!Model.IsNew && Model.Drill is not null && Model.ShareTargets.Count > 0)
+    @if (!Model.IsNew && Model.Drill is not null && Model.CopyTargets.Count > 0)
     {
-        <div class="hp-section">Share this drill</div>
+        <div class="hp-section">Copy this drill</div>
         <div class="hp-panel">
             <p class="hp-muted" style="margin-top:0;">
                 Sends a copy to another team you manage. They get their own to edit, so changes
                 here won't reach it afterwards.
             </p>
 
-            @if (Model.SharedWith.Count > 0)
+            @if (Model.CopiedTo.Count > 0)
             {
                 <p class="hp-muted" style="font-size:.82rem;">
-                    Already shared with <strong>@string.Join(", ", Model.SharedWith)</strong>.
-                    Sharing again won't overwrite anything they've changed.
+                    Already copied to <strong>@string.Join(", ", Model.CopiedTo)</strong>.
+                    Copying again won't overwrite anything they've changed.
                 </p>
             }
 
@@ -215,17 +215,17 @@
                   class="hp-row">
                 @Html.AntiForgeryToken()
                 <select class="hp-select" name="targetSlug" style="flex:1;min-width:11rem;">
-                    @foreach (var team in Model.ShareTargets)
+                    @foreach (var team in Model.CopyTargets)
                     {
                         <option value="@team.Slug">@team.Name</option>
                     }
                 </select>
-                <button type="submit" class="hp-btn" data-busy="Sharing…">Share</button>
+                <button type="submit" class="hp-btn" data-busy="Copying…">Copy</button>
             </form>
 
             <p class="hp-muted" style="font-size:.78rem;margin-bottom:0;">
-                Sharing several at once?
-                <a asp-action="Share" asp-route-slug="@slug">Pick from the whole library</a>.
+                Copying several at once?
+                <a asp-action="CopyTo" asp-route-slug="@slug">Pick from the whole library</a>.
             </p>
         </div>
     }

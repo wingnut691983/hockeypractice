@@ -54,11 +54,11 @@ public class AppDbContext : DbContext
 
         // A team holds at most one copy of any given source drill.
         //
-        // The controller's "already shared" check is the friendly path; this is the one that holds
-        // when two managers share the same drill at the same moment and both pass that check, or
+        // The controller's "already copied" check is the friendly path; this is the one that holds
+        // when two managers copy the same drill at the same moment and both pass that check, or
         // when someone double-taps. Keyed on provenance rather than title on purpose: the copy is
-        // the target team's own to rename, and a renamed copy must still count as already shared
-        // or the next share would silently duplicate it.
+        // the target team's own to rename, and a renamed copy must still count as already copied
+        // or the next copy would silently duplicate it.
         //
         // Filtered, because CopiedFromDrillId is null for every drill written from scratch, and
         // those must not collide with each other.

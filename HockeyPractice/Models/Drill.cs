@@ -6,7 +6,7 @@ namespace HockeyPractice.Models;
 /// A reusable drill in a team's library: what it is, how it's run, an optional diagram and video.
 /// Plans are assembled from these instead of being drawn from scratch each week.
 ///
-/// Owned by one team and COPIED when shared to another, rather than referenced by several. A drill
+/// Owned by one team and COPIED to another, rather than referenced by several. A drill
 /// run with a 16U side and a 12U side often should differ, and a shared row meant editing it for
 /// one team silently rewrote another team's already-published plan. Copies cost little now that
 /// diagrams are shrunk on upload (~150 KB each), and <see cref="CopiedFromDrillId"/> keeps a record

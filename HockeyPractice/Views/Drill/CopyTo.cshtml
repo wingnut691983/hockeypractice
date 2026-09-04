@@ -1,13 +1,13 @@
-@model DrillShareViewModel
+@model DrillCopyViewModel
 @{
-    ViewBag.Title = "Share drills – " + Model.Ctx.Team.Name;
+    ViewBag.Title = "Copy drills – " + Model.Ctx.Team.Name;
     ViewBag.Team = Model.Ctx.Team;
     var slug = Model.Ctx.Team.Slug;
 }
 @await Html.PartialAsync("_TeamHeader", Model.Ctx)
 
 <div class="hp-shell">
-    <h1 class="hp-title">Share drills</h1>
+    <h1 class="hp-title">Copy drills</h1>
 
     @if (Model.Notice is not null)
     {
@@ -21,7 +21,7 @@
     @if (Model.Targets.Count == 0)
     {
         <div class="hp-empty">
-            There's nowhere to share to yet.<br />
+            There's nowhere to copy to yet.<br />
             <span class="hp-muted">
                 You're only signed in to manage this team in this browser. Enter another team's
                 manager code and it'll show up here.
@@ -42,7 +42,7 @@
         <div class="hp-panel">
             <form method="get" class="hp-row" style="align-items:flex-end;">
                 <div class="hp-field" style="flex:1;min-width:12rem;">
-                    <label class="hp-label" for="target">Share with</label>
+                    <label class="hp-label" for="target">Copy to</label>
                     <select class="hp-select" id="target" name="target">
                         <option value="">Pick a team…</option>
                         @foreach (var team in Model.Targets)
@@ -72,7 +72,7 @@
 
             @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
             {
-                Id = "sharesearch",
+                Id = "copysearch",
                 Noun = "Drill",
                 NameField = "name",
                 TagField = "tag",
@@ -91,18 +91,18 @@
                     }
                     else
                     {
-                        <text>No drills to share yet.</text>
+                        <text>No drills to copy yet.</text>
                     }
                 </div>
             }
             else
             {
                 <div class="hp-muted" style="font-size:.82rem;margin-bottom:.5rem;">
-                    @Model.ReadyCount can be shared@(Model.AlreadyCount > 0 ? $", {Model.AlreadyCount} already there" : "")@(Model.ClashCount > 0 ? $", {Model.ClashCount} with a clashing name" : "").
+                    @Model.ReadyCount can be copied@(Model.AlreadyCount > 0 ? $", {Model.AlreadyCount} already there" : "")@(Model.ClashCount > 0 ? $", {Model.ClashCount} with a clashing name" : "").
                     Archived drills aren't listed.
                 </div>
 
-                <form method="post" asp-action="ShareSelected" asp-route-slug="@slug">
+                <form method="post" asp-action="CopySelected" asp-route-slug="@slug">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="targetSlug" value="@Model.Target.Slug" />
                     <input type="hidden" name="tag" value="@Model.ActiveTag" />
@@ -112,11 +112,11 @@
                     {
                         <div class="hp-row" style="margin-bottom:.5rem;">
                             @* type="button": a bare button inside a form submits it, which would
-                               share everything the moment someone meant to tick everything. *@
+                               copy everything the moment someone meant to tick everything. *@
                             <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm"
-                                    data-select-all="hp-share">Select all @Model.ReadyCount</button>
+                                    data-select-all="hp-copy">Select all @Model.ReadyCount</button>
                             <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm"
-                                    data-select-none="hp-share">Clear</button>
+                                    data-select-none="hp-copy">Clear</button>
                         </div>
                     }
 
@@ -125,28 +125,28 @@
                             @foreach (var candidate in Model.Candidates)
                             {
                                 var drill = candidate.Card.Drill;
-                                var boxId = $"share-{drill.Id}";
+                                var boxId = $"copy-{drill.Id}";
                                 <li style="flex-wrap:wrap;align-items:flex-start;
-                                           @(candidate.CanShare ? "" : "opacity:.62;")">
+                                           @(candidate.CanCopy ? "" : "opacity:.62;")">
                                     @* The label wraps only the checkbox and the drill's content, so
                                        tapping anywhere on the row ticks it — a 44px target is hard
                                        to hit on a phone otherwise. *@
-                                    <label for="@boxId" class="hp-share-row">
+                                    <label for="@boxId" class="hp-copy-row">
                                         <input type="checkbox" class="hp-check" id="@boxId"
                                                name="drillIds" value="@drill.Id"
-                                               data-group="hp-share"
-                                               disabled="@(!candidate.CanShare)" />
+                                               data-group="hp-copy"
+                                               disabled="@(!candidate.CanCopy)" />
                                         <span class="grow" style="min-width:0;">
                                             @await Html.PartialAsync("_DrillRow", candidate.Card)
 
-                                            @if (candidate.Status == ShareStatus.AlreadyShared)
+                                            @if (candidate.Status == CopyStatus.AlreadyCopied)
                                             {
                                                 <span class="hp-pill hp-pill-viewed">
                                                     Already in @Model.Target.Name@(candidate.RenamedTo is not null
                                                         ? $", as “{candidate.RenamedTo}”" : "")
                                                 </span>
                                             }
-                                            else if (candidate.Status == ShareStatus.NameClash)
+                                            else if (candidate.Status == CopyStatus.NameClash)
                                             {
                                                 <span class="hp-pill hp-pill-draft">
                                                     @Model.Target.Name has a different drill with this name
@@ -160,8 +160,8 @@
                     </div>
 
                     <button type="submit" class="hp-btn hp-btn-block" style="margin-top:.8rem;"
-                            data-busy="Sharing…" disabled="@(Model.ReadyCount == 0)">
-                        Share with @Model.Target.Name
+                            data-busy="Copying…" disabled="@(Model.ReadyCount == 0)">
+                        Copy to @Model.Target.Name
                     </button>
                     <p class="hp-muted" style="font-size:.78rem;">
                         Drills already there are never touched, so anything they've changed since

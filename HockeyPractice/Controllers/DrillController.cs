@@ -123,7 +123,7 @@ public class DrillController : TeamScopedController
             .FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
-        var shareTargets = await CopyTargetsAsync(ctx!.Team.Id);
+        var copyTargets = await CopyTargetsAsync(ctx!.Team.Id);
 
         ViewBag.NavSection = "drills";
         return View(new DrillEditViewModel
@@ -132,8 +132,8 @@ public class DrillController : TeamScopedController
             Drill = drill,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
             UsedInPlans = await Db.PlanDrills.CountAsync(pd => pd.DrillId == drill.Id),
-            ShareTargets = shareTargets,
-            SharedWith = await SharedWithAsync(drill.Id, shareTargets),
+            CopyTargets = copyTargets,
+            CopiedTo = await CopiedToAsync(drill.Id, copyTargets),
             Notice = notice
         });
     }
@@ -250,8 +250,8 @@ public class DrillController : TeamScopedController
     }
 
     /// <summary>
-    /// Shares one drill with another team this browser also manages, from that drill's own page.
-    /// Lands back on the drill rather than the library: sharing is a side errand, not the end of
+    /// Copies one drill into another team this browser also manages, from that drill's own page.
+    /// Lands back on the drill rather than the library: copying is a side errand, not the end of
     /// editing, and the coach usually has more to do with the drill they were looking at.
     /// </summary>
     [HttpPost("{id:int}/copy")]
@@ -270,9 +270,9 @@ public class DrillController : TeamScopedController
             return RedirectToAction(nameof(Edit), new { slug, id, notice = "You don't manage that team on this device." });
 
         if (_storage.IsFull())
-            return RedirectToAction(nameof(Edit), new { slug, id, notice = "Storage is nearly full, so nothing was shared." });
+            return RedirectToAction(nameof(Edit), new { slug, id, notice = "Storage is nearly full, so nothing was copied." });
 
-        var outcome = await ShareOneAsync(drill, ctx!.Team.Id, target);
+        var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
 
         return RedirectToAction(nameof(Edit), new { slug, id, notice = outcome.Message });
     }
@@ -282,8 +282,8 @@ public class DrillController : TeamScopedController
     /// the list cannot say which drills that team already has, and that is the part worth
     /// getting right. Copying the whole library is still one press away for a season rollover.
     /// </summary>
-    [HttpGet("share")]
-    public async Task<IActionResult> Share(string slug, string? target, string? tag, string? name,
+    [HttpGet("copy")]
+    public async Task<IActionResult> CopyTo(string slug, string? target, string? tag, string? name,
         string? notice, string? error)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -292,13 +292,13 @@ public class DrillController : TeamScopedController
         var chosen = await ResolveCopyTargetAsync(target);
 
         ViewBag.NavSection = "drills";
-        return View(new DrillShareViewModel
+        return View(new DrillCopyViewModel
         {
             Ctx = ctx!,
             Targets = await CopyTargetsAsync(ctx!.Team.Id),
             Target = chosen is null ? null : new TeamLink(chosen.Slug, chosen.Name),
             Candidates = chosen is null
-                ? new List<ShareCandidate>()
+                ? new List<CopyCandidate>()
                 : await BuildCandidatesAsync(ctx.Team.Id, chosen.Id, tag, name),
             AllTags = await DistinctTagsAsync(ctx.Team.Id),
             ActiveTag = tag,
@@ -309,13 +309,13 @@ public class DrillController : TeamScopedController
     }
 
     /// <summary>
-    /// Shares the ticked drills. Every one is re-checked here rather than trusted from the form:
-    /// the page may have been open a while, and someone else may have shared the same drill in
+    /// Copies the ticked drills. Every one is re-checked here rather than trusted from the form:
+    /// the page may have been open a while, and someone else may have copied the same drill in
     /// the meantime.
     /// </summary>
-    [HttpPost("share")]
+    [HttpPost("copy")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ShareSelected(string slug, string targetSlug,
+    public async Task<IActionResult> CopySelected(string slug, string targetSlug,
         List<int>? drillIds, string? tag, string? name)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -323,14 +323,14 @@ public class DrillController : TeamScopedController
 
         var target = await ResolveCopyTargetAsync(targetSlug);
         if (target is null)
-            return RedirectToAction(nameof(Share), new { slug, tag, name, error = "You don't manage that team on this device." });
+            return RedirectToAction(nameof(CopyTo), new { slug, tag, name, error = "You don't manage that team on this device." });
 
         var selected = (drillIds ?? new List<int>()).Distinct().ToList();
         if (selected.Count == 0)
-            return RedirectToAction(nameof(Share), new { slug, target = targetSlug, tag, name, error = "Tick at least one drill to share." });
+            return RedirectToAction(nameof(CopyTo), new { slug, target = targetSlug, tag, name, error = "Tick at least one drill to copy." });
 
         if (_storage.IsFull())
-            return RedirectToAction(nameof(Share), new { slug, target = targetSlug, tag, name, error = "Storage is nearly full, so nothing was shared." });
+            return RedirectToAction(nameof(CopyTo), new { slug, target = targetSlug, tag, name, error = "Storage is nearly full, so nothing was copied." });
 
         // Scoped to this team, so an id belonging to someone else's library cannot be posted in.
         var drills = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
@@ -338,25 +338,25 @@ public class DrillController : TeamScopedController
             .OrderBy(d => d.Title)
             .ToListAsync();
 
-        int shared = 0, already = 0, clashed = 0;
+        int copied = 0, already = 0, clashed = 0;
         var ranOutOfSpace = false;
 
         foreach (var drill in drills)
         {
             if (_storage.IsFull()) { ranOutOfSpace = true; break; }
 
-            var outcome = await ShareOneAsync(drill, ctx!.Team.Id, target);
+            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
             switch (outcome.Result)
             {
-                case ShareStatus.Ready:         shared++;  break;
-                case ShareStatus.AlreadyShared: already++; break;
-                case ShareStatus.NameClash:     clashed++; break;
+                case CopyStatus.Ready:         copied++;  break;
+                case CopyStatus.AlreadyCopied: already++; break;
+                case CopyStatus.NameClash:     clashed++; break;
             }
         }
 
-        var notice = shared > 0
-            ? $"Shared {shared} drill{(shared == 1 ? "" : "s")} with {target.Name}."
-            : $"Nothing new to share with {target.Name}.";
+        var notice = copied > 0
+            ? $"Copied {copied} drill{(copied == 1 ? "" : "s")} to {target.Name}."
+            : $"Nothing new to copy to {target.Name}.";
 
         if (already > 0)
             notice += $" {already} {(already == 1 ? "was" : "were")} already there.";
@@ -366,10 +366,10 @@ public class DrillController : TeamScopedController
             notice += " Stopped early because storage is full.";
 
         _log.LogInformation(
-            "Team {TeamId} shared {Shared} drill(s) with team {TargetId}; {Already} already there, {Clashed} name clashes",
-            ctx!.Team.Id, shared, target.Id, already, clashed);
+            "Team {TeamId} copied {Copied} drill(s) to team {TargetId}; {Already} already there, {Clashed} name clashes",
+            ctx!.Team.Id, copied, target.Id, already, clashed);
 
-        return RedirectToAction(nameof(Share), new { slug, target = targetSlug, tag, name, notice });
+        return RedirectToAction(nameof(CopyTo), new { slug, target = targetSlug, tag, name, notice });
     }
 
     /// <summary>
@@ -399,19 +399,19 @@ public class DrillController : TeamScopedController
         int copied = 0, already = 0, clashed = 0;
         var ranOutOfSpace = false;
 
-        // Through the same helper the single and selected shares use, so all three agree on what
-        // counts as already shared. This one used to compare titles only, which meant a copy the
+        // Through the same helper the single and selected copies use, so all three agree on what
+        // counts as already copied. This one used to compare titles only, which meant a copy the
         // other team had renamed looked new and got duplicated on the next rollover.
         foreach (var drill in source)
         {
             if (_storage.IsFull()) { ranOutOfSpace = true; break; }
 
-            var outcome = await ShareOneAsync(drill, ctx!.Team.Id, target);
+            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
             switch (outcome.Result)
             {
-                case ShareStatus.Ready:         copied++;  break;
-                case ShareStatus.AlreadyShared: already++; break;
-                case ShareStatus.NameClash:     clashed++; break;
+                case CopyStatus.Ready:         copied++;  break;
+                case CopyStatus.AlreadyCopied: already++; break;
+                case CopyStatus.NameClash:     clashed++; break;
             }
         }
 
@@ -477,23 +477,23 @@ public class DrillController : TeamScopedController
     }
 
     /// <summary>What happened to one drill, and how to say it.</summary>
-    private record ShareOutcome(ShareStatus Result, string Message);
+    private record CopyOutcome(CopyStatus Result, string Message);
 
     /// <summary>
-    /// Shares one drill, refusing rather than overwriting. The single share and the bulk share
-    /// both go through here so the two can never disagree about what "already shared" means.
+    /// Copies one drill, refusing rather than overwriting. The single copy and the bulk copy
+    /// both go through here so the two can never disagree about what "already copied" means.
     ///
     /// Three things can stop a copy, and they are genuinely different situations:
     ///  - the target already has this drill (matched on where it came from, not its name, so a
     ///    copy renamed over there still counts),
     ///  - the target has its own drill by the same name, which is not the same thing and would be
     ///    confusing to silently duplicate,
-    ///  - someone else shared it a moment ago, between the check and the insert.
+    ///  - someone else copied it a moment ago, between the check and the insert.
     ///
     /// Nothing here ever updates an existing drill. Once a copy lands it belongs to the other
-    /// team, and re-sharing must not reach across and undo whatever they have done to it since.
+    /// team, and copying again must not reach across and undo whatever they have done to it since.
     /// </summary>
-    private async Task<ShareOutcome> ShareOneAsync(Drill drill, int fromTeamId, Team target)
+    private async Task<CopyOutcome> CopyOneAsync(Drill drill, int fromTeamId, Team target)
     {
         var existing = await Db.Drills.Where(d => d.TeamId == target.Id)
             .Select(d => new { d.Id, d.Title, d.CopiedFromDrillId })
@@ -501,12 +501,12 @@ public class DrillController : TeamScopedController
 
         if (existing.FirstOrDefault(e => e.CopiedFromDrillId == drill.Id) is { } copy)
         {
-            // Naming what it is called over there matters: told only "already shared", a coach
+            // Naming what it is called over there matters: told only "already copied", a coach
             // goes looking for the original title, doesn't find it, and assumes this is wrong.
             var renamed = !string.Equals(copy.Title, drill.Title, StringComparison.OrdinalIgnoreCase)
                 ? $" It's called \"{copy.Title}\" there."
                 : "";
-            return new ShareOutcome(ShareStatus.AlreadyShared,
+            return new CopyOutcome(CopyStatus.AlreadyCopied,
                 $"{target.Name} already has \"{drill.Title}\".{renamed} Nothing was changed, so any " +
                 "edits they've made are safe.");
         }
@@ -514,9 +514,9 @@ public class DrillController : TeamScopedController
         // Compared in memory: OrdinalIgnoreCase has no SQL translation and would throw at runtime.
         if (existing.Any(e => string.Equals(e.Title, drill.Title, StringComparison.OrdinalIgnoreCase)))
         {
-            return new ShareOutcome(ShareStatus.NameClash,
+            return new CopyOutcome(CopyStatus.NameClash,
                 $"{target.Name} already has a different drill called \"{drill.Title}\", so this one " +
-                "wasn't shared. Rename one of them if you want both.");
+                "wasn't copied. Rename one of them if you want both.");
         }
 
         try
@@ -527,32 +527,32 @@ public class DrillController : TeamScopedController
         catch (DbUpdateException)
         {
             // The unique index on (TeamId, CopiedFromDrillId) caught what the check above could
-            // not: another manager shared this same drill in the gap between the two. Reporting it
+            // not: another manager copied this same drill in the gap between the two. Reporting it
             // as "already there" is the truth, and is what the coach would have been told a second
             // earlier.
             Db.ChangeTracker.Clear();
             _log.LogInformation(
-                "Concurrent share of drill {DrillId} into team {TargetId} was refused by the index",
+                "Concurrent copy of drill {DrillId} into team {TargetId} was refused by the index",
                 drill.Id, target.Id);
 
-            return new ShareOutcome(ShareStatus.AlreadyShared,
-                $"Someone else shared \"{drill.Title}\" with {target.Name} just now, so it wasn't " +
-                "shared twice.");
+            return new CopyOutcome(CopyStatus.AlreadyCopied,
+                $"Someone else copied \"{drill.Title}\" to {target.Name} just now, so it wasn't " +
+                "copied twice.");
         }
 
-        return new ShareOutcome(ShareStatus.Ready, $"Shared \"{drill.Title}\" with {target.Name}.");
+        return new CopyOutcome(CopyStatus.Ready, $"Copied \"{drill.Title}\" to {target.Name}.");
     }
 
     /// <summary>
     /// The library, annotated with what the target team already holds. One query for the target's
     /// drills rather than one per row, since a full library is easily fifty of them.
     /// </summary>
-    private async Task<List<ShareCandidate>> BuildCandidatesAsync(int fromTeamId, int toTeamId,
+    private async Task<List<CopyCandidate>> BuildCandidatesAsync(int fromTeamId, int toTeamId,
         string? tag, string? name)
     {
         // Archived drills are left out, the same as copying the whole library does. They have been
-        // retired here, so offering them for sharing is offering to spread something on its way
-        // out. Sharing one deliberately is still possible from its own page.
+        // retired here, so offering them for copying is offering to spread something on its way
+        // out. Copying one deliberately is still possible from its own page.
         var cards = await QueryLibraryAsync(fromTeamId, tag, name, archived: false);
 
         var existing = await Db.Drills.Where(d => d.TeamId == toTeamId)
@@ -568,25 +568,25 @@ public class DrillController : TeamScopedController
             // Provenance wins over the name check: a copy renamed at the far end is still the same
             // drill, and calling that a name clash would be both wrong and unfixable.
             if (fromHere.TryGetValue(card.Drill.Id, out var titleThere))
-                return new ShareCandidate
+                return new CopyCandidate
                 {
                     Card = card,
-                    Status = ShareStatus.AlreadyShared,
+                    Status = CopyStatus.AlreadyCopied,
                     RenamedTo = string.Equals(titleThere, card.Drill.Title, StringComparison.OrdinalIgnoreCase)
                         ? null
                         : titleThere
                 };
 
-            return new ShareCandidate
+            return new CopyCandidate
             {
                 Card = card,
-                Status = titles.Contains(card.Drill.Title) ? ShareStatus.NameClash : ShareStatus.Ready
+                Status = titles.Contains(card.Drill.Title) ? CopyStatus.NameClash : CopyStatus.Ready
             };
         }).ToList();
     }
 
     /// <summary>Teams already holding a copy of this drill, limited to ones this browser manages.</summary>
-    private async Task<List<string>> SharedWithAsync(int drillId, List<TeamLink> targets)
+    private async Task<List<string>> CopiedToAsync(int drillId, List<TeamLink> targets)
     {
         if (targets.Count == 0) return new List<string>();
 

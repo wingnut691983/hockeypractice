@@ -86,7 +86,7 @@
        group can't rewrite what another team already published. *@
     @if (!Model.ShowingArchived)
     {
-        <div class="hp-section">Share with another team</div>
+        <div class="hp-section">Copy to another team</div>
         <div class="hp-panel">
             @if (Model.CopyTargets.Count == 0)
             {
@@ -107,8 +107,8 @@
 
                 @* The selective page leads: not every drill suits every team, which is the usual
                    case. Copying the whole library stays here for the end-of-season rollover. *@
-                <a class="hp-btn hp-btn-accent" asp-action="Share" asp-route-slug="@slug">
-                    Pick drills to share
+                <a class="hp-btn hp-btn-accent" asp-action="CopyTo" asp-route-slug="@slug">
+                    Pick drills to copy
                 </a>
 
                 <div class="hp-muted" style="font-size:.82rem;margin:1rem 0 .4rem;">

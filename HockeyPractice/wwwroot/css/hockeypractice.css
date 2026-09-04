@@ -1086,11 +1086,11 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
-/* ── Share picker rows ─────────────────────────────────────
+/* ── Copy picker rows ──────────────────────────────────────
    The label wraps the box and the drill together, so the whole row is the tap target. On a phone
    a bare 16px checkbox is a miss waiting to happen, and these rows are tall enough that aiming
    for the box specifically is the slow way to tick fifteen drills. */
-.hp-share-row {
+.hp-copy-row {
   display: flex;
   align-items: flex-start;
   gap: .7rem;
@@ -1098,7 +1098,7 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   min-width: 0;
   cursor: pointer;
 }
-.hp-share-row:has(input:disabled) { cursor: default; }
+.hp-copy-row:has(input:disabled) { cursor: default; }
 
 .hp-check {
   flex: 0 0 auto;
