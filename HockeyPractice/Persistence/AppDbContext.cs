@@ -52,6 +52,21 @@ public class AppDbContext : DbContext
         // The library list always filters to one team's unarchived drills.
         b.Entity<Drill>().HasIndex(d => new { d.TeamId, d.IsArchived });
 
+        // A team holds at most one copy of any given source drill.
+        //
+        // The controller's "already shared" check is the friendly path; this is the one that holds
+        // when two managers share the same drill at the same moment and both pass that check, or
+        // when someone double-taps. Keyed on provenance rather than title on purpose: the copy is
+        // the target team's own to rename, and a renamed copy must still count as already shared
+        // or the next share would silently duplicate it.
+        //
+        // Filtered, because CopiedFromDrillId is null for every drill written from scratch, and
+        // those must not collide with each other.
+        b.Entity<Drill>()
+            .HasIndex(d => new { d.TeamId, d.CopiedFromDrillId })
+            .IsUnique()
+            .HasFilter("[CopiedFromDrillId] IS NOT NULL");
+
         b.Entity<DrillTag>()
             .HasOne(t => t.Drill).WithMany(d => d.Tags)
             .HasForeignKey(t => t.DrillId).OnDelete(DeleteBehavior.Cascade);

@@ -101,9 +101,19 @@
             else
             {
                 <p class="hp-muted" style="margin-top:0;">
-                    Copies every drill above into another team you manage, skipping any it already
-                    has. Each team keeps its own copy to edit &mdash; handy at the end of a season.
+                    Each team keeps its own copy to edit, so a drill tuned for a younger group
+                    can't rewrite what another team has already published.
                 </p>
+
+                @* The selective page leads: not every drill suits every team, which is the usual
+                   case. Copying the whole library stays here for the end-of-season rollover. *@
+                <a class="hp-btn hp-btn-accent" asp-action="Share" asp-route-slug="@slug">
+                    Pick drills to share
+                </a>
+
+                <div class="hp-muted" style="font-size:.82rem;margin:1rem 0 .4rem;">
+                    Or send the whole library at once, skipping anything the other team already has:
+                </div>
                 <form method="post" asp-action="CopyAll" asp-route-slug="@slug" class="hp-row"
                       data-confirm="Copy all of these drills into the team you picked?">
                     @Html.AntiForgeryToken()
@@ -113,7 +123,7 @@
                             <option value="@team.Slug">@team.Name</option>
                         }
                     </select>
-                    <button type="submit" class="hp-btn" data-busy="Copying…">Copy all</button>
+                    <button type="submit" class="hp-btn hp-btn-quiet" data-busy="Copying…">Copy all</button>
                 </form>
             }
         </div>

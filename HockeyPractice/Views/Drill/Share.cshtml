@@ -1,0 +1,204 @@
+@model DrillShareViewModel
+@{
+    ViewBag.Title = "Share drills – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+    var slug = Model.Ctx.Team.Slug;
+}
+@await Html.PartialAsync("_TeamHeader", Model.Ctx)
+
+<div class="hp-shell">
+    <h1 class="hp-title">Share drills</h1>
+
+    @if (Model.Notice is not null)
+    {
+        <div class="hp-notice">@Model.Notice</div>
+    }
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+
+    @if (Model.Targets.Count == 0)
+    {
+        <div class="hp-empty">
+            There's nowhere to share to yet.<br />
+            <span class="hp-muted">
+                You're only signed in to manage this team in this browser. Enter another team's
+                manager code and it'll show up here.
+            </span>
+        </div>
+        <a class="hp-btn hp-btn-quiet" asp-controller="Home" asp-action="Index"
+           style="margin-top:1rem;">Go to the teams</a>
+    }
+    else
+    {
+        <p class="hp-muted" style="margin-top:0;">
+            Each team gets its own copy to edit, so changing a drill here later won't change
+            theirs, and changing theirs won't change yours.
+        </p>
+
+        @* Team first, on its own GET form. Until it's known, the list below can't say which
+           drills that team already has, and that's the part worth getting right. *@
+        <div class="hp-panel">
+            <form method="get" class="hp-row" style="align-items:flex-end;">
+                <div class="hp-field" style="flex:1;min-width:12rem;">
+                    <label class="hp-label" for="target">Share with</label>
+                    <select class="hp-select" id="target" name="target">
+                        <option value="">Pick a team…</option>
+                        @foreach (var team in Model.Targets)
+                        {
+                            <option value="@team.Slug" selected="@(Model.Target?.Slug == team.Slug)">
+                                @team.Name
+                            </option>
+                        }
+                    </select>
+                </div>
+                @* The filters ride along so switching teams doesn't silently drop the search. *@
+                <input type="hidden" name="tag" value="@Model.ActiveTag" />
+                <input type="hidden" name="name" value="@Model.ActiveName" />
+                <button type="submit" class="hp-btn">Choose</button>
+            </form>
+        </div>
+
+        @if (Model.Target is null)
+        {
+            <div class="hp-empty" style="margin-top:1rem;">
+                Pick a team above to see which of your drills they already have.
+            </div>
+        }
+        else
+        {
+            <div class="hp-section">Your drills</div>
+
+            @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
+            {
+                Id = "sharesearch",
+                Noun = "Drill",
+                NameField = "name",
+                TagField = "tag",
+                ActiveName = Model.ActiveName,
+                ActiveTag = Model.ActiveTag,
+                KnownTags = Model.AllTags,
+                Preserve = new Dictionary<string, string> { ["target"] = Model.Target.Slug }
+            })
+
+            @if (Model.Candidates.Count == 0)
+            {
+                <div class="hp-empty">
+                    @if (Model.ActiveTag is not null || Model.ActiveName is not null)
+                    {
+                        <text>Nothing matches those filters.</text>
+                    }
+                    else
+                    {
+                        <text>No drills to share yet.</text>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="hp-muted" style="font-size:.82rem;margin-bottom:.5rem;">
+                    @Model.ReadyCount can be shared@(Model.AlreadyCount > 0 ? $", {Model.AlreadyCount} already there" : "")@(Model.ClashCount > 0 ? $", {Model.ClashCount} with a clashing name" : "").
+                    Archived drills aren't listed.
+                </div>
+
+                <form method="post" asp-action="ShareSelected" asp-route-slug="@slug">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="targetSlug" value="@Model.Target.Slug" />
+                    <input type="hidden" name="tag" value="@Model.ActiveTag" />
+                    <input type="hidden" name="name" value="@Model.ActiveName" />
+
+                    @if (Model.ReadyCount > 0)
+                    {
+                        <div class="hp-row" style="margin-bottom:.5rem;">
+                            @* type="button": a bare button inside a form submits it, which would
+                               share everything the moment someone meant to tick everything. *@
+                            <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                    data-select-all="hp-share">Select all @Model.ReadyCount</button>
+                            <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                    data-select-none="hp-share">Clear</button>
+                        </div>
+                    }
+
+                    <div class="hp-panel">
+                        <ul class="hp-list">
+                            @foreach (var candidate in Model.Candidates)
+                            {
+                                var drill = candidate.Card.Drill;
+                                var boxId = $"share-{drill.Id}";
+                                <li style="flex-wrap:wrap;align-items:flex-start;
+                                           @(candidate.CanShare ? "" : "opacity:.62;")">
+                                    @* The label wraps only the checkbox and the drill's content, so
+                                       tapping anywhere on the row ticks it — a 44px target is hard
+                                       to hit on a phone otherwise. *@
+                                    <label for="@boxId" class="hp-share-row">
+                                        <input type="checkbox" class="hp-check" id="@boxId"
+                                               name="drillIds" value="@drill.Id"
+                                               data-group="hp-share"
+                                               disabled="@(!candidate.CanShare)" />
+                                        <span class="grow" style="min-width:0;">
+                                            @await Html.PartialAsync("_DrillRow", candidate.Card)
+
+                                            @if (candidate.Status == ShareStatus.AlreadyShared)
+                                            {
+                                                <span class="hp-pill hp-pill-viewed">
+                                                    Already in @Model.Target.Name@(candidate.RenamedTo is not null
+                                                        ? $", as “{candidate.RenamedTo}”" : "")
+                                                </span>
+                                            }
+                                            else if (candidate.Status == ShareStatus.NameClash)
+                                            {
+                                                <span class="hp-pill hp-pill-draft">
+                                                    @Model.Target.Name has a different drill with this name
+                                                </span>
+                                            }
+                                        </span>
+                                    </label>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+
+                    <button type="submit" class="hp-btn hp-btn-block" style="margin-top:.8rem;"
+                            data-busy="Sharing…" disabled="@(Model.ReadyCount == 0)">
+                        Share with @Model.Target.Name
+                    </button>
+                    <p class="hp-muted" style="font-size:.78rem;">
+                        Drills already there are never touched, so anything they've changed since
+                        stays as they left it.
+                    </p>
+                </form>
+            }
+        }
+    }
+
+    <div class="hp-panel" style="margin-top:1rem;">
+        <a class="hp-muted" asp-action="Index" asp-route-slug="@slug" style="font-size:.85rem;">
+            &#8249; Back to drills
+        </a>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // Only ever touches boxes that aren't disabled, so "select all" can't tick a drill the other
+    // team already has — the server would refuse it anyway, but a box that ticks and then does
+    // nothing reads as a bug.
+    function boxes(group) {
+        return Array.prototype.slice.call(
+            document.querySelectorAll('input[data-group="' + group + '"]:not([disabled])'));
+    }
+    document.querySelectorAll('[data-select-all]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            boxes(b.getAttribute('data-select-all')).forEach(function (c) { c.checked = true; });
+        });
+    });
+    document.querySelectorAll('[data-select-none]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            boxes(b.getAttribute('data-select-none')).forEach(function (c) { c.checked = false; });
+        });
+    });
+})();
+</script>
+}

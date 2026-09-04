@@ -21,6 +21,11 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
 - **Uploads are never served from `wwwroot`.** They stream through a controller action so the team-code
   gate applies.
 - **Storage is capped at 1 GiB with no resize path.** The upload guard is a correctness requirement.
+- **Drill sharing is keyed on provenance (`CopiedFromDrillId`), not title.** A copy the receiving
+  team renamed is still the same drill, so title matching would duplicate it on the next share.
+  A partial unique index on `(TeamId, CopiedFromDrillId)` enforces it, and every share path goes
+  through `DrillController.ShareOneAsync`. Sharing only ever inserts, never updates: once a copy
+  lands it belongs to the other team.
 - **Backup/restore lives in `DatabaseBackupService`.** Copies are taken with `VACUUM INTO` (never a
   file copy); restoring swaps the file and then exits the process on purpose, because `Migrate()`
   only runs at startup and that is what lets an older backup be restored at all. `-wal`/`-shm` are
