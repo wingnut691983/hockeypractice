@@ -274,10 +274,7 @@ public class CoachController : TeamScopedController
         });
         await Db.SaveChangesAsync();
 
-        // Back to the same row in the library, not the top of the page. Building a plan means
-        // adding several drills in a row, and being thrown back to the top after each one means
-        // scrolling to find your place again every single time.
-        return BackToPlan(slug, id, drillTag, $"lib-{drill.Id}");
+        return BackToPlan(slug, id, drillTag);
     }
 
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/remove")]
@@ -295,8 +292,7 @@ public class CoachController : TeamScopedController
         Db.PlanDrills.Remove(entry);
         await Db.SaveChangesAsync();
 
-        // The row itself is gone, so aim at the list rather than a now-missing anchor.
-        return BackToPlan(slug, id, drillTag, "hp-plan-drills");
+        return BackToPlan(slug, id, drillTag);
     }
 
     /// <summary>
@@ -323,15 +319,13 @@ public class CoachController : TeamScopedController
 
         var neighbour = direction == "up" ? index - 1 : index + 1;
         if (neighbour < 0 || neighbour >= ordered.Count)
-            return BackToPlan(slug, id, drillTag, $"pd-{planDrillId}");
+            return BackToPlan(slug, id, drillTag);
 
         (ordered[index].SortOrder, ordered[neighbour].SortOrder) =
             (ordered[neighbour].SortOrder, ordered[index].SortOrder);
 
         await Db.SaveChangesAsync();
-
-        // Follow the row that moved, so the coach's eye stays on it through a run of reorders.
-        return BackToPlan(slug, id, drillTag, $"pd-{planDrillId}");
+        return BackToPlan(slug, id, drillTag);
     }
 
     [HttpPost("plans/{id:int}")]
@@ -801,14 +795,15 @@ public class CoachController : TeamScopedController
         SpotifyPlaylistUrlPattern.IsMatch(value);
 
     /// <summary>
-    /// Back to the plan editor, scrolled to the thing that was just acted on.
+    /// Back to the plan editor, scrolled to the plan's own drill list.
     ///
-    /// RedirectToAction can't carry a fragment, and without one every add, move or remove lands
-    /// at the top of a long page — which is precisely the page a coach spends the most time
-    /// scrolling through.
+    /// Always that list, whatever the action was. After adding, moving or removing a drill, what
+    /// the coach wants to see is the plan as it now stands, so every one of those lands in the
+    /// same place. RedirectToAction can't carry a fragment, and without one they all land at the
+    /// top of a long page instead.
     /// </summary>
-    private IActionResult BackToPlan(string slug, int id, string? drillTag, string anchor) =>
-        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag }) + "#" + anchor);
+    private IActionResult BackToPlan(string slug, int id, string? drillTag) =>
+        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag }) + "#hp-plan-drills");
 
     /// <summary>The plan's drills, in order. Ties on SortOrder break on Id so the order is stable.</summary>
     private async Task<List<DrillCard>> PlanDrillsAsync(int planId)

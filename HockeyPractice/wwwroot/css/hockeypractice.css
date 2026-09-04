@@ -308,10 +308,9 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-plan-summary-foot.over { color: var(--hp-danger); border-color: var(--hp-danger); }
 .hp-plan-summary-foot strong { color: inherit; }
-/* Jumping to a drill shouldn't leave it flush against the top of the window. Same for the plan
-   editor's rows, which are landed on after every add, move and remove. */
+/* Jumping to a drill or to the plan editor's drill list shouldn't leave the target flush
+   against the top of the window. */
 .hp-drill,
-.hp-list > li[id],
 .hp-section[id] { scroll-margin-top: 1rem; }
 
 .hp-drill-head { display: flex; align-items: flex-start; gap: .6rem; }
