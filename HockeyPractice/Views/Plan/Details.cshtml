@@ -33,6 +33,17 @@
         }
     </div>
 
+    @* The same action also sits at the foot of the page. A plan with a dozen drills, each with a
+       picture, is a long scroll, so a coach who opens one to change something shouldn't have to
+       travel the whole page to find the way in. Shown only to a manager, so a player never sees
+       a control they can't use. *@
+    @if (Model.Ctx.IsManager)
+    {
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-bottom:.8rem;"
+           asp-controller="Coach" asp-action="EditPlan"
+           asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
+    }
+
     @if (!string.IsNullOrWhiteSpace(Model.Plan.CoachNotes))
     {
         <div class="hp-panel" style="border-left:4px solid var(--hp-accent);">
