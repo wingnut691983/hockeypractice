@@ -1113,9 +1113,13 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
    the same specificity so the media query is what decides. */
 .hp-topbar-brand img { width: auto; }
 
-/* Both are capped under the 40px team logo beside them, so adding this cannot grow the bar. */
+/* Both stay under the bar's 44px content area, so neither can grow the header. Measured on the
+   real page: the two text lines beside them come to 34.3px and the team badge to 40px.
+   The wordmark is set to 38 rather than 34 because the badge carries its own padding, so a
+   38px box shows about 30px of actual artwork; that reads level with the two lines of text
+   while the badge itself lines up with the team's. */
 .hp-brand-mark     { display: block; height: 30px; }
-.hp-brand-wordmark { display: none;  height: 26px; }
+.hp-brand-wordmark { display: none;  height: 38px; }
 
 @media (min-width: 30rem) {
   .hp-brand-mark     { display: none; }
