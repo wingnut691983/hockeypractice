@@ -68,9 +68,17 @@ public class HomeController : Controller
             display = "standalone",
             background_color = "#f4f6f9",
             theme_color = "#0B4EA2",
-            icons = new[]
+            // Was a single entry claiming the .ico was 48x48, which it never contained, and
+            // nothing an Android launcher can install from. Two purposes, deliberately:
+            // "any" is the full-bleed art for launchers that show it square, and "maskable" is
+            // the padded one for the majority that crop to a circle. 13.6% of this artwork sits
+            // outside an inscribed circle, so without the padded variant the corner marks are
+            // sliced off on most phones.
+            icons = new object[]
             {
-                new { src = Url.Content("~/favicon.ico"), sizes = "48x48", type = "image/x-icon" }
+                new { src = Url.Content("~/icon-192.png"), sizes = "192x192", type = "image/png", purpose = "any" },
+                new { src = Url.Content("~/icon-512.png"), sizes = "512x512", type = "image/png", purpose = "any" },
+                new { src = Url.Content("~/icon-maskable-512.png"), sizes = "512x512", type = "image/png", purpose = "maskable" }
             }
         });
     }

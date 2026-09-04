@@ -18,7 +18,14 @@
     <title>@title</title>
     <link rel="stylesheet" href="~/css/hockeypractice.css" asp-append-version="true" />
     <link rel="manifest" href="@Url.Action("Manifest", "Home")" />
-    <link rel="icon" href="~/favicon.ico" />
+
+    @* The .ico carries 16, 32 and 48 with transparent corners, so the tab icon sits on whatever
+       colour the browser's tab strip is rather than in a white box. apple-touch-icon is a
+       separate opaque file because iOS masks and rounds it itself, and transparency there shows
+       up as black slivers behind the rounding. Versioned, since a favicon is cached hard and a
+       stale one would outlive several deploys. *@
+    <link rel="icon" href="~/favicon.ico" sizes="16x16 32x32 48x48" asp-append-version="true" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" asp-append-version="true" />
 </head>
 <body>
     @* Everyone sees this, not just the admin who set it. A coach whose save is about to be
