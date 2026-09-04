@@ -43,8 +43,17 @@
         </datalist>
     }
 
-    @if (!string.IsNullOrWhiteSpace(Model.Hint))
-    {
-        <span class="hp-muted" style="font-size:.8rem;">@Model.Hint</span>
-    }
+    @* How it works lives here rather than in the pages that use it: the mechanics are identical
+       on the drill form and the plan form, and two copies would drift. Always visible rather
+       than a title= tooltip — this app is used on phones, where a hover tooltip never appears
+       at all. *@
+    <span class="hp-muted" style="font-size:.8rem;">
+        Start typing to see tags you've used before &mdash; pick one to reuse it, or just type a
+        new one. <strong>Enter</strong> or <strong>Add tag</strong> adds it; <strong>&times;</strong>
+        on a tag removes it.
+        @if (!string.IsNullOrWhiteSpace(Model.Hint))
+        {
+            <text>@Model.Hint</text>
+        }
+    </span>
 </div>
