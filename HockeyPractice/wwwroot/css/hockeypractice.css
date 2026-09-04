@@ -1086,6 +1086,39 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
+.hp-footer-feedback {
+  margin: 0 0 .7rem;
+  font-size: .78rem;
+  color: var(--hp-muted);
+}
+/* The mailto stands out from the surrounding muted sentence, or it reads as inert text rather
+   than a link — the one thing on this line someone might actually want to tap. */
+.hp-footer-feedback a { color: var(--hp-accent-text); }
+
+.hp-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .6rem .9rem;
+}
+
+/* A pill rather than a full .hp-btn: this is a credit, not an action competing with the page's
+   own buttons, and .hp-btn's 44px tap target would make it the loudest thing in the footer. */
+.hp-footer-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .65rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 999px;
+  font-size: .76rem !important;
+  font-weight: 600 !important;
+}
+.hp-footer-badge:hover {
+  border-color: var(--hp-muted);
+  background: var(--hp-surface-2);
+}
+
 /* ── Landing page team cards ───────────────────────────────
    Both ways into a team are visible here: read the plans, or manage it. This is the only
    page where that choice is presented, so it is stated rather than hidden behind a menu. */
