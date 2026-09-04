@@ -291,7 +291,11 @@ public class TeamController : TeamScopedController
 
         await Access.GrantTeamAsync(HttpContext, team.Id, TeamAccessLevel.None);
         await Access.SetPlayerAsync(HttpContext, team.Id, null);
-        return RedirectToAction(nameof(EnterCode), new { slug });
+
+        // Out to the team list, not back to this team's code box. Signing out and being handed
+        // the very gate you just left reads as a failed sign-out, and left no way to reach any
+        // other team without editing the URL.
+        return RedirectToAction("Index", "Home");
     }
 
     /// <summary>

@@ -33,6 +33,16 @@ public class HomeController : Controller
         });
     }
 
+    /// <summary>
+    /// What has changed on the site, newest batch first.
+    ///
+    /// A page here rather than a link off to a document elsewhere: it needs no sign-in, it is
+    /// reachable by every player and parent without anything being shared with them first, and
+    /// it stays with the site it describes.
+    /// </summary>
+    [Route("whats-new")]
+    public IActionResult WhatsNew() => View();
+
     [Route("Home/Error")]
     public IActionResult Error(int? status)
     {

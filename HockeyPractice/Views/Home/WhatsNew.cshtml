@@ -1,0 +1,131 @@
+@{ ViewBag.Title = "What's new – EBHockey Plans"; }
+@*
+    Newest batch at the top. To add the next one, copy a <div class="hp-section"> date heading
+    and the panel under it, and leave the older entries below it untouched.
+*@
+<div class="hp-rail"></div>
+<div class="hp-shell">
+    <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:1rem;"
+       asp-action="Index">&#8249; All teams</a>
+
+    <h1 class="hp-title">What's new</h1>
+    <p class="hp-muted" style="margin-top:0;">
+        Changes to this site, newest first. Most of it is for coaches building plans, but there
+        are things players and parents will notice too.
+    </p>
+
+    <div class="hp-section">3 September 2026</div>
+
+    <div class="hp-panel hp-changelog">
+        <p class="hp-changelog-lead">
+            <strong>Practice plans can now be built from a drill library.</strong>
+            Coaches can keep a library of reusable drills, each with a name, how it's run, tags,
+            an approximate run time, up to six pictures and a video link. A plan is then put
+            together by picking drills from that library. Uploading a PDF plan still works
+            exactly as before, so this is a second way to build a plan and not a replacement.
+        </p>
+
+        <h2>Players and parents</h2>
+        <ul>
+            <li>
+                <strong>Drill plans open right in the page</strong>, with the pictures and video
+                links inline, so there's no PDF to pinch and zoom around on a phone.
+            </li>
+            <li>
+                <strong>The running order is at the top.</strong> Every drill plan starts with a
+                summary: each drill, how long it takes, and what the clock should read when it
+                starts, counting down from 80:00.
+            </li>
+            <li>
+                <strong>Drills can have more than one picture</strong>, shown in the order the
+                coach added them, for a progression that needs a diagram per stage.
+            </li>
+            <li>
+                <strong>A way to send feedback.</strong> There's a footer on every page now with
+                a Contact us link, for anything that looks wrong or anything you'd like added.
+            </li>
+        </ul>
+
+        <h2>Coaches: building drills</h2>
+        <ul>
+            <li>
+                <strong>Paste or drag a screenshot straight in.</strong> Clip a diagram out of a
+                PDF or a video and paste it onto the drill form. No need to save it as a file
+                first.
+            </li>
+            <li>
+                <strong>Approximate run time, totalled across the plan</strong>, so you can see
+                whether practice fits the ice time you've booked. Leave it blank if you're not
+                sure and the total says how many are unset.
+            </li>
+            <li>
+                <strong>Up to six pictures per drill</strong>, added several at a time and kept
+                in order. New pictures add to a drill rather than replacing what's there.
+            </li>
+            <li>
+                <strong>Pictures keep their shape.</strong> Diagrams were being squashed out of
+                proportion.
+            </li>
+            <li>
+                <strong>Saving a drill takes you back to the library</strong>, rather than
+                leaving you on the form wondering whether it saved.
+            </li>
+        </ul>
+
+        <h2>Coaches: finding things</h2>
+        <ul>
+            <li>
+                <strong>Tags are chips now</strong>, added one at a time with suggestions from
+                tags the team already uses, each with a small x to remove it. The old single
+                comma-separated box is gone.
+            </li>
+            <li>
+                <strong>Search by name as well as by tag</strong>, on both the drill library and
+                the plan list. Use either box on its own, or both together to narrow: filter to a
+                tag, then search within those results by name.
+            </li>
+            <li>
+                <strong>A clear banner when a filter is on.</strong> If a list looks short or
+                empty, it now tells you which filters are applied and gives you a Clear filters
+                button.
+            </li>
+        </ul>
+
+        <h2>Coaches: copying drills between teams</h2>
+        <ul>
+            <li>
+                <strong>Copy one drill from its own page</strong>, picking the team to send it
+                to. The page also tells you which teams already have it.
+            </li>
+            <li>
+                <strong>Or pick several at once.</strong> Pick drills to copy opens a page where
+                you choose the team first, filter by name or tag, and tick what you want.
+            </li>
+            <li>
+                <strong>Nothing gets copied twice, and nothing gets overwritten.</strong> Drills
+                the other team already has are marked and can't be ticked, even if they renamed
+                their copy. Each team owns its copy, so editing a drill afterwards doesn't change
+                theirs.
+            </li>
+            <li>
+                <strong>Copy the whole library at once is still there</strong> for the end of a
+                season, and skips anything the other team already has.
+            </li>
+        </ul>
+
+        <h2>Smaller fixes</h2>
+        <ul>
+            <li>An Edit plan button at the top of a plan as well as the bottom.</li>
+            <li>Adding a drill, or moving one up or down, no longer jumps you to the top of the page.</li>
+            <li>Clicking the picture box arms it for a paste instead of opening the file dialog.</li>
+            <li>On a plan built from drills the button says Add drills, not Upload plan.</li>
+        </ul>
+
+        <div class="hp-notice" style="margin-top:1.2rem;">
+            <strong>Worth knowing about copying drills:</strong> it works between teams you
+            manage <em>in the same browser</em>. If you entered one team's manager code on your
+            laptop and another team's on your phone, neither offers the other as somewhere to
+            copy to. Enter both manager codes in the same browser and they'll show up.
+        </div>
+    </div>
+</div>

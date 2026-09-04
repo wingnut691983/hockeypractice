@@ -74,5 +74,12 @@
                 Ask your coach if you don't have the team code.
             </p>
         }
+
+        @* No team header on this page, so without this the only way out is the browser's back
+           button or editing the URL. *@
+        <p style="margin-top:1.1rem;">
+            <a class="hp-muted" style="font-size:.85rem;"
+               asp-controller="Home" asp-action="Index">&#8249; All teams</a>
+        </p>
     </div>
 </div>

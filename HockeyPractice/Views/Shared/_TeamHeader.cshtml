@@ -87,6 +87,11 @@
                     </form>
                 }
 
+                @* Always present, unlike "Switch team" below, which only lists teams this
+                   browser already has access to. Without it there was no way back to the team
+                   list from inside a team except editing the URL. *@
+                <a class="hp-menu-item" asp-controller="Home" asp-action="Index">All teams</a>
+
                 @if (Model.OtherTeams.Count > 0)
                 {
                     <div class="hp-menu-heading">Switch team</div>

@@ -1086,6 +1086,36 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
+/* ── Changelog ─────────────────────────────────────────────
+   A page to read down rather than scan, so it gets real running text: wider line height than
+   the app's dense list rows, and headings that separate the audiences. */
+.hp-changelog h2 {
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--hp-accent-text);
+  margin: 1.6rem 0 .5rem;
+}
+.hp-changelog h2:first-of-type { margin-top: 1.2rem; }
+
+.hp-changelog-lead {
+  margin: 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--hp-border);
+  line-height: 1.6;
+}
+
+.hp-changelog ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+.hp-changelog li { line-height: 1.55; color: var(--hp-muted); }
+.hp-changelog li strong { color: var(--hp-text); }
+
 /* ── Copy picker rows ──────────────────────────────────────
    The label wraps the box and the drill together, so the whole row is the tap target. On a phone
    a bare 16px checkbox is a miss waiting to happen, and these rows are tall enough that aiming
