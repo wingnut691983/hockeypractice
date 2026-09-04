@@ -46,19 +46,6 @@
             : new Dictionary<string, string>()
     })
 
-    @if (Model.AllTags.Count > 0)
-    {
-        <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
-            @foreach (var tag in Model.AllTags)
-            {
-                <a class="hp-pill @(string.Equals(Model.ActiveTag, tag, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
-                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@tag"
-                   asp-route-name="@Model.ActiveName"
-                   asp-route-archived="@(Model.ShowingArchived ? "true" : null)">@tag</a>
-            }
-        </div>
-    }
-
     @if (!string.IsNullOrWhiteSpace(Model.ActiveTag) || !string.IsNullOrWhiteSpace(Model.ActiveName))
     {
         <div class="hp-muted" style="margin-bottom:.6rem;">

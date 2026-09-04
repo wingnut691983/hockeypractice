@@ -30,17 +30,6 @@
         ActiveTag = Model.ActiveTag,
         KnownTags = Model.AllTags
     })
-    @if (Model.AllTags.Count > 0)
-    {
-        <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
-            @foreach (var t in Model.AllTags)
-            {
-                <a class="hp-pill @(string.Equals(Model.ActiveTag, t, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
-                   asp-action="Index" asp-route-slug="@slug" asp-route-tag="@t"
-                   asp-route-name="@Model.ActiveName">@t</a>
-            }
-        </div>
-    }
     @if (!string.IsNullOrWhiteSpace(Model.ActiveTag) || !string.IsNullOrWhiteSpace(Model.ActiveName))
     {
         <div class="hp-muted" style="margin-bottom:.6rem;">
@@ -100,8 +89,11 @@
                                 <div style="margin-top:.3rem;">
                                     @foreach (var t in card.Plan.Tags.OrderBy(x => x.Name))
                                     {
+                                        @* Carries the name filter, or clicking a plan's tag to
+                                           narrow would throw away whatever was typed. *@
                                         <a class="hp-pill" asp-action="Index" asp-route-slug="@slug"
-                                           asp-route-tag="@t.Name">@t.Name</a>
+                                           asp-route-tag="@t.Name"
+                                           asp-route-name="@Model.ActiveName">@t.Name</a>
                                     }
                                 </div>
                             }

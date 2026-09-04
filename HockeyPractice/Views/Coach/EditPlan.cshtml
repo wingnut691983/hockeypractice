@@ -271,23 +271,6 @@
             KnownTags = Model.AllDrillTags
         })
 
-        @if (Model.AllDrillTags.Count > 0)
-        {
-            <div class="hp-row" style="flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem;">
-                @foreach (var tag in Model.AllDrillTags)
-                {
-                    <a class="hp-pill @(string.Equals(tagFilter, tag, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
-                       asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId"
-                       asp-route-drillTag="@tag" asp-route-drillName="@nameFilter">@tag</a>
-                }
-                @if (!string.IsNullOrWhiteSpace(tagFilter) || !string.IsNullOrWhiteSpace(nameFilter))
-                {
-                    <a class="hp-muted" style="font-size:.8rem;align-self:center;"
-                       asp-action="EditPlan" asp-route-slug="@slug" asp-route-id="@planId">Clear</a>
-                }
-            </div>
-        }
-
         @if (Model.Library.Count == 0)
         {
             <div class="hp-empty">
