@@ -21,6 +21,12 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
 - **Uploads are never served from `wwwroot`.** They stream through a controller action so the team-code
   gate applies.
 - **Storage is capped at 1 GiB with no resize path.** The upload guard is a correctness requirement.
+- **The gateway does not reliably pass `X-Forwarded-For`.** Measured, not assumed: the address the
+  app resolves alternates between the real client and whichever gateway pod relayed the request.
+  So never partition anything on the client address. The code-entry rate limiter keys on the team
+  slug from the route for exactly this reason, and a per-address key silently stopped limiting
+  altogether (36 rapid wrong codes all allowed). `UseForwardedHeaders` still clears its
+  known-proxy lists, but only for `Request.Scheme` and logging.
 - **Drill copying is keyed on provenance (`CopiedFromDrillId`), not title.** A copy the receiving
   team renamed is still the same drill, so title matching would duplicate it on the next copy.
   A partial unique index on `(TeamId, CopiedFromDrillId)` enforces it, and every copy path goes
