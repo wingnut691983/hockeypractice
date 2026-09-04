@@ -2,7 +2,11 @@
 @{ ViewBag.Title = "EBHockey Plans"; }
 <div class="hp-rail"></div>
 <div class="hp-shell">
-    <h1 class="hp-title">EBHockey Plans</h1>
+    @* Still an h1 so the page keeps its heading; the alt text carries the name for screen
+       readers and search. *@
+    <h1 class="hp-title hp-home-brand">
+        <img src="~/logo-wordmark.png" alt="EBHockey Plans" width="880" height="275" />
+    </h1>
 
     @if (Model.Teams.Count == 0)
     {

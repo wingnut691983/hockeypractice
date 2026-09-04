@@ -1086,6 +1086,42 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
+/* ── Site brand ────────────────────────────────────────────
+   The logo is a black plate by design: its wordmark is white, so knocking the background out
+   would leave it invisible on the light theme. Kept as a badge, which reads deliberately on
+   both. */
+
+.hp-home-brand {
+  margin: 1.4rem 0 .25rem;
+  line-height: 0;              /* an h1's line-height would pad the image */
+}
+.hp-home-brand img {
+  display: block;
+  width: 100%;
+  max-width: 21rem;
+  height: auto;
+}
+
+.hp-topbar-brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;              /* the team name truncates before the logo does */
+}
+/* Deliberately sets no display here. `.hp-topbar-brand img` is (0,1,1) and would outrank the
+   (0,1,0) class rules below, so a display declared here pins BOTH variants visible at every
+   width and the media query silently does nothing. Every display rule for these two stays at
+   the same specificity so the media query is what decides. */
+.hp-topbar-brand img { width: auto; }
+
+/* Both are capped under the 40px team logo beside them, so adding this cannot grow the bar. */
+.hp-brand-mark     { display: block; height: 30px; }
+.hp-brand-wordmark { display: none;  height: 26px; }
+
+@media (min-width: 30rem) {
+  .hp-brand-mark     { display: none; }
+  .hp-brand-wordmark { display: block; }
+}
+
 /* ── Changelog ─────────────────────────────────────────────
    A page to read down rather than scan, so it gets real running text: wider line height than
    the app's dense list rows, and headings that separate the audiences. */

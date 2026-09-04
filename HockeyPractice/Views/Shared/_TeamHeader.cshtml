@@ -19,6 +19,15 @@
 }
 <header class="hp-topbar">
     <div class="hp-topbar-inner">
+        @* Site brand, and the way back to the team list, which is where a logo in the top-left
+           corner is expected to go anyway. Two logos share this bar, so on a narrow phone the
+           wordmark collapses to just the emblem: the full lockup plus the team's own logo and
+           name does not fit beside the menu at 390px without truncating the team to nothing. *@
+        <a class="hp-topbar-brand" asp-controller="Home" asp-action="Index" aria-label="EBHockey Plans, all teams">
+            <img class="hp-brand-mark" src="~/logo-mark.png" alt="" width="96" height="96" />
+            <img class="hp-brand-wordmark" src="~/logo-wordmark.png" alt="" width="880" height="275" />
+        </a>
+
         <a class="hp-topbar-id" asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">
             @if (!onPlansPage)
             {
