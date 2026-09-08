@@ -1116,9 +1116,13 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 
 .hp-suggest {
   margin-top: .3rem;
-  max-height: 40vh;              /* long vocabularies scroll rather than taking the screen */
+  /* rem, not vh. On iOS Safari vh resolves against the largest viewport, ignoring browser chrome
+     and the keyboard, so 40vh was reliably taller than 40% of what could actually be seen. Rows
+     are --hp-tap tall, so this is about six of them. */
+  max-height: 17rem;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;           /* commit to vertical scrolling without waiting to see */
   background: var(--hp-surface);
   border: 1px solid var(--hp-border);
   border-radius: 10px;
@@ -1140,6 +1144,13 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 .hp-suggest-item.active {
   background: var(--hp-primary);
   color: var(--hp-on-primary, #fff);
+}
+
+/* About four rows on a phone. The panel sits in normal flow so it is never hidden behind the
+   keyboard, and the cost of that is shoving the page down; a shorter list keeps the shove small
+   while the rest stays a scroll away. */
+@media (max-width: 30rem) {
+  .hp-suggest { max-height: 11.5rem; }
 }
 
 /* ── Pager ─────────────────────────────────────────────────

@@ -259,6 +259,11 @@
 
             var open = false, active = -1, shown = [], justPicked = false;
 
+            // Touch gesture state. A press on a row might be a tap or the start of a scroll, and
+            // which it was is only known on release.
+            var press = null;
+            var TAP_SLOP = 10;   // px of movement still counted as a tap, not a drag
+
             function close() {
                 open = false; active = -1;
                 panel.hidden = true;
@@ -287,11 +292,19 @@
                     row.setAttribute('aria-selected', i === active ? 'true' : 'false');
                     row.textContent = value;
 
-                    // pointerdown, not click. blur fires before click, which closes the panel and
-                    // leaves the tap landing on nothing — the classic reason a custom dropdown
-                    // "does nothing" on a phone. preventDefault keeps focus in the input.
+                    // Deliberately NO preventDefault here, and deliberately not committing on
+                    // pointerdown. Doing both is what made the list unscrollable on iOS:
+                    // preventDefault cancels the browser's default touch handling, and scrolling
+                    // is part of what it cancels, while picking on contact means the first touch
+                    // commits whatever is under the finger. Decide on release instead.
                     row.addEventListener('pointerdown', function (e) {
-                        e.preventDefault();
+                        press = { row: row, value: value, x: e.clientX, y: e.clientY, drag: false };
+                    });
+
+                    row.addEventListener('pointerup', function () {
+                        var p = press;
+                        press = null;
+                        if (!p || p.drag || p.row !== row) return;
                         pick(value);
                     });
                     panel.appendChild(row);
@@ -338,6 +351,28 @@
             input.setAttribute('aria-controls', panel.id);
             panel.setAttribute('role', 'listbox');
 
+            // Movement and cancellation are tracked on the panel rather than per row, because a
+            // scroll that starts on one row ends on another and the row's own handlers would
+            // never see it.
+            panel.addEventListener('pointermove', function (e) {
+                if (!press) return;
+                if (Math.abs(e.clientX - press.x) > TAP_SLOP ||
+                    Math.abs(e.clientY - press.y) > TAP_SLOP) {
+                    press.drag = true;
+                }
+            });
+
+            // iOS fires this the moment it takes the gesture over for scrolling, which makes it
+            // the most reliable "this was not a tap" signal available.
+            panel.addEventListener('pointercancel', function () { press = null; });
+
+            // Safety net. A drag that starts on a row and releases anywhere else never reaches the
+            // row's own pointerup, so without this `press` would stay set and the blur guard above
+            // would keep the panel open for good. Runs after the row handler, which has already
+            // done its work by the time the event bubbles this far.
+            window.addEventListener('pointerup', function () { press = null; });
+            window.addEventListener('pointercancel', function () { press = null; });
+
             input.addEventListener('focus', function () {
                 // Consumed here as well as cleared on a timer. Whether the refocus in pick()
                 // fires a focus event depends on whether the input was already focused, so the
@@ -376,8 +411,14 @@
             });
 
             input.addEventListener('blur', function () {
-                // Deferred, because pointerdown on an option fires before blur settles.
-                setTimeout(close, 120);
+                // Deferred, because pointerdown on an option fires before blur settles. Skipped
+                // entirely while a finger is down on the panel: without preventDefault, touching
+                // the list blurs the input, and closing here would pull the list out from under
+                // the scroll that was just starting.
+                setTimeout(function () {
+                    if (press) return;
+                    close();
+                }, 120);
             });
 
             // Last, and only now that the replacement works. Removing it earlier and then
