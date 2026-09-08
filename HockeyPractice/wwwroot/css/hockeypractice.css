@@ -1109,6 +1109,39 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
+/* ── Tag suggestions ───────────────────────────────────────
+   Replaces <datalist>, which mobile Safari does not render dependably. In normal flow rather
+   than absolutely positioned: an overlay lands under the on-screen keyboard on a phone, which is
+   the one place it must not. */
+
+.hp-suggest {
+  margin-top: .3rem;
+  max-height: 40vh;              /* long vocabularies scroll rather than taking the screen */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  box-shadow: var(--hp-shadow);
+}
+
+.hp-suggest-item {
+  display: flex;
+  align-items: center;
+  min-height: var(--hp-tap);     /* a thumb target, not a mouse target */
+  padding: .5rem .75rem;
+  font-size: .92rem;
+  color: var(--hp-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-suggest-item:last-child { border-bottom: 0; }
+.hp-suggest-item:hover,
+.hp-suggest-item.active {
+  background: var(--hp-primary);
+  color: var(--hp-on-primary, #fff);
+}
+
 /* ── Pager ─────────────────────────────────────────────────
    Sits under a drill list. One line at every width the site supports, because the alternative on
    a phone is a wrapped grid of small targets, which is the thing this is meant to relieve. */

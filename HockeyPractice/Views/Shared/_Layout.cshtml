@@ -223,6 +223,172 @@
     });
 })();
 </script>
+<script>
+// ── Tag suggestions ─────────────────────────────────────────────────────
+// Deliberately its own IIFE, wrapped in try/catch, and NOT part of the script above. That one
+// holds the delete confirmations, and this file already carries the scar of what happens when a
+// fault takes them out: a handler that fails to parse does not stop the form, so the delete runs
+// with no confirmation at all. A tag list is not worth risking that.
+//
+// Replaces <datalist>, which mobile Safari renders unreliably or not at all: the suggestions
+// simply never appear, with no error. The datalist stays in the DOM as the data source and as the
+// no-script fallback, and the input keeps its name, so with this script absent the field behaves
+// exactly as it did before.
+(function () {
+    try {
+        var inputs = document.querySelectorAll('input[data-suggest]');
+        if (!inputs.length) return;
+
+        inputs.forEach(function (input) {
+            var list = document.getElementById(input.getAttribute('data-suggest'));
+            var panel = document.getElementById(input.getAttribute('data-suggest-panel'));
+            if (!list || !panel) return;
+
+            var options = Array.prototype.slice.call(list.options).map(function (o) { return o.value; });
+            if (!options.length) return;
+
+            // Only in the tag editor: tags already on this drill cannot be added twice, so
+            // offering them is misleading.
+            var chipsId = input.getAttribute('data-suggest-exclude');
+            function taken() {
+                var chips = chipsId ? document.getElementById(chipsId) : null;
+                if (!chips) return [];
+                return Array.prototype.slice.call(chips.querySelectorAll('input[type="hidden"]'))
+                    .map(function (i) { return i.value.toLowerCase(); });
+            }
+
+            var open = false, active = -1, shown = [], justPicked = false;
+
+            function close() {
+                open = false; active = -1;
+                panel.hidden = true;
+                panel.innerHTML = '';
+                input.setAttribute('aria-expanded', 'false');
+                input.removeAttribute('aria-activedescendant');
+            }
+
+            function render() {
+                var typed = input.value.trim().toLowerCase();
+                var already = taken();
+                shown = options.filter(function (o) {
+                    var lower = o.toLowerCase();
+                    if (already.indexOf(lower) !== -1) return false;
+                    return !typed || lower.indexOf(typed) !== -1;
+                });
+
+                if (!shown.length) { close(); return; }
+
+                panel.innerHTML = '';
+                shown.forEach(function (value, i) {
+                    var row = document.createElement('div');
+                    row.className = 'hp-suggest-item' + (i === active ? ' active' : '');
+                    row.id = panel.id + '-o' + i;
+                    row.setAttribute('role', 'option');
+                    row.setAttribute('aria-selected', i === active ? 'true' : 'false');
+                    row.textContent = value;
+
+                    // pointerdown, not click. blur fires before click, which closes the panel and
+                    // leaves the tap landing on nothing — the classic reason a custom dropdown
+                    // "does nothing" on a phone. preventDefault keeps focus in the input.
+                    row.addEventListener('pointerdown', function (e) {
+                        e.preventDefault();
+                        pick(value);
+                    });
+                    panel.appendChild(row);
+                });
+
+                panel.hidden = false;
+                open = true;
+                input.setAttribute('aria-expanded', 'true');
+                if (active >= 0) input.setAttribute('aria-activedescendant', panel.id + '-o' + active);
+                else input.removeAttribute('aria-activedescendant');
+
+                // The phone keyboard covers the lower half of the screen, so a panel that opens
+                // below the fold is invisible even though it rendered.
+                if (panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest' });
+            }
+
+            function pick(value) {
+                input.value = value;
+                close();
+                // The chip script already treats insertReplacementText as "a suggestion was
+                // chosen" and turns it into a chip. Firing exactly that keeps one commit path
+                // rather than reaching into its closure. Where there is no chip script, this is
+                // simply an input event and the value stays in the box.
+                var ev;
+                try {
+                    ev = new InputEvent('input', { inputType: 'insertReplacementText', bubbles: true });
+                } catch (e) {
+                    ev = document.createEvent('Event');
+                    ev.initEvent('input', true, false);
+                }
+                // Guarded, because refocusing after a pick would fire focus and reopen the panel
+                // on top of the choice just made. Whether focus() fires at all depends on whether
+                // the element was already focused, so the flag makes the behaviour the same
+                // either way rather than depending on that.
+                justPicked = true;
+                input.dispatchEvent(ev);
+                if (document.activeElement !== input) input.focus();
+                setTimeout(function () { justPicked = false; }, 0);
+            }
+
+            input.setAttribute('role', 'combobox');
+            input.setAttribute('aria-expanded', 'false');
+            input.setAttribute('aria-autocomplete', 'list');
+            input.setAttribute('aria-controls', panel.id);
+            panel.setAttribute('role', 'listbox');
+
+            input.addEventListener('focus', function () {
+                // Consumed here as well as cleared on a timer. Whether the refocus in pick()
+                // fires a focus event depends on whether the input was already focused, so the
+                // flag has to be cleared on both paths or it could linger and swallow a later
+                // legitimate focus.
+                if (justPicked) { justPicked = false; return; }
+                active = -1;
+                render();
+            });
+
+            input.addEventListener('input', function (e) {
+                // Ignore the event pick() just dispatched, or choosing an option would reopen
+                // the panel on top of itself.
+                if (e && e.inputType === 'insertReplacementText') return;
+                active = -1;
+                render();
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { if (open) { e.preventDefault(); close(); } return; }
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    if (!open) { render(); return; }
+                    e.preventDefault();
+                    active += (e.key === 'ArrowDown' ? 1 : -1);
+                    if (active < -1) active = shown.length - 1;
+                    if (active >= shown.length) active = -1;
+                    render();
+                    return;
+                }
+                // Enter with nothing highlighted falls through untouched, so it still adds
+                // whatever was typed the way it always did.
+                if (e.key === 'Enter' && open && active >= 0) {
+                    e.preventDefault();
+                    pick(shown[active]);
+                }
+            });
+
+            input.addEventListener('blur', function () {
+                // Deferred, because pointerdown on an option fires before blur settles.
+                setTimeout(close, 120);
+            });
+
+            // Last, and only now that the replacement works. Removing it earlier and then
+            // throwing would leave desktop worse than it started.
+            input.removeAttribute('list');
+        });
+    } catch (e) {
+        // Leave the datalist in place and say nothing: the field still works, just natively.
+    }
+})();
+</script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

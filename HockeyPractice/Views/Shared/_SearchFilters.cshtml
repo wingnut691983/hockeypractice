@@ -3,6 +3,7 @@
     var nameId = Model.Id + "-name";
     var tagId = Model.Id + "-tag";
     var listId = Model.Id + "-tags";
+    var panelId = Model.Id + "-suggest";
     var things = Model.Noun.ToLowerInvariant() + "s";
 
     // Clear drops the two filters and keeps everything else, so clearing a search on the archived
@@ -33,12 +34,15 @@
         </div>
 
         @* A picklist rather than free text: the tags are a known, finite set, so guessing at them
-           in a plain box is the wrong shape. The arrow opens the lot, typing narrows it. A
-           datalist suggests without restricting, so a tag typed by hand still filters. *@
+           in a plain box is the wrong shape. Focusing it lists the lot, typing narrows it, and a
+           tag typed by hand still filters, so it suggests without restricting. list= remains for
+           the no-script path; the script removes it once its own panel is up. *@
         <div class="hp-field" style="flex:1;min-width:9rem;">
             <label class="hp-label" for="@tagId">Tag</label>
             <input class="hp-input" type="text" id="@tagId" name="@Model.TagField" list="@listId"
-                   value="@Model.ActiveTag" placeholder="Pick or type a tag" autocomplete="off" />
+                   value="@Model.ActiveTag" placeholder="Pick or type a tag" autocomplete="off"
+                   data-suggest="@listId" data-suggest-panel="@panelId" />
+            <div class="hp-suggest" id="@panelId" hidden></div>
         </div>
 
         <button type="submit" class="hp-btn hp-btn-sm hp-searchfilters-go">Search</button>

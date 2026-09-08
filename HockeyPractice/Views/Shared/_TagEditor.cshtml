@@ -1,6 +1,7 @@
 @model TagEditorModel
 @{
     var listId = Model.Id + "-known";
+    var panelId = Model.Id + "-suggest";
     var chipsId = Model.Id + "-chips";
     var inputId = Model.Id + "-entry";
 }
@@ -30,11 +31,19 @@
            pressing Add, it still posts rather than being silently dropped, and it means the
            field degrades to "one tag per save" if the script never runs. The script clears this
            box when it makes a chip, so nothing is ever submitted twice. *@
+        @* list= is still here for the no-script path. The suggestion script removes it once
+           its own panel is working, so the two never appear at the same time. *@
         <input class="hp-input" type="text" id="@inputId" name="@Model.Name" list="@listId"
                placeholder="@Model.Placeholder" maxlength="40" autocomplete="off"
-               data-tagentry="@chipsId" style="flex:1;min-width:9rem;" />
+               data-tagentry="@chipsId" data-suggest="@listId" data-suggest-panel="@panelId"
+               data-suggest-exclude="@chipsId" style="flex:1;min-width:9rem;" />
         <button type="button" class="hp-btn hp-btn-sm" data-tagadd="@inputId">Add tag</button>
     </div>
+
+    @* In normal flow and outside the row above, not an overlay. Absolutely positioned it would
+       sit under the phone keyboard, and inside the row it would become a flex item beside the
+       Add button. Filled in by the script; stays empty and invisible without one. *@
+    <div class="hp-suggest" id="@panelId" hidden></div>
 
     @if (Model.Known.Count > 0)
     {
@@ -48,7 +57,8 @@
        than a title= tooltip. This app is used on phones, where a hover tooltip never appears
        at all. *@
     <span class="hp-muted" style="font-size:.8rem;">
-        Start typing to see tags you've used before. Pick one to reuse it, or just type a new one.
+        Tap the box to see tags you've used before, or type to narrow them. Pick one to reuse it,
+        or just type a new one.
         <strong>Enter</strong> or <strong>Add tag</strong> adds it; <strong>&times;</strong>
         on a tag removes it.
         @if (!string.IsNullOrWhiteSpace(Model.Hint))
