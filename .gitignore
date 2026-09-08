@@ -489,3 +489,9 @@ publish/
 
 # Machine-local tool permissions, not project config
 .claude/settings.local.json
+
+# Database backups, wherever they are staged for a restore. A backup carries every team's
+# ViewCode in PLAINTEXT — deliberately, so a manager can re-share the join link — along with
+# subscriber emails and the whole roster. One `git add -A` would publish the lot.
+restore/
+*.db
