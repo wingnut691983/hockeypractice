@@ -1,0 +1,67 @@
+@model PagerModel
+@*
+    Draws nothing at all when the list is empty, and only the count line when everything fits on
+    one page. Both checks live here rather than at each call site so a page cannot forget them.
+*@
+@{
+    // Built by hand rather than with asp-fragment, which writes a bare "#" when there is no
+    // anchor. That is not cosmetic: "#" on its own is a link to the top of the document, so every
+    // page link on the library would have scrolled the coach back up on the way through.
+    string Href(int page)
+    {
+        var url = Url.Action(Model.Action, Model.Controller,
+            new RouteValueDictionary(Model.LinkFor(page))) ?? "";
+        return Model.Anchor is { Length: > 0 } anchor ? $"{url}#{anchor}" : url;
+    }
+}
+
+@if (Model.TotalItems > 0)
+{
+    <div class="hp-pager">
+        <div class="hp-pager-count">
+            Showing @Model.FirstItem&ndash;@Model.LastItem of @Model.TotalItems @Model.Noun@(Model.TotalItems == 1 ? "" : "s")
+        </div>
+
+        @if (Model.HasPages)
+        {
+            @* aria-label rather than a visible heading: the count line above already says what
+               this is, and a heading would be one more thing between the list and the control. *@
+            <nav class="hp-pager-nav" aria-label="Pages">
+                @if (Model.Page > 1)
+                {
+                    <a class="hp-page hp-page-step" href="@Href(Model.Page - 1)"
+                       rel="prev" aria-label="Previous page">&#8249;<span class="hp-page-word"> Prev</span></a>
+                }
+                else
+                {
+                    @* Rendered but inert, so the numbers do not shift sideways between the first,
+                       middle and last pages. A span and not a hrefless <a>, which stays focusable
+                       in some browsers and reads as a link that does nothing. *@
+                    <span class="hp-page hp-page-step hp-page-off" aria-hidden="true">&#8249;<span class="hp-page-word"> Prev</span></span>
+                }
+
+                @for (var p = Model.WindowStart; p <= Model.WindowEnd; p++)
+                {
+                    if (p == Model.Page)
+                    {
+                        <span class="hp-page hp-page-current" aria-current="page" aria-label="Page @p, current page">@p</span>
+                    }
+                    else
+                    {
+                        <a class="hp-page" href="@Href(p)" aria-label="Page @p">@p</a>
+                    }
+                }
+
+                @if (Model.Page < Model.TotalPages)
+                {
+                    <a class="hp-page hp-page-step" href="@Href(Model.Page + 1)"
+                       rel="next" aria-label="Next page"><span class="hp-page-word">Next </span>&#8250;</a>
+                }
+                else
+                {
+                    <span class="hp-page hp-page-step hp-page-off" aria-hidden="true"><span class="hp-page-word">Next </span>&#8250;</span>
+                }
+            </nav>
+        }
+    </div>
+}

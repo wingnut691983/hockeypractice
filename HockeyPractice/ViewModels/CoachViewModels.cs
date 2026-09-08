@@ -61,6 +61,9 @@ public class PlanEditViewModel
     public string? ActiveDrillTag { get; init; }
     public string? ActiveDrillName { get; init; }
 
+    /// <summary>Pages the picker's library. Draws nothing when it all fits on one page.</summary>
+    public PagerModel LibraryPager { get; init; } = new();
+
     /// <summary>Distinct tag names used anywhere on the team, for the tag field's autocomplete.</summary>
     public List<string> AllTags { get; init; } = new();
 

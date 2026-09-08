@@ -215,7 +215,7 @@ public class CoachController : TeamScopedController
 
     [HttpGet("plans/{id:int}")]
     public async Task<IActionResult> EditPlan(string slug, int id, string? notice, string? drillTag,
-        string? drillName)
+        string? drillName, int drillPage = 1)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -223,6 +223,13 @@ public class CoachController : TeamScopedController
         var plan = await Db.Plans.Include(p => p.Links).Include(p => p.Tags)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
+
+        // Hoisted out of the initialiser below because the pager needs the totals as well as the
+        // rows. A PDF plan has no picker, so it pays for none of this.
+        var library = plan.Kind == PlanKind.Drills
+            ? await DrillLibraryQuery(ctx!.Team.Id, drillTag, drillName)
+                .ToPageAsync(drillPage, DrillController.PageSize)
+            : DrillSearch.PagedResult<Drill>.Empty;
 
         var model = new PlanEditViewModel
         {
@@ -237,14 +244,33 @@ public class CoachController : TeamScopedController
             PlanDrills = plan.Kind == PlanKind.Drills
                 ? await PlanDrillsAsync(plan.Id)
                 : new List<DrillCard>(),
-            Library = plan.Kind == PlanKind.Drills
-                ? await DrillLibraryAsync(ctx.Team.Id, drillTag, drillName)
-                : new List<DrillCard>(),
+            Library = library.Items.Select(d => new DrillCard { Drill = d }).ToList(),
             AllDrillTags = plan.Kind == PlanKind.Drills
                 ? await DistinctDrillTagsAsync(ctx.Team.Id)
                 : new List<string>(),
             ActiveDrillTag = drillTag,
-            ActiveDrillName = drillName
+            ActiveDrillName = drillName,
+            LibraryPager = new PagerModel
+            {
+                Page = library.Page,
+                TotalPages = library.TotalPages,
+                TotalItems = library.TotalItems,
+                PageSize = DrillController.PageSize,
+                Action = nameof(EditPlan),
+                Controller = "Coach",
+                PageKey = "drillPage",
+                // Anchored at the picker, unlike the POST redirects, which land on the plan's own
+                // list. Turning a page is browsing the library, so it should leave you where the
+                // library is rather than at the top of a long plan.
+                Anchor = "hp-drill-picker",
+                RouteValues = new Dictionary<string, string?>
+                {
+                    ["slug"] = slug,
+                    ["id"] = id.ToString(),
+                    ["drillTag"] = drillTag,
+                    ["drillName"] = drillName
+                }
+            }
         };
 
         ViewBag.NavSection = "manage";
@@ -256,7 +282,7 @@ public class CoachController : TeamScopedController
     [HttpPost("plans/{id:int}/drills/add")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddDrill(string slug, int id, int drillId, string? drillTag,
-        string? drillName)
+        string? drillName, int drillPage = 1)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -279,13 +305,13 @@ public class CoachController : TeamScopedController
         });
         await Db.SaveChangesAsync();
 
-        return BackToPlan(slug, id, drillTag, drillName);
+        return BackToPlan(slug, id, drillTag, drillName, drillPage);
     }
 
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/remove")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoveDrill(string slug, int id, int planDrillId, string? drillTag,
-        string? drillName)
+        string? drillName, int drillPage = 1)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -298,7 +324,7 @@ public class CoachController : TeamScopedController
         Db.PlanDrills.Remove(entry);
         await Db.SaveChangesAsync();
 
-        return BackToPlan(slug, id, drillTag, drillName);
+        return BackToPlan(slug, id, drillTag, drillName, drillPage);
     }
 
     /// <summary>
@@ -308,7 +334,7 @@ public class CoachController : TeamScopedController
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/move")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> MoveDrill(string slug, int id, int planDrillId,
-        string direction, string? drillTag, string? drillName)
+        string direction, string? drillTag, string? drillName, int drillPage = 1)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -325,13 +351,13 @@ public class CoachController : TeamScopedController
 
         var neighbour = direction == "up" ? index - 1 : index + 1;
         if (neighbour < 0 || neighbour >= ordered.Count)
-            return BackToPlan(slug, id, drillTag, drillName);
+            return BackToPlan(slug, id, drillTag, drillName, drillPage);
 
         (ordered[index].SortOrder, ordered[neighbour].SortOrder) =
             (ordered[neighbour].SortOrder, ordered[index].SortOrder);
 
         await Db.SaveChangesAsync();
-        return BackToPlan(slug, id, drillTag, drillName);
+        return BackToPlan(slug, id, drillTag, drillName, drillPage);
     }
 
     [HttpPost("plans/{id:int}")]
@@ -808,8 +834,18 @@ public class CoachController : TeamScopedController
     /// same place. RedirectToAction can't carry a fragment, and without one they all land at the
     /// top of a long page instead.
     /// </summary>
-    private IActionResult BackToPlan(string slug, int id, string? drillTag, string? drillName) =>
-        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag, drillName }) + "#hp-plan-drills");
+    /// <summary>
+    /// The single redirect every drill action funnels through, so the picker's filters and page
+    /// survive an add, a move or a remove in one place rather than four.
+    ///
+    /// The anchor stays on the plan's own list and not the picker: after adding a drill you want
+    /// to see it land in the plan, which is what was asked for. Only the pager's own links point
+    /// at the picker.
+    /// </summary>
+    private IActionResult BackToPlan(string slug, int id, string? drillTag, string? drillName,
+        int drillPage) =>
+        Redirect(Url.Action(nameof(EditPlan), new { slug, id, drillTag, drillName, drillPage })
+                 + "#hp-plan-drills");
 
     /// <summary>The plan's drills, in order. Ties on SortOrder break on Id so the order is stable.</summary>
     private async Task<List<DrillCard>> PlanDrillsAsync(int planId)
@@ -829,16 +865,20 @@ public class CoachController : TeamScopedController
     }
 
     /// <summary>The team's pickable drills — archived ones are deliberately left out.</summary>
-    private async Task<List<DrillCard>> DrillLibraryAsync(int teamId, string? tag, string? name)
-    {
-        var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
+    /// <summary>
+    /// The pickable library as a query, filtered and ordered but not run, so the caller can take
+    /// just the page it needs.
+    ///
+    /// ThenBy(Id) is load-bearing once this is paged: Title alone is not a total order, and
+    /// Skip/Take over an ambiguous sort can serve one drill on two pages and never serve another.
+    /// </summary>
+    private IQueryable<Drill> DrillLibraryQuery(int teamId, string? tag, string? name) =>
+        Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == teamId && !d.IsArchived)
             .MatchingTag(tag)
-            .MatchingName(name);
-
-        var drills = await query.OrderBy(d => d.Title).ToListAsync();
-        return drills.Select(d => new DrillCard { Drill = d }).ToList();
-    }
+            .MatchingName(name)
+            .OrderBy(d => d.Title)
+            .ThenBy(d => d.Id);
 
     /// <summary>
     /// Distinct drill-tag names for the team. Grouped in memory rather than with EF GroupBy, whose

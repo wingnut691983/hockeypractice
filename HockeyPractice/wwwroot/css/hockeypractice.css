@@ -1109,6 +1109,82 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-footer a:hover { color: var(--hp-text); }
 
+/* ── Pager ─────────────────────────────────────────────────
+   Sits under a drill list. One line at every width the site supports, because the alternative on
+   a phone is a wrapped grid of small targets, which is the thing this is meant to relieve. */
+
+.hp-pager {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  align-items: center;
+  margin: .9rem 0 .2rem;
+}
+
+.hp-pager-count {
+  font-size: .82rem;
+  color: var(--hp-muted);
+}
+
+.hp-pager-nav {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  flex-wrap: nowrap;          /* one line; the window is capped at 6 so it always fits */
+  max-width: 100%;
+}
+
+.hp-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.35rem;
+  min-height: var(--hp-tap);  /* the whole point of a pager is being tappable */
+  padding: 0 .4rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 9px;
+  background: var(--hp-surface);
+  color: var(--hp-text);
+  font-size: .9rem;
+  font-weight: 600;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.hp-page:hover { border-color: var(--hp-muted); }
+
+.hp-page-current {
+  background: var(--hp-primary);
+  border-color: var(--hp-primary);
+  color: var(--hp-on-primary, #fff);
+}
+
+/* Prev and Next keep their box when unavailable, so the numbers do not jump sideways as you move
+   between the first, middle and last pages. */
+.hp-page-off {
+  opacity: .35;
+  background: transparent;
+}
+
+/* The words drop away on a phone and leave the chevrons. */
+.hp-page-word { display: none; }
+@media (min-width: 26rem) {
+  .hp-page-word { display: inline; }
+}
+
+/* Eight targets at the default size need about 370px of room, which overflows not just the old
+   320px phones but the 360px ones still in plenty of pockets. Measured, after the strip pushed
+   scrollWidth to 350 in a 320 viewport. Tightened rather than wrapped or scrolled: a pager that
+   needs its own sideways scroll is worse than one with slightly narrower keys, and the 44px
+   height, which is what a thumb actually needs, is untouched. */
+@media (max-width: 24rem) {
+  .hp-pager-nav { gap: .2rem; }
+  .hp-page {
+    min-width: 2rem;
+    padding: 0 .25rem;
+    font-size: .85rem;
+  }
+}
+
 /* ── Site brand ────────────────────────────────────────────
    The logo is a black plate by design: its wordmark is white, so knocking the background out
    would leave it invisible on the light theme. Kept as a badge, which reads deliberately on

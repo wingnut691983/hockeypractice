@@ -128,7 +128,74 @@ public class DrillListViewModel
     /// </summary>
     public List<TeamLink> CopyTargets { get; init; } = new();
 
+    /// <summary>Drives the pager under the list. Draws nothing when everything fits on one page.</summary>
+    public PagerModel Pager { get; init; } = new();
+
     public string? Notice { get; init; }
+}
+
+/// <summary>
+/// Everything the shared pager needs. Built by the controller because only it knows which action
+/// the page links point at and which route values have to survive the trip.
+/// </summary>
+public class PagerModel
+{
+    public int Page { get; init; } = 1;
+    public int TotalPages { get; init; }
+    public int TotalItems { get; init; }
+
+    /// <summary>What is being counted, for the "Showing 1-12 of 30 drills" line.</summary>
+    public string Noun { get; init; } = "drill";
+
+    public string Action { get; init; } = "Index";
+    public string Controller { get; init; } = "Drill";
+
+    public int PageSize { get; init; } = 12;
+
+    /// <summary>
+    /// Every route value a page link must carry EXCEPT the page itself: the slug, the plan id, the
+    /// two filters, the archived flag. Anything left out here is silently dropped the moment
+    /// someone turns a page. Null and empty values are dropped when the link is built, so an unset
+    /// filter does not litter the URL.
+    /// </summary>
+    public Dictionary<string, string?> RouteValues { get; init; } = new();
+
+    /// <summary>Route key the page number goes in. Differs per page: the plan editor already uses
+    /// "page" for nothing, but names its picker state drillTag/drillName, so drillPage matches.</summary>
+    public string PageKey { get; init; } = "page";
+
+    /// <summary>Appended to each link, so turning a page does not jump to the top of a long page.</summary>
+    public string? Anchor { get; init; }
+
+    /// <summary>How many numbers the strip offers at once.</summary>
+    public const int Window = 6;
+
+    /// <summary>
+    /// The strip starts at the current page and looks forward, which suits flipping through a
+    /// library. Clamped so it never runs past the end: without this the last few pages would offer
+    /// fewer and fewer numbers, and the final page would offer only itself.
+    /// </summary>
+    public int WindowStart => Math.Max(1, Math.Min(Page, TotalPages - Window + 1));
+    public int WindowEnd => Math.Min(TotalPages, WindowStart + Window - 1);
+
+    public bool HasPages => TotalPages > 1;
+
+    public int FirstItem => TotalItems == 0 ? 0 : (Page - 1) * PageSize + 1;
+    public int LastItem => Math.Min(Page * PageSize, TotalItems);
+
+    /// <summary>
+    /// Route values for one page number. Non-nullable values, because asp-all-route-data takes an
+    /// IDictionary&lt;string, string&gt;; empties are dropped rather than passed as blanks.
+    /// </summary>
+    public Dictionary<string, string> LinkFor(int page)
+    {
+        var values = RouteValues
+            .Where(kv => !string.IsNullOrEmpty(kv.Value))
+            .ToDictionary(kv => kv.Key, kv => kv.Value!);
+
+        values[PageKey] = page.ToString();
+        return values;
+    }
 }
 
 /// <summary>Why a drill can or cannot be copied to the chosen team, decided per drill.</summary>

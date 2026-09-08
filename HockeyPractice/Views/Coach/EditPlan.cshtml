@@ -199,6 +199,9 @@
         var planId = Model.Plan.Id;
         var tagFilter = Model.ActiveDrillTag;
         var nameFilter = Model.ActiveDrillName;
+        // Carried through every add, move and remove alongside the two filters, so acting on a
+        // drill returns you to the page of the picker you were looking at.
+        var pageFilter = Model.LibraryPager.Page;
 
         <div class="hp-section" id="hp-plan-drills">Drills in this plan</div>
         @if (Model.PlanDrills.Count == 0)
@@ -239,7 +242,7 @@
                             <form method="post" class="hp-row" style="gap:.2rem;"
                                   asp-action="MoveDrill" asp-route-slug="@slug" asp-route-id="@planId"
                                   asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter"
-                                  asp-route-drillName="@nameFilter">
+                                  asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" name="direction" value="up"
                                         class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
@@ -248,7 +251,7 @@
                                         class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
                                         @(i == Model.PlanDrills.Count - 1 ? "disabled" : "")>&darr;</button>
                                 <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm"
-                                        formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter, drillName = nameFilter })">
+                                        formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter, drillName = nameFilter, drillPage = pageFilter })">
                                     Remove
                                 </button>
                             </form>
@@ -258,7 +261,7 @@
             </div>
         }
 
-        <div class="hp-section">Add a drill</div>
+        <div class="hp-section" id="hp-drill-picker">Add a drill</div>
 
         @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
         {
@@ -297,7 +300,7 @@
                             @await Html.PartialAsync("_DrillRow", card)
                             <form method="post" asp-action="AddDrill" asp-route-slug="@slug"
                                   asp-route-id="@planId" asp-route-drillTag="@tagFilter"
-                                  asp-route-drillName="@nameFilter">
+                                  asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="drillId" value="@card.Drill.Id" />
                                 <button type="submit" class="hp-btn hp-btn-sm">Add</button>
@@ -306,6 +309,8 @@
                     }
                 </ul>
             </div>
+
+            @await Html.PartialAsync("_Pager", Model.LibraryPager)
         }
 
         @* Carries the way back, so building a plan isn't interrupted by remembering a missing

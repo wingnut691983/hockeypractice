@@ -29,24 +29,44 @@ public class DrillController : TeamScopedController
 
     [HttpGet("")]
     public async Task<IActionResult> Index(string slug, string? tag, string? name,
-        bool archived = false, string? notice = null)
+        bool archived = false, int page = 1, string? notice = null)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var drills = await QueryLibraryAsync(ctx!.Team.Id, tag, name, archived);
+        var paged = await LibraryQuery(ctx!.Team.Id, tag, name, archived)
+            .ToPageAsync(page, PageSize);
 
         ViewBag.NavSection = "drills";
         return View(new DrillListViewModel
         {
             Ctx = ctx,
-            Drills = drills,
+            Drills = paged.Items.Select(ToCard).ToList(),
             AllTags = await DistinctTagsAsync(ctx.Team.Id),
             ActiveTag = tag,
             ActiveName = name,
             ShowingArchived = archived,
             CopyTargets = await CopyTargetsAsync(ctx.Team.Id),
-            Notice = notice
+            Notice = notice,
+            Pager = new PagerModel
+            {
+                Page = paged.Page,
+                TotalPages = paged.TotalPages,
+                TotalItems = paged.TotalItems,
+                PageSize = PageSize,
+                Action = nameof(Index),
+                Controller = "Drill",
+                // archived has to ride along or turning a page on the archived view drops you
+                // back into the working library. The two filters keep the page in step with
+                // whatever is being searched.
+                RouteValues = new Dictionary<string, string?>
+                {
+                    ["slug"] = slug,
+                    ["tag"] = tag,
+                    ["name"] = name,
+                    ["archived"] = archived ? "true" : null
+                }
+            }
         });
     }
 
@@ -671,23 +691,39 @@ public class DrillController : TeamScopedController
             .ToListAsync();
     }
 
+    /// <summary>
+    /// The library as a query, filtered and ordered but not yet run.
+    ///
+    /// Deliberately not materialised, because the two callers want different amounts of it: the
+    /// library page takes a page, and the copy page takes all of it so its counts and its
+    /// "select all" mean what they say. Sharing the query rather than the result is what lets
+    /// them differ in exactly that one respect and nothing else.
+    ///
+    /// ThenBy(Id) is not cosmetic. Title alone is not a total order, and Skip/Take over an
+    /// ambiguous sort can serve one drill on two pages while never serving another.
+    /// </summary>
+    private IQueryable<Drill> LibraryQuery(int teamId, string? tag, string? name, bool archived) =>
+        Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
+            .Where(d => d.TeamId == teamId && d.IsArchived == archived)
+            // Each filter applies only when it has something in it, so an empty box is ignored
+            // rather than matching nothing, and the two combine to narrow when both are set.
+            .MatchingTag(tag)
+            .MatchingName(name)
+            .OrderBy(d => d.Title)
+            .ThenBy(d => d.Id);
+
+    private static DrillCard ToCard(Drill d) => new()
+    {
+        Drill = d,
+        EmbedUrl = LinkExtractionService.EmbedUrlFor(d.VideoUrl)
+    };
+
+    /// <summary>The whole library, for the copy page, which needs every row to count and tick.</summary>
     private async Task<List<DrillCard>> QueryLibraryAsync(int teamId, string? tag, string? name,
         bool archived)
     {
-        // Each filter is applied only when it has something in it, so an empty box is ignored
-        // rather than matching nothing, and the two combine to narrow when both are set.
-        var query = Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
-            .Where(d => d.TeamId == teamId && d.IsArchived == archived)
-            .MatchingTag(tag)
-            .MatchingName(name);
-
-        var drills = await query.OrderBy(d => d.Title).ToListAsync();
-
-        return drills.Select(d => new DrillCard
-        {
-            Drill = d,
-            EmbedUrl = LinkExtractionService.EmbedUrlFor(d.VideoUrl)
-        }).ToList();
+        var drills = await LibraryQuery(teamId, tag, name, archived).ToListAsync();
+        return drills.Select(ToCard).ToList();
     }
 
     private async Task<List<string>> DistinctTagsAsync(int teamId)
@@ -836,6 +872,14 @@ public class DrillController : TeamScopedController
     public const int MaxDiagrams = 6;
 
     public const int MaxTags = 15;
+
+    /// <summary>
+    /// Drills per page in the library and the plan editor's picker. Roughly three phone screens of
+    /// rows, and about a practice's worth of drills. One constant on purpose: page size is not
+    /// worth a control, a URL parameter and a stored preference, and ISession is not available
+    /// here to hold one anyway.
+    /// </summary>
+    public const int PageSize = 12;
 
     private static string NormalizeTag(string name) =>
         string.Join(' ', name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();

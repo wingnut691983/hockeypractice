@@ -80,6 +80,8 @@
                 }
             </ul>
         </div>
+
+        @await Html.PartialAsync("_Pager", Model.Pager)
     }
 
     @* Copying is by value: each team gets its own drill to edit, so tuning one for a younger

@@ -54,6 +54,39 @@ public static class DrillSearch
         return plans.Where(p => EF.Functions.Like(p.Title, pattern, LikeEscapeChar));
     }
 
+    /// <summary>
+    /// One page of results, plus what the pager needs to describe itself. <see cref="Page"/> is
+    /// the page actually served, which is not always the one asked for.
+    /// </summary>
+    public record PagedResult<T>(List<T> Items, int Page, int TotalPages, int TotalItems)
+    {
+        public static PagedResult<T> Empty => new(new List<T>(), 1, 0, 0);
+    }
+
+    /// <summary>
+    /// Counts, clamps and slices, in that order.
+    ///
+    /// The clamp is the part that matters: a bookmarked ?page=99, or a page that stopped existing
+    /// because drills were deleted or a filter narrowed the list, lands on the last real page
+    /// instead of rendering an empty list under a pager that says there are results. Callers pass
+    /// the page straight from the query string and do not validate it.
+    ///
+    /// The query must already be ordered, and ordered by something unique enough to be a total
+    /// order. Skip/Take over an ambiguous sort can serve the same row on two pages and never serve
+    /// another.
+    /// </summary>
+    public static async Task<PagedResult<T>> ToPageAsync<T>(this IQueryable<T> query, int page, int size)
+    {
+        var total = await query.CountAsync();
+        if (total == 0) return PagedResult<T>.Empty;
+
+        var totalPages = (int)Math.Ceiling(total / (double)size);
+        var current = Math.Clamp(page, 1, totalPages);
+
+        var items = await query.Skip((current - 1) * size).Take(size).ToListAsync();
+        return new PagedResult<T>(items, current, totalPages, total);
+    }
+
     public const string LikeEscapeChar = "\\";
 
     /// <summary>
