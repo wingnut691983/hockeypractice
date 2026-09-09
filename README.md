@@ -323,6 +323,15 @@ answer in September.
   `VolumeBackupService.CreateAsync` takes an explicit allowlist (the database snapshot, `dpkeys`,
   `teams/**`). A new directory is not picked up automatically, and the failure is silent until the
   day someone restores and finds it missing.
+- **Every way out of the plan editor's drill picker carries an anchor, and they are not all the
+  same one.** The page is long: on a phone the picker sits about 3,000px below the top, so any
+  round trip that forgets its anchor dumps the coach at the title field. Adding, moving or
+  removing a drill goes through `CoachController.BackToPlan` and lands on `#hp-plan-drills`, the
+  plan as it now stands. Turning a page of the library, searching, and clearing a search all land
+  on `#hp-drill-picker`, because those are browsing the library rather than changing the plan. The
+  search is a GET form, so its anchor rides on the form's `action`: submitting replaces the query
+  and leaves the fragment alone. Drop the `action` as redundant and the search silently starts
+  landing at the top of the page again.
 - **A failed startup migration is shown on the admin page, not just logged.** The app deliberately
   serves on rather than crash-looping, which leaves a site that looks healthy and fails on every
   write. Restoring an archive old enough to need a migration is exactly when that happens.

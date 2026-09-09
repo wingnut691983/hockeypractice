@@ -106,6 +106,14 @@ public class SearchFiltersModel
     /// </summary>
     public Dictionary<string, string> Preserve { get; init; } = new();
 
+    /// <summary>
+    /// Element id to come back to after a search, without the "#". A search is a GET that
+    /// reloads the page, so on a long page (the plan editor, where the picker sits well below
+    /// the plan itself) the results land off screen and the coach has to scroll back down to
+    /// what they just asked for. Left unset on pages where the boxes are already near the top.
+    /// </summary>
+    public string? Anchor { get; init; }
+
     public bool AnyActive =>
         !string.IsNullOrWhiteSpace(ActiveName) || !string.IsNullOrWhiteSpace(ActiveTag);
 }

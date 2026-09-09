@@ -261,6 +261,10 @@
             </div>
         }
 
+        @* Above the picker, not below it. Publishing is the end of building a plan, and with the
+           whole library and its pager in between it was something you had to go hunting for. *@
+        @await Html.PartialAsync("_PlanPublishing", Model)
+
         <div class="hp-section" id="hp-drill-picker">Add a drill</div>
 
         @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
@@ -271,7 +275,11 @@
             TagField = "drillTag",
             ActiveName = nameFilter,
             ActiveTag = tagFilter,
-            KnownTags = Model.AllDrillTags
+            KnownTags = Model.AllDrillTags,
+            // A search is a GET that reloads the whole page, and the picker is a long way down
+            // it. Without this the results land off screen and you scroll back to what you just
+            // asked for. The pager's links already come back here for the same reason.
+            Anchor = "hp-drill-picker"
         })
 
         @if (Model.Library.Count == 0)
@@ -351,35 +359,11 @@
             </div>
         }
 
-        <div class="hp-section">Publishing</div>
-        <div class="hp-panel">
-            @if (plan.Status == PlanStatus.Draft)
-            {
-                <p style="margin-top:0;">
-                    This is a <strong>draft</strong> — players can't see it and no email has been sent.
-                </p>
-                <form method="post" asp-action="Publish" asp-route-slug="@slug" asp-route-id="@plan.Id">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="hp-btn hp-btn-accent">Publish to the team</button>
-                </form>
-            }
-            else
-            {
-                <p style="margin-top:0;">
-                    Published@(plan.PublishedUtc is null ? "" : $" {plan.PublishedUtc:MMM d}"). Players can see this.
-                </p>
-                <div class="hp-row">
-                    <button type="button" class="hp-btn" id="hp-copy"
-                            data-url="@Url.Action("Details", "Plan", new { slug, id = plan.Id }, Context.Request.Scheme)">
-                        Copy link for the team chat
-                    </button>
-                    <form method="post" asp-action="Unpublish" asp-route-slug="@slug" asp-route-id="@plan.Id">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="hp-btn hp-btn-quiet">Unpublish</button>
-                    </form>
-                </div>
-            }
-        </div>
+        @* A drill plan has already shown this, above its picker. *@
+        @if (!Model.IsDrillPlan)
+        {
+            @await Html.PartialAsync("_PlanPublishing", Model)
+        }
 
         <div class="hp-panel">
             @if (!Model.IsDrillPlan)

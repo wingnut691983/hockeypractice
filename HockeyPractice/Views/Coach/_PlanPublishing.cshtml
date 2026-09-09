@@ -1,0 +1,41 @@
+@model PlanEditViewModel
+@{
+    var plan = Model.Plan!;
+    var slug = Model.Ctx.Team.Slug;
+}
+
+@* Its own partial because the two plan kinds want it in different places. A drill plan puts it
+   between the plan's own drills and the picker below them, so the coach is not scrolling past the
+   whole library to publish what they just built. A PDF plan has no picker, so it stays at the
+   bottom where it always was. Same markup either way, rather than two copies that drift. *@
+<div class="hp-section">Publishing</div>
+<div class="hp-panel">
+    @if (plan.Status == PlanStatus.Draft)
+    {
+        <p style="margin-top:0;">
+            This is a <strong>draft</strong> &mdash; players can't see it and no email has been sent.
+        </p>
+        <form method="post" asp-action="Publish" asp-route-slug="@slug" asp-route-id="@plan.Id">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="hp-btn hp-btn-accent">Publish to the team</button>
+        </form>
+    }
+    else
+    {
+        <p style="margin-top:0;">
+            Published@(plan.PublishedUtc is null ? "" : $" {plan.PublishedUtc:MMM d}"). Players can see this.
+        </p>
+        <div class="hp-row">
+            @* id, not a class: the copy script binds to one button, and there is only ever one
+               Publishing block on the page. *@
+            <button type="button" class="hp-btn" id="hp-copy"
+                    data-url="@Url.Action("Details", "Plan", new { slug, id = plan.Id }, Context.Request.Scheme)">
+                Copy link for the team chat
+            </button>
+            <form method="post" asp-action="Unpublish" asp-route-slug="@slug" asp-route-id="@plan.Id">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="hp-btn hp-btn-quiet">Unpublish</button>
+            </form>
+        </div>
+    }
+</div>

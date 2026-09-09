@@ -14,13 +14,19 @@
         ? "?" + string.Join("&", Model.Preserve.Select(kv =>
             $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"))
         : "";
-    var clearHref = Context.Request.PathBase + Context.Request.Path + clearQuery;
+
+    // Submitting a GET form replaces the action's query and leaves its fragment alone, so an
+    // anchored action is what brings the coach back to the results instead of the top of the
+    // page. Clearing the filters has to land in the same place, or it would undo that.
+    var self = Context.Request.PathBase + Context.Request.Path;
+    var anchor = string.IsNullOrWhiteSpace(Model.Anchor) ? "" : "#" + Model.Anchor;
+    var clearHref = self + clearQuery + anchor;
 }
 
 @* Both boxes in one form so a single Search applies both. The hidden values carry whatever else
    the page needs (the plan id, the archived flag), which would otherwise be dropped the moment a
    search is submitted. *@
-<form method="get" class="hp-searchfilters" style="margin:.6rem 0;">
+<form method="get" action="@(self + anchor)" class="hp-searchfilters" style="margin:.6rem 0;">
     @foreach (var keep in Model.Preserve)
     {
         <input type="hidden" name="@keep.Key" value="@keep.Value" />
