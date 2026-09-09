@@ -1,5 +1,6 @@
 using HockeyPractice.Infrastructure;
 using HockeyPractice.Persistence;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -55,6 +56,11 @@ public class BackupStatus
     }
 }
 
+public record RestoreRunResult(
+    bool Ok,
+    string? Error = null,
+    bool AlreadyRunning = false);
+
 public record BackupRunResult(
     bool Ok,
     string? Error = null,
@@ -75,6 +81,9 @@ public class BackupRunner
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private readonly VolumeBackupService _volume;
+    private readonly DatabaseBackupService _backup;
+    private readonly DataPaths _paths;
+    private readonly long _storageQuota;
     private readonly IBackupStore _store;
     private readonly IServiceScopeFactory _scopes;
     private readonly MaintenanceState _maintenance;
@@ -82,11 +91,15 @@ public class BackupRunner
     private readonly VolumeBackupOptions _options;
     private readonly ILogger<BackupRunner> _log;
 
-    public BackupRunner(VolumeBackupService volume, IBackupStore store, IServiceScopeFactory scopes,
+    public BackupRunner(VolumeBackupService volume, DatabaseBackupService backup, DataPaths paths,
+        IBackupStore store, IServiceScopeFactory scopes,
         MaintenanceState maintenance, BackupStatus status, IOptions<VolumeBackupOptions> options,
-        ILogger<BackupRunner> log)
+        IOptions<SiteOptions> site, ILogger<BackupRunner> log)
     {
         _volume = volume;
+        _backup = backup;
+        _paths = paths;
+        _storageQuota = site.Value.StorageQuotaBytes;
         _store = store;
         _scopes = scopes;
         _maintenance = maintenance;
@@ -220,6 +233,109 @@ public class BackupRunner
 
             var name = VolumeBackupService.NameFor(DateTime.UtcNow);
             return await _volume.CreateAsync(Path.Combine(staging, name), migrations, ct);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Pulls one archive out of the bucket into the container's ephemeral disk. The caller owns
+    /// the file. Restoring from the bucket rather than by upload is the primary path: the archive
+    /// never travels in a request body, so it cannot hit whatever ceiling the gateway imposes.
+    /// </summary>
+    public async Task<string> FetchAsync(string key, CancellationToken ct = default)
+    {
+        var staging = Path.Combine(Path.GetTempPath(), "hockeypractice-backup");
+        Directory.CreateDirectory(staging);
+        var local = Path.Combine(staging, $"fetched-{Guid.NewGuid():N}.zip");
+        await _store.DownloadAsync(key, local, ct);
+        return local;
+    }
+
+    /// <summary>
+    /// Makes an archive the live site: validates it, puts the files back, swaps the database, and
+    /// records that a restore happened. Does <b>not</b> restart the app; the caller owns that,
+    /// because it also owns getting a response to the browser first.
+    ///
+    /// Behind the same gate as a backup, so a nightly run cannot start halfway through a restore
+    /// and capture a half-restored volume.
+    /// </summary>
+    public async Task<RestoreRunResult> RestoreAsync(string zipPath, CancellationToken ct = default)
+    {
+        if (!await _gate.WaitAsync(0, ct))
+            return new RestoreRunResult(false,
+                "A backup is running right now. Wait for it to finish and try again.",
+                AlreadyRunning: true);
+
+        string? staged = null;
+        try
+        {
+            List<string> migrations;
+            using (var scope = _scopes.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                migrations = db.Database.GetMigrations().ToList();
+            }
+
+            var check = await _volume.ValidateAsync(zipPath, migrations, ct);
+            if (!check.Ok) return new RestoreRunResult(false, check.Error);
+
+            staged = check.StagedDatabase!;
+
+            var headroom = Math.Max(0, _storageQuota - _paths.UsedBytes());
+            if (check.AdditionalBytes > headroom)
+            {
+                _volume.CleanUpStagedDatabase(staged);
+                return new RestoreRunResult(false,
+                    $"That backup needs {PlanStorageService.Human(check.AdditionalBytes)} of new " +
+                    $"space and there is only {PlanStorageService.Human(headroom)} free. Delete " +
+                    "some old plans first.");
+            }
+
+            // Files FIRST, database second, and the order is the safety property. The other way
+            // round, a failed extraction leaves a new database pointing at files that are not
+            // there, which is a broken plan page for every family. This way a failure here leaves
+            // the database untouched and the restore simply abandoned.
+            _volume.ApplyFiles(zipPath, ct);
+
+            // Re-checked immediately before the irreversible step. The pause lifts itself after
+            // 30 minutes and everything above — a slow upload, integrity_check on a large file,
+            // extracting the tree — can outlast it. Writes landing in the database between here
+            // and the swap would go into the copy that is about to become the undo file.
+            if (!_maintenance.IsPaused)
+            {
+                _volume.CleanUpStagedDatabase(staged);
+                return new RestoreRunResult(false,
+                    "Saving switched back on while the backup was being unpacked, so the database " +
+                    "was left alone. The files were restored. Pause saving and run it again.");
+            }
+
+            _backup.Swap(staged);
+            staged = null;
+
+            // Records that a restore just happened, so the scheduler's startup catch-up does not
+            // immediately archive the just-restored state and spend a retention slot on it.
+            File.WriteAllText(_paths.RestoreMarker, DateTime.UtcNow.ToString("o"));
+
+            _log.LogWarning("Restored the site from an archive");
+            return new RestoreRunResult(true);
+        }
+        catch (SqliteException ex)
+        {
+            // Almost certainly the checkpoint refusing to run. Nothing has moved when that
+            // happens, so this is genuinely "nothing was changed" as far as the database goes.
+            if (staged is not null) _volume.CleanUpStagedDatabase(staged);
+            _log.LogError("Restore aborted before the swap: {Error}", ex.Message);
+            return new RestoreRunResult(false,
+                "The database could not be quiesced, so it was left alone and nothing was changed.");
+        }
+        catch (Exception ex)
+        {
+            if (staged is not null) _volume.CleanUpStagedDatabase(staged);
+            _log.LogError("Restore failed. {Type}: {Error}", ex.GetType().Name, ex.Message);
+            return new RestoreRunResult(false, $"The restore failed. {ex.Message}");
         }
         finally
         {

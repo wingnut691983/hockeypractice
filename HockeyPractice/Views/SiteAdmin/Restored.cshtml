@@ -17,11 +17,23 @@
             Give it about twenty seconds, then reload. Saving switches itself back on when the
             site comes up, so there is nothing to un-pause.
         </p>
-        <p class="hp-muted" style="font-size:.85rem;">
-            The database it replaced was kept, so restoring the wrong file is recoverable.
-            Uploaded PDFs and drill pictures are not inside the database: if this backup is from
-            before a plan was deleted, the plan comes back but its PDF does not.
-        </p>
+        @if (ViewBag.IncludedFiles == true)
+        {
+            <p class="hp-muted" style="font-size:.85rem;">
+                The database it replaced was kept, so restoring the wrong backup is recoverable:
+                site admin has a button to download it. The uploaded PDFs and pictures were put
+                back too, over the top of what was there, and nothing was deleted.
+            </p>
+        }
+        else
+        {
+            <p class="hp-muted" style="font-size:.85rem;">
+                The database it replaced was kept, so restoring the wrong file is recoverable:
+                site admin has a button to download it. Uploaded PDFs and drill pictures are not
+                inside a database backup, so if this one is from before a plan was deleted, the
+                plan comes back but its PDF does not. A full off-site backup does include them.
+            </p>
+        }
         <a class="hp-btn" asp-action="Index">Reload site admin</a>
     </div>
 </div>

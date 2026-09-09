@@ -46,6 +46,13 @@ public class AdminViewModel
     public bool ArchiveRunning { get; init; }
     public int ArchiveKeep { get; init; }
     public int ArchiveHourUtc { get; init; }
+
+    /// <summary>
+    /// Set when migrations failed at startup. The app deliberately serves on rather than
+    /// crash-looping, which leaves a site that looks healthy and fails on every data operation,
+    /// so the failure has to be visible to someone who can act on it.
+    /// </summary>
+    public string? MigrationError { get; init; }
 }
 
 public class TeamSummary

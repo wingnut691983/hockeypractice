@@ -104,6 +104,15 @@ public class PlanController : TeamScopedController
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
         if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
+
+        // A drill plan has no file of its own, so it must never serve one — and this is not
+        // theoretical. Plan directories are keyed on the row id, and a restore rolls the ids back
+        // without removing the directories of plans created since. New plans then walk back up
+        // through ids whose folder already holds an old plan.pdf. A PDF plan overwrites it on
+        // upload, but a drill plan writes nothing, so without this check the existence test below
+        // would happily stream a previous plan's PDF to anyone with the team code.
+        if (plan.Kind != PlanKind.Pdf) return NotFound();
+
         if (!_storage.Exists(ctx!.Team.Id, plan.Id)) return NotFound();
 
         var stream = _storage.Open(ctx.Team.Id, plan.Id);

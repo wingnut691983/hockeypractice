@@ -160,7 +160,23 @@ public class DatabaseBackupService
         // live in the sidecar, so moving the .db on its own would quietly hand back an undo file
         // that is missing the most recent writes. Checkpointing first leaves everything in one
         // file, and the sidecars with nothing left to lose.
+        //
+        // Throws on failure, and nothing has moved yet when it does, so the caller can report
+        // "nothing was changed" and mean it.
         Checkpoint();
+
+        // Everything past this point must be the same filesystem as `live`. File.Move is a rename
+        // within one filesystem and a copy across two, and a copy can fail half-written — at
+        // which point the recovery below sees a file already at the live path, skips, and leaves
+        // a truncated database live with the good one in .replaced. Callers stage on the volume
+        // for this reason; the check is here because the cost of getting it wrong is the site.
+        if (Path.GetDirectoryName(Path.GetFullPath(incoming)) !=
+            Path.GetDirectoryName(Path.GetFullPath(live)))
+        {
+            throw new ArgumentException(
+                $"The incoming database must be staged beside the live one, not at {incoming}. " +
+                "A cross-filesystem move is not atomic and cannot be rolled back.", nameof(incoming));
+        }
 
         // Pooled connections still point at the file about to be moved aside. On Linux the moves
         // would succeed regardless, but a pooled handle would keep reading the old data until the
@@ -200,24 +216,26 @@ public class DatabaseBackupService
     }
 
     /// <summary>
-    /// Writes any write-ahead log back into the database file and truncates it. A no-op on a
-    /// database that is not in WAL mode, and never worth failing a restore over: the worst case
-    /// is the kept copy needing its own sidecar to be complete, which is still recoverable.
+    /// Folds the write-ahead log back into the database file and truncates it.
+    ///
+    /// This is load-bearing, not hygiene, and it <b>throws</b> rather than logging and carrying
+    /// on. The database runs in WAL mode — EF Core's provider puts the connection there, measured
+    /// on a fresh volume, which reports `-wal` and `-shm` and a header write_version of 2 before
+    /// the app serves a single request — so the newest transactions live in the sidecar. Since
+    /// <see cref="Swap"/> then moves the .db aside and clears those sidecars, a checkpoint that
+    /// quietly failed would hand back an undo copy missing the most recent writes, with nothing
+    /// anywhere saying so. That is the exact failure the kept copy exists to prevent.
+    ///
+    /// Safe to throw from: this runs before any file has moved, so the caller is left with
+    /// everything exactly as it was.
     /// </summary>
     private void Checkpoint()
     {
-        try
-        {
-            using var connection = new SqliteConnection(_paths.ConnectionString);
-            connection.Open();
-            using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
-            command.ExecuteNonQuery();
-        }
-        catch (SqliteException ex)
-        {
-            _log.LogWarning("Could not checkpoint before the swap: {Error}", ex.Message);
-        }
+        using var connection = new SqliteConnection(_paths.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+        command.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -225,14 +243,59 @@ public class DatabaseBackupService
     /// are derived from the database's own filename, so a sidecar left next to a path that later
     /// holds a DIFFERENT database gets replayed into it. Always clear them alongside the file
     /// they belong to.
+    ///
+    /// Public because staging paths need it too: validating an uploaded database leaves its own
+    /// `-wal` and `-shm` beside the staged file, and deleting only the `.db` strands them on the
+    /// volume for good.
     /// </summary>
-    private static void DeleteSidecars(string database)
+    public static void DeleteSidecars(string database)
     {
         foreach (var suffix in new[] { "-wal", "-shm" })
         {
             var sidecar = database + suffix;
             if (File.Exists(sidecar)) File.Delete(sidecar);
         }
+    }
+
+    /// <summary>
+    /// Clears staging files left behind by a download or a restore that did not finish.
+    ///
+    /// Both names are always transient, so anything still wearing one is rubbish. Startup is the
+    /// one moment nothing can be holding them: a periodic sweep would race a download that is
+    /// mid-stream. The age check is belt and braces for the same reason.
+    ///
+    /// This matters more than it sounds on a volume with a fixed 1 GiB and no resize path. A
+    /// cancelled upload used to leave a full-size database behind with nothing to ever remove it.
+    /// </summary>
+    public void SweepStagingFiles(TimeSpan olderThan)
+    {
+        var cutoff = DateTime.UtcNow - olderThan;
+        var swept = 0;
+        long bytes = 0;
+
+        foreach (var pattern in new[] { "snapshot-*.db", "restore-*.db" })
+        {
+            foreach (var path in Directory.EnumerateFiles(_paths.Root, pattern))
+            {
+                try
+                {
+                    var info = new FileInfo(path);
+                    if (info.LastWriteTimeUtc > cutoff) continue;
+
+                    bytes += info.Length;
+                    File.Delete(path);
+                    DeleteSidecars(path);
+                    swept++;
+                }
+                catch (IOException ex)
+                {
+                    _log.LogWarning("Could not sweep {Path}: {Error}", path, ex.Message);
+                }
+            }
+        }
+
+        if (swept > 0)
+            _log.LogInformation("Swept {Count} abandoned staging file(s), {Bytes} bytes", swept, bytes);
     }
 
     private static long Size(string path) => File.Exists(path) ? new FileInfo(path).Length : 0;

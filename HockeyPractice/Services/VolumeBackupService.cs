@@ -195,6 +195,215 @@ public class VolumeBackupService
     }
 
     /// <summary>
+    /// Whether an archive can safely be restored, and what it would cost to do it.
+    /// </summary>
+    /// <param name="StagedDatabase">
+    /// The database entry, already extracted onto the volume beside the live one, ready to hand
+    /// to <see cref="DatabaseBackupService.Swap"/>. The caller owns it and must delete it if the
+    /// restore does not go ahead. Null when the check failed.
+    /// </param>
+    /// <param name="AdditionalBytes">
+    /// How much the volume would actually grow: the database, plus the entries whose target does
+    /// not already exist. Files that overwrite something cost nothing, and counting them would
+    /// refuse a restore onto a nearly-full volume for space it is not going to use.
+    /// </param>
+    public record ArchiveCheck(
+        bool Ok,
+        string? Error = null,
+        string? StagedDatabase = null,
+        long AdditionalBytes = 0,
+        BackupManifest? Manifest = null);
+
+    /// <summary>
+    /// Decides whether an archive can become the live site.
+    ///
+    /// Everything that can be checked without changing anything is checked here, because the
+    /// caller's next step moves real files around.
+    /// </summary>
+    public async Task<ArchiveCheck> ValidateAsync(string zipPath, IEnumerable<string> knownMigrations,
+        CancellationToken ct = default)
+    {
+        ZipArchive zip;
+        try
+        {
+            zip = ZipFile.OpenRead(zipPath);
+        }
+        catch (InvalidDataException)
+        {
+            return new ArchiveCheck(false, "That file is not a zip archive.");
+        }
+
+        using (zip)
+        {
+            var manifestEntry = zip.GetEntry(ManifestEntry);
+            if (manifestEntry is null)
+                return new ArchiveCheck(false,
+                    "That zip has no manifest, so it is not one of this site's backups.");
+
+            BackupManifest? manifest;
+            try
+            {
+                await using var manifestStream = manifestEntry.Open();
+                manifest = await JsonSerializer.DeserializeAsync<BackupManifest>(manifestStream,
+                    cancellationToken: ct);
+            }
+            catch (JsonException)
+            {
+                return new ArchiveCheck(false, "That backup's manifest could not be read.");
+            }
+
+            if (manifest is null)
+                return new ArchiveCheck(false, "That backup's manifest is empty.");
+
+            // Same reasoning as the migration check below, one level up: a newer LAYOUT may hold
+            // entries this build would silently ignore, and a restore that quietly drops half an
+            // archive is worse than one that refuses.
+            if (manifest.SchemaVersion > SchemaVersion)
+            {
+                _log.LogWarning("Rejected an archive with schemaVersion {Version}, this build " +
+                                "understands {Known}", manifest.SchemaVersion, SchemaVersion);
+                return new ArchiveCheck(false,
+                    "That backup came from a newer version of the site than the one running now. " +
+                    "Deploy that version first, then restore.");
+            }
+
+            if (zip.GetEntry(DatabaseEntry) is not { } databaseEntry)
+                return new ArchiveCheck(false, "That backup has no database in it.");
+
+            // Every entry, before anything is written. A crafted zip can carry "../" or an
+            // absolute path and land a file anywhere the process can write; the whole archive is
+            // refused rather than the offending entry skipped, because an archive containing one
+            // is not a backup this site produced.
+            long additional = 0;
+            foreach (var entry in zip.Entries)
+            {
+                if (entry.FullName.EndsWith('/')) continue;
+
+                if (ResolveEntry(entry.FullName) is not { } target)
+                {
+                    _log.LogWarning("Rejected an archive: entry {Entry} escapes the volume",
+                        entry.FullName);
+                    return new ArchiveCheck(false,
+                        "That backup contains a file path that points outside the site's storage, " +
+                        "so it was refused.");
+                }
+
+                if (entry.FullName is ManifestEntry or DatabaseEntry) continue;
+                if (!File.Exists(target)) additional += entry.Length;
+            }
+
+            // Onto the VOLUME, not temp. Swap moves this into place, and File.Move is only atomic
+            // within one filesystem; from the container's ephemeral disk it becomes a copy that
+            // can fail half-written and cannot be rolled back. See Swap's own guard.
+            var staged = Path.Combine(_paths.Root, $"restore-{Guid.NewGuid():N}.db");
+            try
+            {
+                databaseEntry.ExtractToFile(staged, overwrite: true);
+
+                var dbCheck = await _database.ValidateAsync(staged, knownMigrations, ct);
+                if (!dbCheck.Ok)
+                {
+                    CleanUpStagedDatabase(staged);
+                    return new ArchiveCheck(false, dbCheck.Error);
+                }
+
+                return new ArchiveCheck(true, StagedDatabase: staged,
+                    AdditionalBytes: additional + new FileInfo(staged).Length, Manifest: manifest);
+            }
+            catch (Exception)
+            {
+                CleanUpStagedDatabase(staged);
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Puts the archive's files back, over the top of whatever is there.
+    ///
+    /// Nothing is ever removed. Moving the existing tree aside instead would drop every file
+    /// uploaded since the archive was taken, and it is not needed: the restored database decides
+    /// what is visible, and a file with no row pointing at it is already invisible. The cost is
+    /// orphaned bytes, which the storage meter already counts.
+    /// </summary>
+    public void ApplyFiles(string zipPath, CancellationToken ct = default)
+    {
+        using var zip = ZipFile.OpenRead(zipPath);
+
+        foreach (var entry in zip.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (entry.FullName.EndsWith('/')) continue;
+            if (entry.FullName is ManifestEntry or DatabaseEntry) continue;
+
+            // Re-resolved rather than trusted from validation, so the safety check and the write
+            // cannot drift apart.
+            if (ResolveEntry(entry.FullName) is not { } target)
+                throw new InvalidOperationException($"Entry {entry.FullName} escapes the volume.");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+
+            // Written to a sibling name and renamed into place, never straight over the target.
+            // Extracting directly truncates the existing file the instant it is opened, so a
+            // failure part way through — the volume filling up is the obvious one — leaves a
+            // gutted PDF where a complete one was. Measured: a 36-byte file became 5 bytes.
+            // A rename within a directory is atomic, so the target is either the old file or the
+            // new one and never a torn mixture. It also means a player who is midway through
+            // downloading a plan keeps reading the file they opened.
+            var incoming = target + ".incoming";
+            try
+            {
+                entry.ExtractToFile(incoming, overwrite: true);
+                File.Move(incoming, target, overwrite: true);
+            }
+            catch
+            {
+                TryDelete(incoming);
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Where an archive entry is allowed to land, or null if it tries to escape.
+    ///
+    /// Only the two roots the archive is built from are accepted, so an entry naming anything
+    /// else on the volume — the live database, the undo copy, a staging file — is refused even
+    /// though it resolves inside the root.
+    /// </summary>
+    private string? ResolveEntry(string entryName)
+    {
+        if (entryName.Length == 0) return null;
+        if (entryName is ManifestEntry or DatabaseEntry)
+            return Path.Combine(_paths.Root, entryName);
+
+        var root = Path.GetFullPath(_paths.Root) + Path.DirectorySeparatorChar;
+        var full = Path.GetFullPath(Path.Combine(_paths.Root,
+            entryName.Replace('/', Path.DirectorySeparatorChar)));
+
+        if (!full.StartsWith(root, StringComparison.Ordinal)) return null;
+
+        var relative = full[root.Length..];
+        var first = relative.Split(Path.DirectorySeparatorChar)[0];
+        return first is "teams" or "dpkeys" ? full : null;
+    }
+
+    /// <summary>Removes a staged database and the sidecars validating it leaves behind.</summary>
+    public void CleanUpStagedDatabase(string path)
+    {
+        TryDelete(path);
+        try
+        {
+            DatabaseBackupService.DeleteSidecars(path);
+        }
+        catch (IOException ex)
+        {
+            _log.LogWarning("Could not clear sidecars for {Path}: {Error}", path, ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Path inside the zip, relative to the volume root, always with forward slashes so an
     /// archive written anywhere restores anywhere.
     /// </summary>

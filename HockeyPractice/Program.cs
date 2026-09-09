@@ -57,6 +57,7 @@ builder.Services.AddSingleton<DatabaseBackupService>();
 // memory, so a restart clears it, which is the failure direction to want: a site that can get
 // stuck open, never one stuck read-only with nobody left who knows why.
 builder.Services.AddSingleton<MaintenanceState>();
+builder.Services.AddSingleton<StartupHealth>();
 // Off-site archive of the whole volume. Same shape as IEmailSender below: a real store when the
 // credentials are there, an inert one when they are not, so the app builds and runs locally with
 // no cloud config at all and the admin page simply says archiving is off.
@@ -141,6 +142,26 @@ using (var scope = app.Services.CreateScope())
         logger.LogError("Database migration failed at startup; the app will start but data " +
                         "operations will fail until this is resolved. {Type}: {Error}",
                         ex.GetType().FullName, ex.Message);
+
+        // Also recorded where a person will see it. Serving on rather than crash-looping is the
+        // right call, but it produces a site that looks healthy and fails on every data
+        // operation, and a log line is not where anyone looks first. Restoring an archive old
+        // enough to need a migration is exactly when this fires.
+        app.Services.GetRequiredService<StartupHealth>()
+            .RecordMigrationFailure($"{ex.GetType().Name}: {ex.Message}");
+    }
+
+    // Clears staging files a download or restore abandoned. Startup is the only moment nothing
+    // can be holding them.
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<DatabaseBackupService>()
+            .SweepStagingFiles(TimeSpan.FromHours(1));
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning("Could not sweep staging files at startup. {Type}: {Error}",
+            ex.GetType().Name, ex.Message);
     }
 }
 

@@ -17,6 +17,16 @@
         when you need it. The team's pages will say you're in as site admin while you are.
     </p>
 
+    @if (Model.MigrationError is not null)
+    {
+        <div class="hp-error">
+            <strong>The database schema did not finish updating when the site started.</strong>
+            The site is serving, but saving anything may fail until this is sorted. This usually
+            means a backup was restored from a version older than the code now running.
+            <div class="hp-mono" style="font-size:.78rem;margin-top:.4rem;">@Model.MigrationError</div>
+        </div>
+    }
+
     @if (Model.Notice is not null)
     {
         <div class="hp-notice">@Model.Notice</div>
@@ -249,10 +259,24 @@
                 <p class="hp-muted" style="font-size:.78rem;margin:.6rem 0 0;">
                     The last restore kept the database it replaced, holding everything up to
                     @replacedAt.ToString("d MMM yyyy HH:mm") UTC
-                    (@PlanStorageService.Human(Model.ReplacedBytes)), at
-                    <span class="hp-mono">@Model.ReplacedPath</span>. That is the way back from
-                    restoring the wrong file, but only one is kept: the next restore overwrites it.
+                    (@PlanStorageService.Human(Model.ReplacedBytes)). That is the way back from
+                    restoring the wrong file: download it, then restore it with the form above.
+                    Only one is kept, so the next restore overwrites it.
                 </p>
+                <div class="hp-row" style="margin-top:.5rem;">
+                    <form method="post" asp-action="DownloadReplaced" data-download>
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                data-busy="Preparing…">Download the replaced database</button>
+                    </form>
+                    <form method="post" asp-action="DeleteReplaced"
+                          data-confirm="Delete the kept copy? This is the only way back from the last restore.">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">
+                            Delete it and free @PlanStorageService.Human(Model.ReplacedBytes)
+                        </button>
+                    </form>
+                </div>
             }
         </details>
     </div>
@@ -367,6 +391,77 @@
                 </text>
             }
         </p>
+
+        <details style="margin-top:.8rem;">
+            <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">
+                Restore the whole site from a backup
+            </summary>
+
+            <div class="hp-warn" style="margin-top:.6rem;">
+                <strong>This replaces everything.</strong> Every team, plan, drill and roster is
+                swapped for whatever is in the backup, and the uploaded PDFs and pictures are put
+                back over the top. Anything added since that backup was taken is gone from the
+                site. It restarts afterwards, which takes about twenty seconds.
+                <div style="margin-top:.4rem;">
+                    Files are only ever added or replaced, never deleted, so a PDF uploaded after
+                    the backup stays on disk even though the site stops pointing at it.
+                </div>
+            </div>
+
+            @if (!Model.WritesPaused)
+            {
+                <div class="hp-notice" style="margin-top:.6rem;">
+                    Pause saving first, using the button further up. Restoring while people are
+                    still writing would throw away whatever they are in the middle of.
+                </div>
+            }
+
+            <form method="post" asp-action="RestoreArchive" enctype="multipart/form-data"
+                  class="hp-form" style="margin-top:.6rem;"
+                  data-confirm="Replace the entire site from this backup? Everything currently on the site is replaced.">
+                @Html.AntiForgeryToken()
+
+                @if (Model.ArchivingConfigured && Model.Archives.Count > 0)
+                {
+                    <div class="hp-field">
+                        <label class="hp-label" for="key">Pick a backup from storage</label>
+                        <select class="hp-input" id="key" name="key">
+                            <option value="">(or upload one below)</option>
+                            @foreach (var archive in Model.Archives)
+                            {
+                                <option value="@archive.Key">
+                                    @archive.CreatedUtc.ToString("d MMM yyyy HH:mm") UTC
+                                    (@PlanStorageService.Human(archive.Bytes))
+                                </option>
+                            }
+                        </select>
+                        <span class="hp-muted" style="font-size:.8rem;">
+                            Prefer this. The backup is fetched straight from storage by the site,
+                            so it never has to travel up through your connection.
+                        </span>
+                    </div>
+                }
+
+                <div class="hp-field">
+                    <label class="hp-label" for="archive">Or upload a backup zip</label>
+                    <input class="hp-input" type="file" id="archive" name="archive" accept=".zip" />
+                    <span class="hp-muted" style="font-size:.8rem;">
+                        One downloaded from this page, from this version of the site or an older
+                        one. A backup from a newer version is refused.
+                    </span>
+                </div>
+
+                <div class="hp-field">
+                    <label class="hp-label" for="archiveConfirm">Type REPLACE to confirm</label>
+                    <input class="hp-input" id="archiveConfirm" name="confirm" required
+                           autocomplete="off" placeholder="REPLACE" style="max-width:14rem;" />
+                </div>
+
+                <button type="submit" class="hp-btn hp-btn-danger" data-busy="Restoring…">
+                    Replace the whole site
+                </button>
+            </form>
+        </details>
 
         @if (Model.ArchivingConfigured && Model.Archives.Count > 0)
         {

@@ -6,6 +6,7 @@ using HockeyPractice.Util;
 using HockeyPractice.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
@@ -32,6 +33,14 @@ public class SiteAdminController : Controller
     /// </summary>
     private const long MaxRestoreBytes = 200L * 1024 * 1024;
 
+    /// <summary>
+    /// Ceiling on an uploaded ARCHIVE, which carries every PDF and diagram as well as the
+    /// database, so it outgrows MaxRestoreBytes. The gateway may well cap a request body below
+    /// this; that ceiling has never been measured, which is why restoring from the bucket is the
+    /// path to prefer and this one is the fallback.
+    /// </summary>
+    private const long MaxArchiveBytes = 900L * 1024 * 1024;
+
     private readonly AppDbContext _db;
     private readonly TeamAccessService _access;
     private readonly PlanStorageService _storage;
@@ -40,6 +49,7 @@ public class SiteAdminController : Controller
     private readonly BackupRunner _runner;
     private readonly IBackupStore _store;
     private readonly BackupStatus _archiveStatus;
+    private readonly StartupHealth _health;
     private readonly VolumeBackupOptions _archiveOptions;
     private readonly DataPaths _paths;
     private readonly IHostApplicationLifetime _lifetime;
@@ -49,7 +59,7 @@ public class SiteAdminController : Controller
     public SiteAdminController(AppDbContext db, TeamAccessService access,
         PlanStorageService storage, DatabaseBackupService backup, MaintenanceState maintenance,
         BackupRunner runner, IBackupStore store, BackupStatus archiveStatus,
-        IOptions<VolumeBackupOptions> archiveOptions,
+        StartupHealth health, IOptions<VolumeBackupOptions> archiveOptions,
         DataPaths paths, IHostApplicationLifetime lifetime, IConfiguration config,
         ILogger<SiteAdminController> log)
     {
@@ -61,6 +71,7 @@ public class SiteAdminController : Controller
         _runner = runner;
         _store = store;
         _archiveStatus = archiveStatus;
+        _health = health;
         _archiveOptions = archiveOptions.Value;
         _paths = paths;
         _lifetime = lifetime;
@@ -417,29 +428,52 @@ public class SiteAdminController : Controller
             // it does not is from a newer version and gets refused rather than half-loaded.
             var check = await _backup.ValidateAsync(staged, _db.Database.GetMigrations(), ct);
             if (!check.Ok)
-            {
-                TryDelete(staged);
                 return View("Index", await BuildAsync(null, check.Error));
-            }
+
+            // Re-checked here, not just at the top. Everything above — a slow upload on rink
+            // wifi, integrity_check over a large file — can outlast the 30-minute pause, and
+            // writes landing between the check and the swap would go into the file that is about
+            // to become the undo copy.
+            if (!_maintenance.IsPaused)
+                return View("Index", await BuildAsync(null,
+                    "Saving switched back on while the file was uploading, so nothing was " +
+                    "changed. Pause saving and try again."));
 
             _backup.Swap(staged);
+            staged = null;
+        }
+        catch (SqliteException ex)
+        {
+            // The checkpoint refusing to run. It happens before anything moves, so the database
+            // really is untouched.
+            _log.LogError("Restore aborted before the swap: {Error}", ex.Message);
+            return View("Index", await BuildAsync(null,
+                "The database could not be quiesced, so it was left alone and nothing was changed."));
         }
         catch (IOException ex)
         {
-            TryDelete(staged);
             _log.LogError("Restore failed while moving files: {Error}", ex.Message);
             return View("Index", await BuildAsync(null,
                 "Could not write the file to storage, so nothing was changed."));
+        }
+        finally
+        {
+            // A finally, not a catch. The old code cleaned up only on IOException, so a cancelled
+            // upload (OperationCanceledException) or any other failure stranded a full-size
+            // database on a volume with no resize path and nothing to ever remove it. Nulled
+            // above on success, where Swap has already consumed the file. The sidecars go too:
+            // validating a WAL-marked upload leaves its own -wal and -shm beside the staged file.
+            if (staged is not null)
+            {
+                TryDelete(staged);
+                DatabaseBackupService.DeleteSidecars(staged);
+            }
         }
 
         // Restart rather than carry on against a swapped file. A fresh process reopens the
         // database, runs any migrations the backup predates, and leaves nothing anywhere still
         // holding the old one. Delayed so this response reaches the browser first.
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            _lifetime.StopApplication();
-        });
+        ScheduleRestart();
 
         return View("Restored");
     }
@@ -523,6 +557,146 @@ public class SiteAdminController : Controller
         return File(stream, "application/zip", Path.GetFileName(built.Path));
     }
 
+    /// <summary>
+    /// Replaces the whole site — database and files — from an archive, then restarts.
+    ///
+    /// Takes either an archive already in the bucket, by key, or an uploaded zip. Picking from
+    /// the bucket is the path to prefer: it downloads server side, so the archive never travels
+    /// in a request body and cannot meet whatever size ceiling the gateway imposes. Plan PDFs cap
+    /// at 15 MB, so nothing has ever tested a larger body through it.
+    /// </summary>
+    [HttpPost("backup/archive/restore")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(MaxArchiveBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxArchiveBytes)]
+    public async Task<IActionResult> RestoreArchive(IFormFile? archive, string? key, string? confirm,
+        CancellationToken ct)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        if (!_maintenance.IsPaused)
+            return View("Index", await BuildAsync(null,
+                "Pause saving first. Replacing everything while people are still writing would " +
+                "throw away whatever they were in the middle of."));
+
+        if (!string.Equals(confirm?.Trim(), ConfirmWord, StringComparison.OrdinalIgnoreCase))
+            return View("Index", await BuildAsync(null,
+                $"Type {ConfirmWord} to confirm. This replaces every team, plan, drill and " +
+                "uploaded file on the site with whatever is in the backup."));
+
+        // Staged on the container's ephemeral disk, not the volume. Only the database inside it
+        // has to land on the volume, and validation puts it there.
+        var staging = Path.Combine(Path.GetTempPath(), "hockeypractice-backup");
+        Directory.CreateDirectory(staging);
+        var local = Path.Combine(staging, $"incoming-{Guid.NewGuid():N}.zip");
+        var fetched = false;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                // Matched against the listing rather than trusted. The store only ever lists keys
+                // under its own prefix that match the archive name pattern, so going through it
+                // means a hand-edited form cannot name an arbitrary object in the bucket.
+                var available = await _store.ListAsync(ct);
+                if (available.FirstOrDefault(a => a.Key == key) is null)
+                    return View("Index", await BuildAsync(null,
+                        "That backup is no longer in the bucket. Reload and pick another."));
+
+                var downloaded = await _runner.FetchAsync(key, ct);
+                System.IO.File.Move(downloaded, local, overwrite: true);
+                fetched = true;
+            }
+            else if (archive is not null && archive.Length > 0)
+            {
+                await using var destination = System.IO.File.Create(local);
+                await using var source = archive.OpenReadStream();
+                await source.CopyToAsync(destination, ct);
+                fetched = true;
+            }
+
+            if (!fetched)
+                return View("Index", await BuildAsync(null,
+                    "Choose a backup to restore, either from the list or by uploading a zip."));
+
+            var result = await _runner.RestoreAsync(local, ct);
+            if (!result.Ok)
+                return View("Index", await BuildAsync(null, result.Error));
+        }
+        finally
+        {
+            TryDelete(local);
+        }
+
+        ScheduleRestart();
+
+        ViewBag.IncludedFiles = true;
+        return View("Restored");
+    }
+
+    /// <summary>
+    /// Streams the database a restore moved aside.
+    ///
+    /// Without this the undo copy is written, displayed, and reachable by nobody: there is no
+    /// shell into the container, so "the way back from restoring the wrong file" was a claim the
+    /// site could not honour. Downloading it puts it back in the admin's hands, where the
+    /// existing restore can take it.
+    ///
+    /// No DeleteOnClose here, unlike the snapshot downloads — this is the only copy of that
+    /// database and streaming it must not consume it.
+    /// </summary>
+    [HttpPost("backup/replaced/download")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DownloadReplaced()
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        if (!System.IO.File.Exists(_backup.ReplacedDatabase))
+            return View("Index", await BuildAsync(null, "There is no replaced database to download."));
+
+        _log.LogInformation("Site admin downloaded the replaced database");
+
+        var stream = new FileStream(_backup.ReplacedDatabase, FileMode.Open, FileAccess.Read,
+            FileShare.Read, bufferSize: 64 * 1024, useAsync: true);
+
+        return File(stream, "application/vnd.sqlite3",
+            $"hockeypractice-replaced-{_backup.ReplacedAtUtc:yyyy-MM-dd-HHmm}.db");
+    }
+
+    /// <summary>
+    /// Removes the kept undo copy, which is one database in size and otherwise sits on the volume
+    /// for good. Worth doing once a restore has been confirmed good, on a volume capped at 1 GiB
+    /// with no resize path.
+    /// </summary>
+    [HttpPost("backup/replaced/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteReplaced()
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        var bytes = _backup.ReplacedBytes;
+        TryDelete(_backup.ReplacedDatabase);
+        DatabaseBackupService.DeleteSidecars(_backup.ReplacedDatabase);
+
+        _log.LogWarning("Site admin deleted the replaced database ({Bytes} bytes)", bytes);
+
+        return RedirectToAction(nameof(Index), new
+        {
+            notice = $"Deleted the kept copy and freed {PlanStorageService.Human(bytes)}. " +
+                     "There is no longer a way back from the last restore."
+        });
+    }
+
+    /// <summary>
+    /// Steps down after the response has gone out. A fresh process reopens the swapped file and
+    /// runs any migrations the backup predates.
+    /// </summary>
+    private void ScheduleRestart() => _ = Task.Run(async () =>
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        _lifetime.StopApplication();
+    });
+
     private static void TryDelete(string path)
     {
         try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
@@ -582,7 +756,8 @@ public class SiteAdminController : Controller
             ArchiveError = _archiveStatus.LastError,
             ArchiveRunning = _archiveStatus.Running,
             ArchiveKeep = _archiveOptions.Keep,
-            ArchiveHourUtc = _archiveOptions.HourUtc
+            ArchiveHourUtc = _archiveOptions.HourUtc,
+            MigrationError = _health.MigrationError
         };
     }
 
