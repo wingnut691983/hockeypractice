@@ -81,6 +81,67 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
 | `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged and the signup box is hidden. |
 | `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain. |
+| `ARCHIVE_S3_ENDPOINT` | no | Cloudflare R2 S3 endpoint, `https://<accountid>.r2.cloudflarestorage.com`. **Without the bucket on the end**; the SDK appends it, and pasting the bucket's own "S3 API" value gives `.../<bucket>/<bucket>/<key>` and a missing-bucket error. |
+| `ARCHIVE_S3_BUCKET` | no | Bucket name. |
+| `ARCHIVE_S3_PREFIX` | no | `hockeypractice/` in production, `local-test/` for testing. A safety fence, not tidiness: everything the app lists, offers and prunes is confined to this prefix. |
+| `ARCHIVE_S3_ACCESS_KEY_ID` | no | R2 token key pair, not the token *value*, which is for Cloudflare's own API and is unused here. |
+| `ARCHIVE_S3_SECRET_ACCESS_KEY` | no | Shown once by Cloudflare on creation. |
+
+All five must be present or off-site backups are simply off: the scheduler never starts and the
+admin page says so. Everything else keeps working. The tunables live in `appsettings.json` under
+`Archive` (`HourUtc` 8, which is 03:00 Central in summer; `Keep` 3; `MaxBytes` 512 MB) because they
+are code decisions rather than deployment config. Override with `Archive__Keep` style names.
+
+## Backups
+
+There are two, and they cover different things.
+
+**The database download** (site admin, "Download database") is one SQLite file: teams, plans,
+drills, roster, view history and the codes. It does not include a single uploaded PDF or drill
+picture, because those are files on the volume rather than rows.
+
+**The off-site archive** is the whole volume in one zip: that same database, every plan PDF and
+drill diagram, the team logos, and `dpkeys`. It runs nightly to Cloudflare R2, keeps the newest
+three, and can also be triggered by hand or downloaded straight to your machine. This is the one to
+reach for if the app is ever lost, which is not hypothetical: the 1 GiB volume went with the app
+when the trial ended on 7 September 2026, and only a hand-downloaded database survived.
+
+Treat an archive like the codes themselves, and then some. It carries every team's plaintext player
+code, subscriber emails, the whole roster, and the Data Protection key ring, which is unencrypted
+on disk and is what signs the access cookie. Someone holding an archive can forge access to the
+site, not merely read a copy of it. `hockeypractice-*.zip` is gitignored; keep the bucket private.
+
+### Restoring
+
+Both routes need **Pause saving** first, and the word `REPLACE` typed back. The site restarts
+itself afterwards, which takes about twenty seconds.
+
+*The whole site, from an archive.* Site admin, Off-site backups, "Restore the whole site from a
+backup". Pick one from storage (preferred: it is fetched server side, so the archive never travels
+up through your connection and cannot meet whatever request-size ceiling the gateway imposes, which
+has never been measured), or upload a zip.
+
+*The database only, from a `.db` file.* Site admin, Backup, "Restore from a backup file". Use this
+when you have a database download rather than an archive, or to put back the copy a previous
+restore set aside.
+
+What a restore does, exactly:
+
+- **The database is replaced outright.** Anything created since that backup is gone from the site;
+  anything deleted since comes back.
+- **Files are put back over the top, and nothing is ever deleted.** A PDF the backup contains
+  overwrites whatever is there. A file uploaded *after* the backup stays on disk with no row
+  pointing at it, so it is invisible to the site but still counts against the 1 GiB. That
+  asymmetry is deliberate: deleting would let a restore destroy a file a newer backup still needs.
+- **`dpkeys` is merged, not replaced**, so people stay signed in.
+- **The database it replaced is kept** as `hockeypractice.db.replaced`, and site admin can download
+  or delete it. That is the way back from restoring the wrong thing, but only one is kept and the
+  next restore overwrites it. Check the site looks right *before* deleting it.
+
+Worth doing occasionally, and it is the only thing that proves a backup is real: download the
+newest archive, point a scratch local instance at an empty `DATA_DIR`, restore it there, and open a
+plan. That answers "is last night's backup actually restorable", which is the question that had no
+answer in September.
 
 ## What I'd flag
 
@@ -117,6 +178,51 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
   the old one. Don't "improve" this into a hot swap: `Migrate()` only runs at startup, so a hot
   swap would silently refuse every backup older than the current schema, which is exactly when
   you need a restore most.
+- **The database runs in WAL mode, and a database at rest lies about it.** Nothing here sets
+  `journal_mode`; EF Core's provider does. A fresh volume shows `-wal`/`-shm` and header
+  `write_version` 2 before the app serves a request. But an idle file reads `write_version` 1,
+  because SQLite checkpoints and removes the WAL on clean close and every `VACUUM INTO` output is
+  rollback-mode by construction. I got this wrong once by testing a hand-made
+  `Microsoft.Data.Sqlite` database instead of one the app creates, and nearly "fixed"
+  `DeleteSidecars` to chase `-journal` files that never exist here. Check a *running* volume.
+- **`Checkpoint()` throws rather than logging and carrying on, and that is the point.** In WAL mode
+  the newest transactions live in the sidecar, and `Swap` moves the database aside and clears the
+  sidecars, so a checkpoint that quietly failed hands back an undo copy missing the most recent
+  writes. It runs before anything moves, so a throw really does mean nothing changed. **This has no
+  test**: two attempts to reproduce a failing checkpoint were both invalid, because `chmod` doesn't
+  stop a `File.Move` (that needs directory permission) and corrupting the file behind the app
+  doesn't reach a pooled connection. Worth a real one if you touch this.
+- **`Swap` refuses an incoming database from another filesystem.** `File.Move` is a rename within
+  one filesystem and a copy across two. A copy can fail half-written, and the recovery path checks
+  `!File.Exists(live)`, so it would skip and leave a truncated database live with the good one in
+  `.replaced`. The archive restore stages the zip in ephemeral temp but extracts the *database*
+  onto the volume for exactly this reason.
+- **Restores extract each file to a sibling name and rename it into place.** Extracting straight
+  over the target truncates it the moment it's opened, so a volume filling up mid-restore leaves a
+  gutted PDF where a complete one was (measured: 36 bytes became 5, with nothing reporting it). A
+  rename within a directory is atomic, and it also means a player midway through downloading a plan
+  keeps reading the file they opened rather than a torn one.
+- **The archive captures by allowlist, never by excluding transient names.** An exclusion list has
+  to be kept in step with every `-wal`, `.replaced` and staging file, and one of those extracted
+  next to a restored database corrupts it. The cost is that a genuinely new durable directory would
+  be missed silently, so anything added under `DATA_DIR` must also be added to
+  `VolumeBackupService.CreateAsync`.
+- **Cloudflare R2 needs two AWS behaviours switched off, and fixing one alone still fails.**
+  `RequestChecksumCalculation = WHEN_REQUIRED` on the client, and `UseChunkEncoding = false` on the
+  upload. The second was found the hard way, by the first real production upload failing with
+  `STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented` *after* the archive had built. `AWSSDK.S3`
+  is pinned to an exact version, not a `3.7.*` range, because the request shape changes inside that
+  range. Don't relax it.
+- **A backup failure must never take the site down.** Since .NET 6 an unhandled exception in a
+  `BackgroundService` stops the host, so a transient storage outage would take the whole site
+  offline because a *backup* failed. Every path in `ScheduledBackupService` is wrapped, including
+  the startup catch-up, which lists the bucket and can fail as readily as an upload. This was
+  confirmed accidentally in production: the failed upload above left the site serving normally.
+- **Plan directories are keyed on the row id, and a restore rolls the ids back.** The directories of
+  plans created since are not removed, so new plans walk back up through ids whose folder already
+  holds an old `plan.pdf`. A PDF plan overwrites it; a drill plan writes nothing, and
+  `PlanController.File` used to check only that a file existed. It would have streamed a previous
+  plan's PDF to anyone with the team code. It now guards on `PlanKind.Pdf`.
 - **Pausing writes is in-memory and per-process** (`MaintenanceState`), with a 30-minute
   deadline. Both are deliberate: a pause that survived a restart could outlive the person who
   set it, and the failure that actually hurts is a site stuck read-only with nobody left who
@@ -126,7 +232,11 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
   replayed into it. `DatabaseBackupService.Swap` checkpoints first, then clears the sidecars of
   both the live file and the kept copy. Every file move in there has to keep that invariant.
 - **Storage is capped at 1 GiB with no resize path.** Roughly 2,500 PDF-only plans. The upload
-  guard and usage meter on the manage page are correctness features, not polish.
+  guard and usage meter on the manage page are correctness features, not polish. Restores add to
+  it: files the backup doesn't contain are left in place as invisible orphans, and every restore
+  keeps one whole database as `.replaced` until it's deleted by hand. Abandoned `snapshot-*` and
+  `restore-*` staging files are swept at startup, which is the one moment nothing can be holding
+  them; a periodic sweep would race a download that's mid-stream.
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org
   is an unrelated placeholder package with a template description — don't install it.
 
@@ -140,6 +250,13 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
   it every 5 seconds without the path prefix; a slow handler gets the pod restarted.
 - **Uploads never go in `wwwroot`.** They stream through a controller so the team-code gate
   applies. Serving them statically would expose every plan to anyone who guesses a path.
+- **Anything new and durable under `DATA_DIR` has to be added to the archive by hand.**
+  `VolumeBackupService.CreateAsync` takes an explicit allowlist (the database snapshot, `dpkeys`,
+  `teams/**`). A new directory is not picked up automatically, and the failure is silent until the
+  day someone restores and finds it missing.
+- **A failed startup migration is shown on the admin page, not just logged.** The app deliberately
+  serves on rather than crash-looping, which leaves a site that looks healthy and fails on every
+  write. Restoring an archive old enough to need a migration is exactly when that happens.
 
 ## Deploying
 
