@@ -14,6 +14,140 @@
         are things players and parents will notice too.
     </p>
 
+    <div class="hp-section">9 September 2026</div>
+
+    <div class="hp-panel hp-changelog">
+        <p class="hp-changelog-lead">
+            <strong>The whole site is now backed up off site every night, and can be put back in
+            one action.</strong> This one is written down because it was learned the hard way: when
+            the hosting trial ended on 7 September the site's storage went with it. A copy of the
+            database had been downloaded by hand so the teams, plans and rosters came back, but
+            every uploaded plan PDF and drill diagram was gone. The backup now covers all of it.
+        </p>
+
+        <h2>Players and parents</h2>
+        <ul>
+            <li>
+                <strong>The bottom bar gets out of the way while you're typing.</strong> On a phone
+                it used to float across the middle of the screen once the keyboard was up, and it's
+                a navigation bar, so one mis-tap lost what you were writing.
+            </li>
+        </ul>
+
+        <h2>Coaches</h2>
+        <ul>
+            <li>
+                <strong>Access codes no longer end up in web addresses.</strong> A code is shown on
+                the page once instead, so it isn't left sitting in your browser history.
+            </li>
+            <li>
+                <strong>Publish is where you can reach it.</strong> It sits above the drill library
+                now, rather than below the whole library and its page buttons.
+            </li>
+            <li>
+                <strong>Searching the drill picker brings you back to the picker.</strong> Filtering
+                by tag used to reload the page and drop you at the very top, about 3,000 pixels
+                above the results you had just asked for.
+            </li>
+            <li>
+                <strong>Picking a tag no longer adds the half-typed one beside it.</strong> Typing
+                "split" and picking Split Ice used to leave a stray tag behind, both with the mouse
+                and with the keyboard.
+            </li>
+            <li>
+                <strong>A run time is required when creating a drill</strong>, so plan totals mean
+                something. It stays optional when editing, because older drills and copies of them
+                don't have one and a typo fix shouldn't be blocked over it.
+            </li>
+            <li>
+                <strong>Scrolling over the minutes box no longer changes it.</strong> A wheel over
+                the field could turn 12 into 13 without anyone noticing.
+            </li>
+            <li>
+                <strong>Re-extract links no longer breaks a plan.</strong> If a plan named the same
+                video twice and you had relabelled both cards, the button returned an error and
+                stayed broken for that plan.
+            </li>
+        </ul>
+
+        <h2>Behind the scenes</h2>
+        <ul>
+            <li>
+                <strong>A nightly archive of everything</strong>, database, plan PDFs, drill
+                pictures and team logos, stored off site with the newest three kept.
+            </li>
+            <li>
+                <strong>Restore in one action.</strong> Site admin can put a whole archive back,
+                picked from storage or uploaded, without re-uploading a season of files by hand.
+                A restore only ever adds or replaces files, never deletes them.
+            </li>
+            <li>
+                <strong>A backup that fails can't take the site down</strong>, and site admin shows
+                when the last one ran and what went wrong if it didn't.
+            </li>
+        </ul>
+    </div>
+
+    <div class="hp-section">7 September 2026</div>
+
+    <div class="hp-panel hp-changelog">
+        <p class="hp-changelog-lead">
+            <strong>Tags now work properly on a phone.</strong> Two things that had been reported:
+            adding a tag to a drill showed none of the tags the team already used, and the tag
+            search box offered no suggestions. Both were built on a browser feature that mobile
+            Safari quietly ignores, so nothing appeared and nothing said why.
+        </p>
+        <ul>
+            <li>
+                <strong>The tag list opens when you tap the box</strong>, not only once you start
+                typing, so you can see what already exists before making a near-duplicate of it.
+                Typing filters the list.
+            </li>
+            <li>
+                <strong>You can scroll the tag list with a finger</strong> without it picking
+                whichever tag you touched. It's about four rows tall on a phone with the rest a
+                scroll away, so it doesn't shove the page around.
+            </li>
+            <li>
+                <strong>The drill library and the plan editor's picker are paged</strong>, 12 at a
+                time, with Prev, Next and numbered pages. A library past a handful of drills was an
+                endless scroll on a phone. Filters and your place in the list survive adding,
+                moving and removing drills.
+            </li>
+            <li>
+                <strong>Pick drills to copy is deliberately not paged</strong>, so turning a page
+                can't quietly lose everything you'd ticked.
+            </li>
+        </ul>
+    </div>
+
+    <div class="hp-section">4 September 2026</div>
+
+    <div class="hp-panel hp-changelog">
+        <ul>
+            <li>
+                <strong>The EB logo is on the site</strong>, on the front page and at the top left
+                of every team page, where it links back to the team list. On a narrow phone it
+                shrinks to just the emblem so the team name and menu still fit on one line.
+            </li>
+            <li>
+                <strong>A proper icon for the browser tab and the home screen</strong>, including
+                the round and squared-off shapes phones crop it to.
+            </li>
+            <li>
+                <strong>The practice date box no longer overflows the form on an iPhone.</strong>
+                Safari sized it to its own content and pushed the whole page sideways.
+            </li>
+            <li>
+                <strong>The code box limits how fast codes can be guessed</strong>, counted per
+                team rather than per device. The old per-device limit had quietly stopped working
+                behind our host's gateway, which made it no limit at all. It's 30 tries a minute
+                now, which is room for a whole squad typing the code in at once on the first night
+                of a season.
+            </li>
+        </ul>
+    </div>
+
     <div class="hp-section">3 September 2026</div>
 
     <div class="hp-panel hp-changelog">
