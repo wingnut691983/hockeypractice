@@ -104,6 +104,47 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org is an
   unrelated placeholder package — do not install it.
 
+## Known issues
+
+`docs/known-issues.md` holds findings that were deliberately deferred, each with the condition
+that should bring it back. Two of them are waiting on `RESEND_API_KEY` being set and should be
+fixed *before* mail is switched on, not after. It also records what has already been audited and
+found clean, so a later pass doesn't re-derive it.
+
+## Keep the README current, without being asked
+
+`README.md` is this project's memory of *why*, not just what. It is the reason a later session
+doesn't re-break something that was already got wrong once. It goes stale silently, and nobody
+notices until the lesson has to be learned twice.
+
+**After any change to this repo, re-read the relevant parts of `README.md` in the same session
+and update them. Do not wait to be asked.** This is part of finishing the change, not a follow-up
+task, and it applies to your own edits as much as to a feature someone requested.
+
+What maps to where:
+
+| A change to... | Update |
+|---|---|
+| An env var, or what happens when one is missing | the Configuration table |
+| Backup, restore, or storage behaviour | "Backups" and the restore list under it |
+| A new durable path under `DATA_DIR` | "Things worth knowing", **and** `VolumeBackupService.CreateAsync` |
+| Roles, codes, or anything in `TeamAccessService` | "Roles", and usually "What I'd flag" |
+| Deploy steps, Dockerfiles, or the image | "Deploying" |
+| A bug you fixed that someone could innocently reintroduce | "What I'd flag" |
+| A problem you found and deliberately left | `docs/known-issues.md`, with its trigger condition |
+
+"What I'd flag" is the highest-value section and the easiest to under-fill. An entry earns its
+place when the fix is not self-evident from the code. Write what actually broke, what it cost,
+and what not to undo. Prefer measured detail over description: "36 bytes became 5" and
+"`STREAMING-AWS4-HMAC-SHA256-PAYLOAD not implemented`" are why the existing entries are useful.
+
+Keep the same voice as the surrounding entries: first person, direct, willing to say what was
+got wrong. If something was reproduced or verified, say so, and say if it wasn't.
+
+A change that genuinely needs no README edit is fine and common (a rename, a formatting pass, a
+test). The *check* is what isn't optional. Say in one line what you checked and why nothing
+needed changing, so it's visible that it happened rather than silently skipped.
+
 ## Commands
 
 ```sh

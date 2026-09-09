@@ -156,6 +156,18 @@ answer in September.
   family on the team — its whole purpose is to be given out repeatedly, and hashing it made the
   invite link unusable the moment the creation notice scrolled away. Don't hash it "for
   consistency" without re-solving how a manager re-shares the join link.
+- **An access code must never travel in a redirect's query string.** Creating a team, issuing a
+  new manager code and rotating the team code all used to end with
+  `RedirectToAction(nameof(Index), new { notice })`, where the notice contained the code. That
+  writes it into the browser's history permanently and into the gateway's access log, which is
+  the last place anyone would think to look for it, and the manager code is the one credential
+  this site stores hash-only and tells you cannot be read back. Those three paths now hand the
+  notice to the page through `TempData` instead (`SecretNotice` in `SiteAdminController`,
+  `SecretNoticeKey` in `CoachController`), which rides an encrypted cookie protected by the same
+  key ring that signs the access ticket. It is shown once, consumed on reload, and leaves nothing
+  behind. Ordinary notices still ride the query string, where they are harmless and survive a
+  refresh; the rule is only about codes. Note this is `TempData` on its cookie provider, not
+  `ISession`, which this app deliberately does not use.
 - **`PlanView` uniqueness is keyed on the resolved player, not the device**, once a player is
   known: `(PlanId, PlayerId)` when a player is picked, `(PlanId, ViewerKey)` only while
   anonymous. Keying purely on device (the original design) meant a shared family device could
@@ -167,6 +179,17 @@ answer in September.
   change as content overflows it, so a `ResizeObserver` on it never fires as pages render in.
   `#viewer` is the plain block-flow div pdf.js actually stacks pages into; that's what grows
   with content and what has to be observed. Got this wrong once already — see `Details.cshtml`.
+- **One plan can legitimately hold two links to the same video, so never key a dictionary on
+  `PlanLink.Url` without grouping first.** Extraction keeps a separate card whenever the document
+  names the same clip differently, because a warm-up video demonstrating three drills is three
+  cards a player goes looking for by name. Both "Re-extract links" and "Replace file" preserve a
+  coach's own wording by building a lookup from the edited links, and they built it with a plain
+  `ToDictionary(l => l.Url, ...)`. Relabel two cards that point at one video and that throws
+  `ArgumentException` on the duplicate key: HTTP 500, both buttons dead for that plan from then
+  on, and nothing on screen saying why. Reproduced and fixed; both paths now go through
+  `CoachController.CoachEdits`, which groups by URL first. The trade it makes is that duplicates
+  can no longer be told apart, so the first edit's label is applied to every fresh card sharing
+  that URL. That is a small loss of precision in a rare case, against a permanently broken button.
 - **The backup download is the whole site's secrets in one file.** It carries every team's
   plaintext player code and every subscriber's email. It's gated behind the site-admin code
   and nothing else, which is the same gate as deleting a team, so that gate is now load-bearing
@@ -257,6 +280,13 @@ answer in September.
 - **A failed startup migration is shown on the admin page, not just logged.** The app deliberately
   serves on rather than crash-looping, which leaves a site that looks healthy and fails on every
   write. Restoring an archive old enough to need a migration is exactly when that happens.
+- **Known problems that were left alone on purpose are written down**, in
+  [`docs/known-issues.md`](docs/known-issues.md), each with the condition that should bring it
+  back rather than a date. Two of them are waiting on `RESEND_API_KEY` being set and want fixing
+  *before* mail is switched on: publishing a plan currently blocks on sending every subscriber
+  email one at a time, and unsubscribing is a destructive GET that a mail scanner can trip. That
+  file also records what has already been audited and found clean, so the next pass over the code
+  does not spend its time re-deriving it.
 
 ## Deploying
 

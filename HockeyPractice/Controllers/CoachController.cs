@@ -36,9 +36,18 @@ public class CoachController : TeamScopedController
         _log = log;
     }
 
+    /// <summary>
+    /// TempData key for a notice carrying a code, which must not travel in the URL. Same
+    /// reasoning as SiteAdminController's: a redirect's query string lands in browser history
+    /// and the gateway's access log, and neither is a place to leave an access code.
+    /// </summary>
+    private const string SecretNoticeKey = "hp:notice";
+
     [HttpGet("")]
     public async Task<IActionResult> Index(string slug, string? notice, string? tag, string? name)
     {
+        notice ??= TempData[SecretNoticeKey] as string;
+
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
@@ -449,10 +458,7 @@ public class CoachController : TeamScopedController
         if (!_storage.Exists(ctx!.Team.Id, plan.Id))
             return RedirectToAction(nameof(EditPlan), new { slug, id });
 
-        // Remember the coach's own wording and visibility choices, keyed by URL.
-        var edited = plan.Links
-            .Where(l => l.WasEditedByCoach)
-            .ToDictionary(l => l.Url, l => (l.Label, l.IsHidden), StringComparer.OrdinalIgnoreCase);
+        var edited = CoachEdits(plan.Links);
 
         var fresh = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
         await _videoTitles.PopulateTitlesAsync(fresh);
@@ -517,12 +523,9 @@ public class CoachController : TeamScopedController
             });
         }
 
-        // Remember the coach's own wording and visibility choices, keyed by URL — the same
-        // preservation ReExtract uses, so replacing the file doesn't undo a correction someone
-        // already made.
-        var edited = plan.Links
-            .Where(l => l.WasEditedByCoach)
-            .ToDictionary(l => l.Url, l => (l.Label, l.IsHidden), StringComparer.OrdinalIgnoreCase);
+        // The same preservation ReExtract uses, so replacing the file doesn't undo a correction
+        // someone already made.
+        var edited = CoachEdits(plan.Links);
 
         var saved = await _storage.SaveAsync(ctx!.Team.Id, plan.Id, file!);
         if (!saved.Ok)
@@ -773,7 +776,11 @@ public class CoachController : TeamScopedController
         ctx.Team.ViewCodeHash = Security.HashCode(fresh);
         await Db.SaveChangesAsync();
 
-        return RedirectToAction(nameof(Index), new { slug, notice = $"New team code: {fresh}" });
+        // Out of band, not in the query string. The team code is shown on this page anyway, so
+        // this is the smaller of the two leaks the redirect used to carry, but it is the same
+        // leak, into the same log, and it costs nothing to close it here too.
+        TempData[SecretNoticeKey] = $"New team code: {fresh}";
+        return RedirectToAction(nameof(Index), new { slug });
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
@@ -947,6 +954,30 @@ public class CoachController : TeamScopedController
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    /// <summary>
+    /// The coach's own wording and visibility choices, keyed by URL, so re-reading the PDF or
+    /// swapping the file for a new one doesn't undo a correction someone already made.
+    ///
+    /// Grouped before the dictionary is built, and that is load-bearing rather than tidy.
+    /// Extraction deliberately keeps two cards for one video when the document names them
+    /// differently (a warm-up clip linked from three drill rows is three cards a player looks
+    /// for by name), so <c>plan.Links</c> legitimately holds several rows with the same Url.
+    /// Once a coach relabels more than one of them, a plain ToDictionary throws on the duplicate
+    /// key and takes down both Re-extract and Replace file for that plan, permanently and with
+    /// nothing on screen saying why.
+    ///
+    /// The consequence of keying on the URL at all is that duplicates cannot be told apart: the
+    /// first edit wins and every fresh card for that URL gets its label. That is a real loss of
+    /// precision in a rare case, and it is the right trade against a dead button: the coach can
+    /// still relabel the others afterwards, which is what they did the first time.
+    /// </summary>
+    private static Dictionary<string, (string Label, bool IsHidden)> CoachEdits(
+        IEnumerable<PlanLink> links) =>
+        links.Where(l => l.WasEditedByCoach)
+            .GroupBy(l => l.Url, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToDictionary(l => l.Url, l => (l.Label, l.IsHidden), StringComparer.OrdinalIgnoreCase);
 
     private static string SafeFileName(string raw)
     {

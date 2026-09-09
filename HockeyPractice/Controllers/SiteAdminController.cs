@@ -81,13 +81,43 @@ public class SiteAdminController : Controller
         _adminCodeHash = string.IsNullOrWhiteSpace(code) ? null : Security.HashCode(code);
     }
 
+    /// <summary>
+    /// TempData key for a notice that must NOT travel in the URL, because it carries a code.
+    /// See <see cref="SecretNotice"/>.
+    /// </summary>
+    private const string SecretNoticeKey = "hp:notice";
+
     [HttpGet("")]
     public async Task<IActionResult> Index(string? notice)
     {
         if (!_access.IsSiteAdmin(User))
             return View("AdminLogin", new AdminViewModel { Configured = _adminCodeHash is not null });
 
+        // A code-bearing notice arrives out of band; ordinary ones still ride the query string,
+        // where they are harmless and survive a reload.
+        notice ??= TempData[SecretNoticeKey] as string;
+
         return View(await BuildAsync(notice));
+    }
+
+    /// <summary>
+    /// Hands a notice to <see cref="Index"/> without putting it in the URL, and redirects there.
+    ///
+    /// For anything containing a code. A manager code is the one credential this site stores
+    /// hash-only and tells you cannot be read back, and RedirectToAction(new { notice }) wrote it
+    /// straight into the query string, which means the browser's history, forever, and the
+    /// gateway's access log, where nobody would ever think to look for it. TempData rides an
+    /// encrypted cookie instead (the CookieTempDataProvider protects it with the same key ring
+    /// that signs the access ticket, and sets its path from PathBase), so the code is shown once
+    /// and leaves no trace behind it.
+    ///
+    /// Not ISession, which this app deliberately does not use: TempData's default provider here
+    /// is cookie-backed and needs no server-side state.
+    /// </summary>
+    private IActionResult SecretNotice(string notice)
+    {
+        TempData[SecretNoticeKey] = notice;
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost("login")]
@@ -157,11 +187,9 @@ public class SiteAdminController : Controller
         });
         await _db.SaveChangesAsync();
 
-        return RedirectToAction(nameof(Index), new
-        {
-            notice = $"Created {name.Trim()} — team code {viewCode}, coach code {coachCode}. " +
-                     "Write these down now; they are not stored and cannot be shown again."
-        });
+        return SecretNotice(
+            $"Created {name.Trim()} — team code {viewCode}, coach code {coachCode}. " +
+            "Write these down now; they are not stored and cannot be shown again.");
     }
 
     /// <summary>
@@ -250,7 +278,7 @@ public class SiteAdminController : Controller
         }
 
         await _db.SaveChangesAsync();
-        return RedirectToAction(nameof(Index), new { notice });
+        return SecretNotice(notice);
     }
 
     /// <summary>
