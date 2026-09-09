@@ -1068,6 +1068,21 @@ a.hp-card:active { transform: scale(.99); }
 /* Keep the fixed bar from covering the end of the page. */
 body:has(.hp-tabs) .hp-shell { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
 
+/* "Fixed" on a phone means fixed to the *layout* viewport, and the on-screen keyboard does not
+   shrink that. Open the keyboard on the plan editor and the bar stays where the bottom of the
+   page used to be: floating across the middle of the screen, moving with every scroll. It is
+   also the last thing that should be tappable while someone is part way through typing a plan,
+   since one mis-tap navigates away from the edit. So it steps out of the way while a field has
+   focus and comes back when the keyboard goes. Narrow screens only: from 700px up the bar is in
+   normal flow beside the header and there is no keyboard to dodge. */
+@media (max-width: 699.98px) {
+  .hp-tabs { transition: transform .18s ease; }
+  .hp-tabs.hp-tabs-away { transform: translateY(120%); pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-tabs { transition: none; }
+}
+
 @media (min-width: 700px) {
   .hp-tabs {
     position: static;

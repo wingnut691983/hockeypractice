@@ -104,6 +104,11 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
   `preventDefault` there without killing iOS scrolling) and commits on release. They coordinate
   through the DOM (`data-suggest-press` on the input during a press, `aria-activedescendant` for
   a highlighted row), or picking a suggestion also adds the half-typed word beside it.
+- **The bottom tab bar hides while a field has focus.** It is `position: fixed`, which on a phone
+  means fixed to the layout viewport, and the keyboard does not shrink that, so it drifts across
+  the middle of the screen instead of staying at the bottom. The hide is narrow screens only, and
+  a `visualViewport` height check is what brings it back when the keyboard is swiped away without
+  the field being blurred.
 - **A run time is required when creating a drill, optional when editing one.** Drills that
   pre-date the rule have none, and blocking an unrelated edit over it would punish them for that.
 - **PDF auto-sizing observes `#viewer` inside the iframe, not `#viewerContainer`** — the latter's

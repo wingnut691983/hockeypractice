@@ -453,6 +453,60 @@
 })();
 </script>
 <script>
+// ── Bottom tab bar and the on-screen keyboard ────────────────────────────
+// Own IIFE and wrapped, same reasoning as the blocks below: navigation styling is not worth
+// risking the delete confirmations over.
+//
+// The bar is `position: fixed`, which pins it to the layout viewport, and the on-screen keyboard
+// does not shrink that. Focus a field in the plan editor and the bar stays where the bottom of
+// the page was before the keyboard opened, which puts it across the middle of the screen and
+// leaves it drifting on every scroll. Hiding it while a field has focus is also the safer
+// behaviour: it is a navigation bar, and one mis-tap abandons a half-written plan.
+//
+// The class is added on every screen width; the stylesheet only acts on it below 700px, where
+// the bar is fixed in the first place.
+(function () {
+    try {
+        var tabs = document.querySelector('.hp-tabs');
+        if (!tabs) return;
+
+        // Everything that isn't one of these raises a keyboard or a picker, including
+        // datetime-local, which the plan editor uses.
+        var NO_KEYBOARD = {
+            button: 1, submit: 1, reset: 1, checkbox: 1, radio: 1,
+            file: 1, image: 1, color: 1, range: 1, hidden: 1
+        };
+        function typing(el) {
+            if (!el || !el.tagName) return false;
+            if (el.isContentEditable) return true;
+            if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+            return el.tagName === 'INPUT' && !NO_KEYBOARD[(el.type || 'text').toLowerCase()];
+        }
+        function away(on) { tabs.classList.toggle('hp-tabs-away', on); }
+
+        document.addEventListener('focusin', function (e) { if (typing(e.target)) away(true); });
+        document.addEventListener('focusout', function () { away(false); });
+
+        // iOS lets you swipe the keyboard down without blurring the field, so focusout is not the
+        // only way back and the bar would stay hidden with nothing on screen explaining why. The
+        // visible viewport returning to its resting height means the keyboard has gone, whatever
+        // the focus says. Only the height is read, never a position: no arithmetic that could
+        // misplace the bar, just shown or hidden.
+        var vv = window.visualViewport;
+        if (!vv) return;
+        var rest = vv.height;
+        window.addEventListener('orientationchange', function () { rest = 0; });
+        vv.addEventListener('resize', function () {
+            if (vv.height > rest) rest = vv.height;
+            if (vv.height >= rest - 60) away(false);
+            else if (typing(document.activeElement)) away(true);
+        });
+    } catch (e) {
+        // Leave the bar exactly as it was: fixed, and visible.
+    }
+})();
+</script>
+<script>
 // ── Scroll wheel over a number field ─────────────────────────────────────
 // Its own IIFE for the same reason as the block above: nothing here is worth risking the delete
 // confirmations over.

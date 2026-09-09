@@ -195,6 +195,21 @@ answer in September.
   before and after, along with the plain paths: a new tag typed and then clicked away from, and
   Enter with nothing highlighted, still make one chip and don't submit the form. Any third commit
   path you add needs the same two guards.
+- **The bottom tab bar steps out of the way while a field has focus, on purpose.**
+  `position: fixed` pins it to the *layout* viewport, and an on-screen keyboard does not shrink
+  that: reported from a phone editing a plan, the bar stopped sitting at the bottom the moment a
+  text field was tapped and drifted across the middle of the screen on every scroll. It is also a
+  navigation bar, so a mis-tap on it abandons a half-written plan. It now slides off on `focusin`
+  of anything that raises a keyboard or a picker (`datetime-local`, which the plan editor uses,
+  counts) and comes back on `focusout`. Two things to keep if you touch it. The CSS rule sits in a
+  `max-width: 699.98px` block, because from 700px up the bar is in normal flow beside the header
+  and hiding it there would be a bug. And the `visualViewport` resize check is the only way back
+  when iOS lets you swipe the keyboard down without blurring the field, which `focusout` never
+  sees; it reads the height only, never a position, so it can move the bar out of sight or back
+  but never misplace it. Verified in an emulated phone viewport: focus hides it, blur restores it,
+  focusing a submit button does not, the desktop width is untouched, and the viewport returning to
+  its resting height brings it back while the field still holds focus. Not verified on a real
+  iPhone, which is where the underlying behaviour comes from.
 - **A wheel over a focused `<input type="number">` edits it.** Type 12 into a drill's run time,
   then two-finger scroll down the page to reach Save, and you save 13 without ever seeing it
   change. Reproduced: 12 became 13 on a single wheel event. The layout now drops focus from any
