@@ -57,6 +57,21 @@ builder.Services.AddSingleton<DatabaseBackupService>();
 // memory, so a restart clears it, which is the failure direction to want: a site that can get
 // stuck open, never one stuck read-only with nobody left who knows why.
 builder.Services.AddSingleton<MaintenanceState>();
+// Off-site archive of the whole volume. Same shape as IEmailSender below: a real store when the
+// credentials are there, an inert one when they are not, so the app builds and runs locally with
+// no cloud config at all and the admin page simply says archiving is off.
+builder.Services.Configure<VolumeBackupOptions>(builder.Configuration.GetSection("Archive"));
+builder.Services.AddSingleton<VolumeBackupService>();
+builder.Services.AddSingleton<BackupStatus>();
+builder.Services.AddSingleton<BackupRunner>();
+
+if (S3BackupStore.IsConfigured(builder.Configuration))
+    builder.Services.AddSingleton<IBackupStore, S3BackupStore>();
+else
+    builder.Services.AddSingleton<IBackupStore, NullBackupStore>();
+
+builder.Services.AddHostedService<ScheduledBackupService>();
+
 builder.Services.AddSingleton<LinkExtractionService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<VideoTitleService>();

@@ -145,10 +145,11 @@
     <div class="hp-section">Backup</div>
     <div class="hp-panel">
         <p class="hp-muted" style="margin-top:0;">
-            The download is the whole site in one file: every team, plan, drill, roster and view
+            The download is the database in one file: every team, plan, drill, roster and view
             history, plus the codes. Treat it like the codes themselves. It does
             <strong>not</strong> include uploaded PDFs or drill pictures, which are files on the
-            volume rather than rows in the database.
+            volume rather than rows in the database. <strong>Off-site backups below do include
+            them</strong>, and are the ones to reach for if the app is ever lost.
         </p>
 
         @if (Model.WritesPaused)
@@ -254,6 +255,136 @@
                 </p>
             }
         </details>
+    </div>
+
+    <div class="hp-section">Off-site backups</div>
+    <div class="hp-panel">
+        <p class="hp-muted" style="margin-top:0;">
+            A copy of the <strong>whole volume</strong> in one zip: the database, every plan PDF,
+            every drill picture, and the keys that keep people signed in. It goes to Cloudflare
+            storage, which is not UpTurtle, so it survives the app being deleted.
+        </p>
+
+        @if (!Model.ArchivingConfigured)
+        {
+            <div class="hp-warn">
+                <strong>Not set up yet.</strong> Off-site backups need the storage endpoint, the
+                bucket and its two keys set on the app. Until then nothing is backed up off site
+                and nothing runs overnight.
+            </div>
+        }
+        else
+        {
+            @* The last run comes from the bucket, not from memory: the app forgets on every
+               restart, and a restore restarts on purpose. Saying "never run" while three good
+               archives sit in storage would be the worst possible thing to tell someone
+               checking whether their backups work. *@
+            @if (Model.ArchiveListError is not null)
+            {
+                <div class="hp-warn">
+                    <strong>Could not reach the backup storage just now.</strong>
+                    This does not mean your backups are gone, only that this page could not list
+                    them. <span class="hp-mono" style="font-size:.78rem;">@Model.ArchiveListError</span>
+                </div>
+            }
+            else if (Model.Archives.Count == 0)
+            {
+                <div class="hp-warn">
+                    <strong>No backups off site yet.</strong> Press Archive now to make the first
+                    one, rather than waiting for tonight.
+                </div>
+            }
+            else
+            {
+                var newest = Model.Archives[0];
+                var age = DateTime.UtcNow - newest.CreatedUtc;
+                var stale = age > TimeSpan.FromHours(36);
+                <div class="@(stale ? "hp-warn" : "hp-notice")">
+                    <strong>Last backup @newest.CreatedUtc.ToString("d MMM yyyy HH:mm") UTC</strong>
+                    (@PlanStorageService.Human(newest.Bytes)).
+                    @if (stale)
+                    {
+                        <text>
+                            That is more than a day and a half ago, so the nightly run may not be
+                            working. The error below, if there is one, says why.
+                        </text>
+                    }
+                </div>
+            }
+
+            @if (Model.ArchiveLastAttemptFailed && Model.ArchiveError is not null)
+            {
+                <div class="hp-warn">
+                    <strong>The last attempt failed</strong>
+                    (@Model.ArchiveLastAttemptUtc?.ToString("d MMM HH:mm") UTC):
+                    <span class="hp-mono" style="font-size:.78rem;">@Model.ArchiveError</span>
+                </div>
+            }
+
+        }
+
+        @* The download is outside the "is it configured" check on purpose: it builds the zip
+           locally and streams it, so it works with no cloud storage set up at all. Hiding it
+           would leave an unconfigured site with no way to take a full backup by hand, which is
+           the one situation where it matters most. *@
+        <div class="hp-row" style="margin-top:.6rem;">
+            @if (Model.ArchivingConfigured)
+            {
+                <form method="post" asp-action="ArchiveNow">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn" data-busy="Archiving…">Archive now</button>
+                </form>
+            }
+
+            @* data-download for the same reason the database download needs it: the reply is a
+               file, so the page never navigates and the shared submit-disabling in the layout
+               would leave the button dead. It matters more here, because zipping the whole
+               volume takes noticeably longer than snapshotting the database. *@
+            <form method="post" asp-action="DownloadArchive" data-download>
+                @Html.AntiForgeryToken()
+                <button type="submit" class="hp-btn @(Model.ArchivingConfigured ? "hp-btn-quiet" : "")"
+                        data-busy="Preparing…">
+                    Download a full backup
+                </button>
+            </form>
+        </div>
+
+        <p class="hp-muted" style="font-size:.8rem;margin:.6rem 0 0;">
+            @if (Model.ArchivingConfigured)
+            {
+                <text>
+                    Runs by itself every day at @Model.ArchiveHourUtc:00 UTC, keeping the newest
+                    @Model.ArchiveKeep. Downloading one to your own machine now and then is worth
+                    doing anyway: it is the only copy that does not depend on the storage account
+                    still being there.
+                </text>
+            }
+            else
+            {
+                <text>
+                    Nothing runs on a schedule until this is set up, but you can still take a
+                    full backup by hand right now and keep it somewhere safe.
+                </text>
+            }
+        </p>
+
+        @if (Model.ArchivingConfigured && Model.Archives.Count > 0)
+        {
+            <details style="margin-top:.8rem;">
+                <summary class="hp-muted" style="cursor:pointer;font-size:.82rem;">
+                    The @Model.Archives.Count backup@(Model.Archives.Count == 1 ? "" : "s") off site
+                </summary>
+                <ul class="hp-muted" style="font-size:.82rem;margin:.5rem 0 0;padding-left:1.1rem;">
+                    @foreach (var archive in Model.Archives)
+                    {
+                        <li>
+                            @archive.CreatedUtc.ToString("d MMM yyyy HH:mm") UTC,
+                            @PlanStorageService.Human(archive.Bytes)
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
     </div>
 
     <div class="hp-section">Storage</div>

@@ -47,12 +47,12 @@ public class DatabaseBackupService
     /// that can catch it mid-write and produce a backup that will not open, which is the worst
     /// possible outcome for a backup because you find out only when you need it.
     /// </summary>
-    public async Task<string> SnapshotAsync(CancellationToken ct = default)
+    public async Task<string> SnapshotAsync(string? directory = null, CancellationToken ct = default)
     {
-        // Alongside the live database on purpose: VACUUM INTO cannot write across a filesystem
-        // boundary any more cheaply, and keeping it here means the size counts against the same
-        // quota the caller checked.
-        var target = Path.Combine(_paths.Root, $"snapshot-{Guid.NewGuid():N}.db");
+        // Defaults to the volume, where the size counts against the same quota the caller
+        // checked. The nightly archive passes the container's ephemeral temp instead, because a
+        // backup must not need free space on the disk it exists to protect.
+        var target = Path.Combine(directory ?? _paths.Root, $"snapshot-{Guid.NewGuid():N}.db");
 
         await using var connection = new SqliteConnection(_paths.ConnectionString);
         await connection.OpenAsync(ct);

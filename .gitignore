@@ -495,3 +495,8 @@ publish/
 # subscriber emails and the whole roster. One `git add -A` would publish the lot.
 restore/
 *.db
+
+# Volume archives. Same reasoning as above, and then some: an archive carries the database AND
+# the Data Protection key ring, which is the material that signs the access cookie. Anyone
+# holding one could forge access to the site, not merely read a copy of it.
+hockeypractice-*.zip

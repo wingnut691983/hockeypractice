@@ -21,6 +21,16 @@
          linux/amd64 base, so a package with native per-RID assets would build fine and fail at
          runtime. Do not "upgrade to latest" without reading this. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <!-- Uploads the nightly volume archive to Cloudflare R2 over the S3-compatible API.
+         Pinned to an EXACT version, not 3.7.*: the request shape changes inside that range.
+         3.7.305 has no RequestChecksumCalculation; 3.7.511 does, which marks AWS's default
+         request-checksum rollout and is a known source of failures against non-AWS S3
+         endpoints. S3BackupStore sets it to WhenRequired explicitly so the default can never
+         move under us on an upgrade. If an upload ever fails with a checksum or signature
+         error, that setting is the first thing to look at.
+         Fully managed with a net8.0 target and no runtimes/ native assets, which is what the
+         ImageSharp note above requires of every package here. -->
+    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
   </ItemGroup>
 
 </Project>

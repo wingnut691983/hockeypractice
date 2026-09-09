@@ -7,6 +7,7 @@ using HockeyPractice.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
 namespace HockeyPractice.Controllers;
@@ -36,6 +37,10 @@ public class SiteAdminController : Controller
     private readonly PlanStorageService _storage;
     private readonly DatabaseBackupService _backup;
     private readonly MaintenanceState _maintenance;
+    private readonly BackupRunner _runner;
+    private readonly IBackupStore _store;
+    private readonly BackupStatus _archiveStatus;
+    private readonly VolumeBackupOptions _archiveOptions;
     private readonly DataPaths _paths;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<SiteAdminController> _log;
@@ -43,6 +48,8 @@ public class SiteAdminController : Controller
 
     public SiteAdminController(AppDbContext db, TeamAccessService access,
         PlanStorageService storage, DatabaseBackupService backup, MaintenanceState maintenance,
+        BackupRunner runner, IBackupStore store, BackupStatus archiveStatus,
+        IOptions<VolumeBackupOptions> archiveOptions,
         DataPaths paths, IHostApplicationLifetime lifetime, IConfiguration config,
         ILogger<SiteAdminController> log)
     {
@@ -51,6 +58,10 @@ public class SiteAdminController : Controller
         _storage = storage;
         _backup = backup;
         _maintenance = maintenance;
+        _runner = runner;
+        _store = store;
+        _archiveStatus = archiveStatus;
+        _archiveOptions = archiveOptions.Value;
         _paths = paths;
         _lifetime = lifetime;
         _log = log;
@@ -329,7 +340,7 @@ public class SiteAdminController : Controller
         string snapshot;
         try
         {
-            snapshot = await _backup.SnapshotAsync(ct);
+            snapshot = await _backup.SnapshotAsync(null, ct);
         }
         catch (Exception ex)
         {
@@ -433,6 +444,85 @@ public class SiteAdminController : Controller
         return View("Restored");
     }
 
+    // ── Off-site backups ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds an archive and uploads it now, rather than waiting for tonight.
+    ///
+    /// No pause required, same reasoning as the database download: the database half is a
+    /// snapshot taken inside a read transaction, and requiring a pause for a routine backup only
+    /// teaches people to skip backups. Unlike the nightly run this does not skip while writes are
+    /// paused, because someone pressing the button has decided.
+    /// </summary>
+    [HttpPost("backup/archive")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ArchiveNow(CancellationToken ct)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        var result = await _runner.RunAsync("manual", skipWhilePaused: false, ct);
+
+        if (result.AlreadyRunning)
+            return RedirectToAction(nameof(Index), new
+            {
+                notice = "An archive is already running. Give it a minute and reload."
+            });
+
+        if (!result.Ok)
+            return View("Index", await BuildAsync(null,
+                $"The archive failed. {result.Error}"));
+
+        var pruned = result.Pruned == 0
+            ? ""
+            : $" {result.Pruned} older archive{(result.Pruned == 1 ? " was" : "s were")} removed.";
+
+        return RedirectToAction(nameof(Index), new
+        {
+            notice = $"Archived {result.Uploaded!.Name} " +
+                     $"({PlanStorageService.Human(result.Uploaded.Bytes)}) off site.{pruned}"
+        });
+    }
+
+    /// <summary>
+    /// Streams a full archive to the browser, without putting it in the bucket.
+    ///
+    /// This is the answer to the Cloudflare account itself going away, since R2 and the DNS live
+    /// behind the same login. Worth pressing occasionally even when the nightly job is healthy.
+    /// </summary>
+    [HttpPost("backup/archive/download")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DownloadArchive(CancellationToken ct)
+    {
+        if (!_access.IsSiteAdmin(User)) return Forbid();
+
+        BackupResult? built;
+        try
+        {
+            built = await _runner.BuildForDownloadAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError("Could not build an archive for download: {Type}: {Error}",
+                ex.GetType().FullName, ex.Message);
+            return View("Index", await BuildAsync(null,
+                "Could not build the archive. The log has the detail."));
+        }
+
+        if (built is null)
+            return View("Index", await BuildAsync(null,
+                "An archive is already running. Give it a minute and try again."));
+
+        _log.LogInformation("Site admin downloaded a full archive ({Bytes} bytes)", built.Bytes);
+
+        // DeleteOnClose, as the database download does: the framework streams the file and
+        // disposes the handle, and the archive goes with it. Without this a full copy of the
+        // volume piles up on the container's disk on every download.
+        var stream = new FileStream(built.Path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 64 * 1024, FileOptions.DeleteOnClose);
+
+        return File(stream, "application/zip", Path.GetFileName(built.Path));
+    }
+
     private static void TryDelete(string path)
     {
         try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
@@ -451,6 +541,25 @@ public class SiteAdminController : Controller
             })
             .ToListAsync();
 
+        // Listing R2 on every admin page load is a network call, so it is wrapped: if the
+        // bucket is unreachable the page still renders and SAYS so. Swallowing this into an
+        // empty list would read as "you have no backups", which is the most alarming possible
+        // way to report a transient network error.
+        IReadOnlyList<StoredBackup> archives = Array.Empty<StoredBackup>();
+        string? archiveListError = null;
+        if (_store.Enabled)
+        {
+            try
+            {
+                archives = await _store.ListAsync();
+            }
+            catch (Exception ex)
+            {
+                archiveListError = $"{ex.GetType().Name}: {ex.Message}";
+                _log.LogError("Could not list the archive bucket: {Error}", archiveListError);
+            }
+        }
+
         return new AdminViewModel
         {
             Teams = teams,
@@ -464,7 +573,16 @@ public class SiteAdminController : Controller
             DatabaseBytes = _backup.DatabaseBytes,
             ReplacedBytes = _backup.ReplacedBytes,
             ReplacedAtUtc = _backup.ReplacedAtUtc,
-            ReplacedPath = _backup.ReplacedDatabase
+            ReplacedPath = _backup.ReplacedDatabase,
+            ArchivingConfigured = _store.Enabled,
+            Archives = archives,
+            ArchiveListError = archiveListError,
+            ArchiveLastAttemptUtc = _archiveStatus.LastAttemptUtc,
+            ArchiveLastAttemptFailed = _archiveStatus.LastAttemptFailed,
+            ArchiveError = _archiveStatus.LastError,
+            ArchiveRunning = _archiveStatus.Running,
+            ArchiveKeep = _archiveOptions.Keep,
+            ArchiveHourUtc = _archiveOptions.HourUtc
         };
     }
 

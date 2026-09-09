@@ -40,6 +40,21 @@ public class DataPaths
 
     public string TeamsRoot => Path.Combine(Root, "teams");
 
+    /// <summary>
+    /// Touched when a restore completes. The nightly archive reads it so its startup catch-up
+    /// does not immediately back up a just-restored volume and spend a retention slot on it
+    /// while someone is still deciding whether the restore was the right one.
+    ///
+    /// A file rather than the mtime of the kept .replaced database, which looks like it would do
+    /// the same job and does not: File.Move preserves the modified time, so that value is when
+    /// the OLD database was last written, which on a quiet site can be days before the restore.
+    /// </summary>
+    public string RestoreMarker => Path.Combine(Root, "last-restore");
+
+    /// <summary>When the last restore finished, or null if this volume has never had one.</summary>
+    public DateTime? LastRestoreUtc =>
+        File.Exists(RestoreMarker) ? File.GetLastWriteTimeUtc(RestoreMarker) : null;
+
     public string TeamDirectory(int teamId) => Path.Combine(TeamsRoot, teamId.ToString());
 
     public string PlanDirectory(int teamId, int planId) =>
