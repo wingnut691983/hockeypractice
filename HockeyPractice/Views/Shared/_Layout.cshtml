@@ -195,6 +195,11 @@
         entry.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            // A highlighted suggestion belongs to the suggestion script below, which commits it
+            // on this same keypress. This handler is registered first and therefore runs first,
+            // so adding the typed text here as well is how "split" ended up as a chip of its own
+            // beside "Split Ice". aria-activedescendant is only set while a row is highlighted.
+            if (entry.getAttribute('aria-activedescendant')) return;
             add(entry.value);
         });
 
@@ -204,7 +209,15 @@
             if (e && e.inputType === 'insertReplacementText') add(entry.value);
         });
 
-        entry.addEventListener('blur', function () { add(entry.value); });
+        entry.addEventListener('blur', function () {
+            // Pressing a suggestion blurs this input before the pick commits, because the panel
+            // isn't focusable and the suggestion script deliberately doesn't preventDefault on
+            // pointerdown (that would kill scrolling on iOS). Committing here as well added the
+            // partial word as its own chip next to the tag that was actually clicked. The marker
+            // is set on pointerdown and cleared on release, so it spans exactly that window.
+            if (entry.hasAttribute('data-suggest-press')) return;
+            add(entry.value);
+        });
 
         var addButton = document.querySelector('[data-tagadd="' + entry.id + '"]');
         if (addButton) {
@@ -264,6 +277,14 @@
             var press = null;
             var TAP_SLOP = 10;   // px of movement still counted as a tap, not a drag
 
+            // Ends the press and tells the chip script the input is no longer mid-pick. Every
+            // path that clears `press` goes through here, or a stale marker would swallow a
+            // later real blur and lose a typed tag.
+            function endPress() {
+                press = null;
+                input.removeAttribute('data-suggest-press');
+            }
+
             function close() {
                 open = false; active = -1;
                 panel.hidden = true;
@@ -299,11 +320,12 @@
                     // commits whatever is under the finger. Decide on release instead.
                     row.addEventListener('pointerdown', function (e) {
                         press = { row: row, value: value, x: e.clientX, y: e.clientY, drag: false };
+                        input.setAttribute('data-suggest-press', '');
                     });
 
                     row.addEventListener('pointerup', function () {
                         var p = press;
-                        press = null;
+                        endPress();
                         if (!p || p.drag || p.row !== row) return;
                         pick(value);
                     });
@@ -364,14 +386,14 @@
 
             // iOS fires this the moment it takes the gesture over for scrolling, which makes it
             // the most reliable "this was not a tap" signal available.
-            panel.addEventListener('pointercancel', function () { press = null; });
+            panel.addEventListener('pointercancel', function () { endPress(); });
 
             // Safety net. A drag that starts on a row and releases anywhere else never reaches the
             // row's own pointerup, so without this `press` would stay set and the blur guard above
             // would keep the panel open for good. Runs after the row handler, which has already
             // done its work by the time the event bubbles this far.
-            window.addEventListener('pointerup', function () { press = null; });
-            window.addEventListener('pointercancel', function () { press = null; });
+            window.addEventListener('pointerup', function () { endPress(); });
+            window.addEventListener('pointercancel', function () { endPress(); });
 
             input.addEventListener('focus', function () {
                 // Consumed here as well as cleared on a timer. Whether the refocus in pick()
@@ -427,6 +449,27 @@
         });
     } catch (e) {
         // Leave the datalist in place and say nothing: the field still works, just natively.
+    }
+})();
+</script>
+<script>
+// ── Scroll wheel over a number field ─────────────────────────────────────
+// Its own IIFE for the same reason as the block above: nothing here is worth risking the delete
+// confirmations over.
+//
+// A focused <input type="number"> treats a wheel or two-finger trackpad scroll as increment /
+// decrement. On a Mac that means typing a run time of 12, scrolling the page to reach Save, and
+// saving 13 without ever seeing it change (reproduced: one wheel event took 12 to 13). Dropping
+// focus rather than preventing the wheel keeps the page scrolling normally; the typed value is
+// untouched and the arrows and keyboard still work.
+(function () {
+    try {
+        document.addEventListener('wheel', function () {
+            var el = document.activeElement;
+            if (el && el.type === 'number') el.blur();
+        }, { passive: true });
+    } catch (e) {
+        // An older browser without the options object: leave the field alone.
     }
 })();
 </script>

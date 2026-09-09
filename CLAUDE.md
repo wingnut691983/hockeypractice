@@ -99,6 +99,13 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
   once a player is known — see README before touching the `Viewed` beacon or its indexes.
 - **The team (player) code is stored in plain text on purpose**, so a manager can re-share the
   join link; the manager code and site-admin code stay hash-only.
+- **The tag editor's two scripts must not both commit the same keystroke.** The chip script adds
+  on blur and on Enter; the suggestion panel blurs the input on `pointerdown` (it can't
+  `preventDefault` there without killing iOS scrolling) and commits on release. They coordinate
+  through the DOM (`data-suggest-press` on the input during a press, `aria-activedescendant` for
+  a highlighted row), or picking a suggestion also adds the half-typed word beside it.
+- **A run time is required when creating a drill, optional when editing one.** Drills that
+  pre-date the rule have none, and blocking an unrelated edit over it would punish them for that.
 - **PDF auto-sizing observes `#viewer` inside the iframe, not `#viewerContainer`** — the latter's
   own box doesn't grow as content overflows it, so a ResizeObserver on it never fires.
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org is an

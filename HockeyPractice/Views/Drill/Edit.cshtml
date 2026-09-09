@@ -55,13 +55,28 @@
         <div class="hp-field">
             <label class="hp-label" for="runTimeMinutes">Approx. run time (minutes)</label>
             @* type=number with inputmode=numeric so a phone shows the digit pad. The real bounds
-               check is server-side; min/max here just steer the spinner. *@
+               check is server-side; min/max here just steer the spinner.
+
+               required only on a new drill, matching ValidateFields: older drills and copies of
+               them have no run time, and forcing one before an unrelated edit can be saved would
+               be a tax on drills that pre-date the rule. *@
             <input class="hp-input" type="number" id="runTimeMinutes" name="runTimeMinutes"
                    min="1" max="@HockeyPractice.Infrastructure.RunTime.MaxMinutes" step="1"
-                   inputmode="numeric" value="@Model.RunTimeValue" placeholder="e.g. 12" />
+                   inputmode="numeric" value="@Model.RunTimeValue" placeholder="e.g. 12"
+                   required="@(Model.IsNew ? "required" : null)" />
             <span class="hp-muted" style="font-size:.8rem;">
-                Added up across a plan so you can see whether practice fits your ice time. Leave
-                blank if you're not sure &mdash; the total will say how many are unset.
+                Added up across a plan so you can see whether practice fits your ice time.
+                @if (Model.IsNew)
+                {
+                    <text>A rough guess is fine. You can change it later.</text>
+                }
+                else
+                {
+                    <text>
+                        Leave blank if you're not sure &mdash; the total will say how many are
+                        unset.
+                    </text>
+                }
             </span>
         </div>
 

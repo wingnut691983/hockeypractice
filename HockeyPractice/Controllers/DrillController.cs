@@ -95,7 +95,7 @@ public class DrillController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
 
-        var error = ValidateFields(title, videoUrl, runTimeMinutes);
+        var error = ValidateFields(title, videoUrl, runTimeMinutes, requireRunTime: true);
         if (error is not null)
             return await RedisplayAsync(ctx!, null, error, title, description, videoUrl,
                 runTimeMinutes, tags, returnUrl);
@@ -759,9 +759,19 @@ public class DrillController : TeamScopedController
         });
     }
 
-    private static string? ValidateFields(string? title, string? videoUrl, string? runTimeMinutes)
+    /// <summary>
+    /// <paramref name="requireRunTime"/> is on for a new drill and off for an edit. A run time is
+    /// what makes a plan total mean anything, so a new drill has to carry one. Drills that
+    /// pre-date the rule, and copies of them, have none, and demanding one before a coach can fix
+    /// a typo in the title would punish them for that.
+    /// </summary>
+    private static string? ValidateFields(string? title, string? videoUrl, string? runTimeMinutes,
+        bool requireRunTime = false)
     {
         if (string.IsNullOrWhiteSpace(title)) return "Give the drill a name.";
+
+        if (requireRunTime && string.IsNullOrWhiteSpace(runTimeMinutes))
+            return "Say roughly how long the drill takes, in minutes.";
 
         if (!string.IsNullOrWhiteSpace(videoUrl))
         {

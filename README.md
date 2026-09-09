@@ -179,6 +179,37 @@ answer in September.
   change as content overflows it, so a `ResizeObserver` on it never fires as pages render in.
   `#viewer` is the plain block-flow div pdf.js actually stacks pages into; that's what grows
   with content and what has to be observed. Got this wrong once already — see `Details.cshtml`.
+- **The tag box commits on blur *and* on Enter, and the suggestion panel drives both of them.**
+  Typing "touch" and then picking "Touch Pass" used to leave the wrong chips behind, two different
+  ways. With the mouse: pressing a suggestion row blurs the input (the panel isn't focusable, and
+  the suggestion script deliberately does *not* `preventDefault` on `pointerdown`, because that is
+  what made the list unscrollable on iOS), so the chip script's blur handler committed the partial
+  word. Measured in headless Chrome against the old code: the chips came out `["touch"]` and the
+  tag actually clicked never landed at all. With the keyboard: ArrowDown then Enter produced
+  `["touch", "Touch Pass"]`, because the chip script's `keydown` is registered first and therefore
+  runs first, and the suggestion script's `preventDefault` cannot undo a commit that has already
+  happened. The two scripts are separate IIFEs on purpose (see the comment above the suggestion
+  one), so they coordinate through the DOM instead: the panel sets `data-suggest-press` on the
+  input for exactly the length of a press and blur skips while it's there, and Enter defers to the
+  suggestion script whenever `aria-activedescendant` says a row is highlighted. Both fixes verified
+  before and after, along with the plain paths: a new tag typed and then clicked away from, and
+  Enter with nothing highlighted, still make one chip and don't submit the form. Any third commit
+  path you add needs the same two guards.
+- **A wheel over a focused `<input type="number">` edits it.** Type 12 into a drill's run time,
+  then two-finger scroll down the page to reach Save, and you save 13 without ever seeing it
+  change. Reproduced: 12 became 13 on a single wheel event. The layout now drops focus from any
+  focused number field on a wheel, rather than preventing the wheel: the page keeps scrolling
+  normally, the typed value is untouched, and the arrows and keyboard still work. It's its own
+  small IIFE for the same reason the suggestion script is. Nothing about a spinner is worth
+  risking the delete confirmations over.
+- **A run time is required on a new drill and optional on an edit, and the asymmetry is on
+  purpose.** Without a time a drill contributes nothing to the plan total, which is the number a
+  coach uses to decide whether practice fits the ice time, so a new one has to carry one
+  (`ValidateFields(..., requireRunTime: true)` from `Create`, plus `required` on the input, which
+  the view puts there only when `Model.IsNew`). Drills that pre-date the rule, and copies of them,
+  have no time; demanding one before a coach can fix a typo in a title would be a tax on them for
+  that. So `Update` stays optional, and `RunTime.StartTimes` and `PlanTotal` must keep handling
+  nulls honestly rather than treating a blank as zero.
 - **One plan can legitimately hold two links to the same video, so never key a dictionary on
   `PlanLink.Url` without grouping first.** Extraction keeps a separate card whenever the document
   names the same clip differently, because a warm-up video demonstrating three drills is three
