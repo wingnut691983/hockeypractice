@@ -145,6 +145,28 @@ answer in September.
 
 ## What I'd flag
 
+- **The What's new page is public, and changelog entries kept leaking security detail.** It is
+  served with no sign-in on purpose (`HomeController.WhatsNew`, so a player or parent can read it
+  without being handed anything first), which means every word on it is readable by anyone probing
+  the site. Written as if it were an internal changelog, several entries had spelled out how the
+  code box's guess limiting is measured and configured, how the off-site archive is retained, and
+  which admin-only paths exist for putting an archive back. Read together they were a tuning guide
+  for guessing a team code, which no entry on that page needs to be. Rewritten on 2026-09-10; the
+  view now carries a comment saying the same thing where the next batch gets written.
+
+  The rule: say what changed and what it means for the person reading. No thresholds, no counts,
+  no keying, no admin-only paths, and never which piece of infrastructure was at fault. "Guessing a
+  team code is rate-limited" is the entry; the number is not. Also removed was an entry announcing
+  that access codes used to appear in web addresses, because the fix had already shipped and the
+  announcement only told people where to go looking. A fixed exposure does not need announcing to
+  readers who cannot act on it; if one ever does, rotate the affected codes and tell managers
+  directly instead of publishing it. Nothing was known to be exploited, and this came from reading
+  the page rather than from an incident.
+
+  Note this repo is public, so the pre-rewrite wording is still in git history and this file is
+  published too. That is why this entry describes the *categories* rather than restating the
+  values: the detail that makes the lesson stick here is the rule, not the numbers.
+
 - **Site admin used to implicitly be a manager of every team** — one line
   (`if (IsSiteAdmin) return TeamAccessLevel.SiteAdmin`) put it at the top of the same access
   ladder as team roles. Fixed: site admin is a completely separate axis now. It can *grant*

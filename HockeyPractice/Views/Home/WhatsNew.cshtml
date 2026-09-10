@@ -2,6 +2,10 @@
 @*
     Newest batch at the top. To add the next one, copy a <div class="hp-section"> date heading
     and the panel under it, and leave the older entries below it untouched.
+
+    This page is public and needs no sign-in, so keep entries to what changed and what it means
+    for the person reading. No thresholds, no retention counts, no admin-only paths, and nothing
+    about which piece of infrastructure was at fault. See README's "What I'd flag".
 *@
 <div class="hp-rail"></div>
 <div class="hp-shell">
@@ -19,71 +23,60 @@
     <div class="hp-panel hp-changelog">
         <p class="hp-changelog-lead">
             <strong>The whole site is now backed up off site every night, and can be put back in
-            one action.</strong> This one is written down because it was learned the hard way: when
-            the hosting trial ended on 7 September the site's storage went with it. A copy of the
-            database had been downloaded by hand so the teams, plans and rosters came back, but
-            every uploaded plan PDF and drill diagram was gone. The backup now covers all of it.
+            one action.</strong> On 7 September the site's stored files were lost. Teams, plans and
+            rosters came back from a copy of the database, but uploaded plan PDFs and drill diagrams
+            had to be added again. The backup now covers all of it.
         </p>
 
         <h2>Players and parents</h2>
         <ul>
             <li>
                 <strong>The bottom bar gets out of the way while you're typing.</strong> On a phone
-                it used to float across the middle of the screen once the keyboard was up, and it's
-                a navigation bar, so one mis-tap lost what you were writing.
+                it no longer floats across the middle of the screen once the keyboard is up.
             </li>
         </ul>
 
         <h2>Coaches</h2>
         <ul>
             <li>
-                <strong>Access codes no longer end up in web addresses.</strong> A code is shown on
-                the page once instead, so it isn't left sitting in your browser history.
+                <strong>Publish is where you can reach it</strong>, above the drill library rather
+                than below the whole library and its page buttons.
             </li>
             <li>
-                <strong>Publish is where you can reach it.</strong> It sits above the drill library
-                now, rather than below the whole library and its page buttons.
+                <strong>Searching the drill picker keeps you at the picker</strong>, instead of
+                dropping you at the top of the page.
             </li>
             <li>
-                <strong>Searching the drill picker brings you back to the picker.</strong> Filtering
-                by tag used to reload the page and drop you at the very top, about 3,000 pixels
-                above the results you had just asked for.
-            </li>
-            <li>
-                <strong>Picking a tag no longer adds the half-typed one beside it.</strong> Typing
-                "split" and picking Split Ice used to leave a stray tag behind, both with the mouse
-                and with the keyboard.
+                <strong>Picking a tag no longer adds the half-typed one beside it</strong>, with
+                either the mouse or the keyboard.
             </li>
             <li>
                 <strong>A run time is required when creating a drill</strong>, so plan totals mean
-                something. It stays optional when editing, because older drills and copies of them
-                don't have one and a typo fix shouldn't be blocked over it.
+                something. Still optional when editing, so a typo fix isn't blocked on an older
+                drill that hasn't got one.
             </li>
             <li>
-                <strong>Scrolling over the minutes box no longer changes it.</strong> A wheel over
-                the field could turn 12 into 13 without anyone noticing.
+                <strong>Scrolling over the minutes box no longer changes it.</strong>
             </li>
             <li>
-                <strong>Re-extract links no longer breaks a plan.</strong> If a plan named the same
-                video twice and you had relabelled both cards, the button returned an error and
-                stayed broken for that plan.
+                <strong>Re-extract links no longer errors</strong> on a plan that names the same
+                video twice.
             </li>
         </ul>
 
         <h2>Behind the scenes</h2>
         <ul>
             <li>
-                <strong>A nightly archive of everything</strong>, database, plan PDFs, drill
-                pictures and team logos, stored off site with the newest three kept.
+                <strong>A nightly archive of everything</strong>: database, plan PDFs, drill
+                pictures and team logos, kept off site.
             </li>
             <li>
-                <strong>Restore in one action.</strong> Site admin can put a whole archive back,
-                picked from storage or uploaded, without re-uploading a season of files by hand.
-                A restore only ever adds or replaces files, never deletes them.
+                <strong>Restore in one action</strong>, so a season of uploaded files never has to
+                be put back by hand.
             </li>
             <li>
-                <strong>A backup that fails can't take the site down</strong>, and site admin shows
-                when the last one ran and what went wrong if it didn't.
+                <strong>A backup that fails can't take the site down</strong>, and a failed one
+                gets noticed rather than passing quietly.
             </li>
         </ul>
     </div>
@@ -92,31 +85,28 @@
 
     <div class="hp-panel hp-changelog">
         <p class="hp-changelog-lead">
-            <strong>Tags now work properly on a phone.</strong> Two things that had been reported:
-            adding a tag to a drill showed none of the tags the team already used, and the tag
-            search box offered no suggestions. Both were built on a browser feature that mobile
-            Safari quietly ignores, so nothing appeared and nothing said why.
+            <strong>Tags now work properly on a phone.</strong> Adding a tag to a drill showed none
+            of the tags the team already used, and the tag search box offered no suggestions.
+            Both are fixed.
         </p>
         <ul>
             <li>
                 <strong>The tag list opens when you tap the box</strong>, not only once you start
-                typing, so you can see what already exists before making a near-duplicate of it.
-                Typing filters the list.
+                typing, so you can see what already exists before making a near-duplicate. Typing
+                filters the list.
             </li>
             <li>
                 <strong>You can scroll the tag list with a finger</strong> without it picking
-                whichever tag you touched. It's about four rows tall on a phone with the rest a
-                scroll away, so it doesn't shove the page around.
+                whichever tag you touched.
             </li>
             <li>
                 <strong>The drill library and the plan editor's picker are paged</strong>, 12 at a
-                time, with Prev, Next and numbered pages. A library past a handful of drills was an
-                endless scroll on a phone. Filters and your place in the list survive adding,
-                moving and removing drills.
+                time, with Prev, Next and numbered pages. Filters and your place in the list
+                survive adding, moving and removing drills.
             </li>
             <li>
                 <strong>Pick drills to copy is deliberately not paged</strong>, so turning a page
-                can't quietly lose everything you'd ticked.
+                can't lose everything you'd ticked.
             </li>
         </ul>
     </div>
@@ -128,7 +118,7 @@
             <li>
                 <strong>The EB logo is on the site</strong>, on the front page and at the top left
                 of every team page, where it links back to the team list. On a narrow phone it
-                shrinks to just the emblem so the team name and menu still fit on one line.
+                shrinks to just the emblem.
             </li>
             <li>
                 <strong>A proper icon for the browser tab and the home screen</strong>, including
@@ -136,14 +126,9 @@
             </li>
             <li>
                 <strong>The practice date box no longer overflows the form on an iPhone.</strong>
-                Safari sized it to its own content and pushed the whole page sideways.
             </li>
             <li>
-                <strong>The code box limits how fast codes can be guessed</strong>, counted per
-                team rather than per device. The old per-device limit had quietly stopped working
-                behind our host's gateway, which made it no limit at all. It's 30 tries a minute
-                now, which is room for a whole squad typing the code in at once on the first night
-                of a season.
+                <strong>The code box limits how fast codes can be guessed.</strong>
             </li>
         </ul>
     </div>
@@ -172,11 +157,11 @@
             </li>
             <li>
                 <strong>Drills can have more than one picture</strong>, shown in the order the
-                coach added them, for a progression that needs a diagram per stage.
+                coach added them.
             </li>
             <li>
-                <strong>A way to send feedback.</strong> There's a footer on every page now with
-                a Contact us link, for anything that looks wrong or anything you'd like added.
+                <strong>A way to send feedback.</strong> There's a Contact us link in the footer of
+                every page.
             </li>
         </ul>
 
@@ -184,52 +169,50 @@
         <ul>
             <li>
                 <strong>Paste or drag a screenshot straight in.</strong> Clip a diagram out of a
-                PDF or a video and paste it onto the drill form. No need to save it as a file
+                PDF or a video and paste it onto the drill form, with no need to save it as a file
                 first.
             </li>
             <li>
                 <strong>Approximate run time, totalled across the plan</strong>, so you can see
-                whether practice fits the ice time you've booked. Leave it blank if you're not
-                sure and the total says how many are unset.
+                whether practice fits the ice time you've booked. Leave it blank and the total says
+                how many are unset.
             </li>
             <li>
-                <strong>Up to six pictures per drill</strong>, added several at a time and kept
-                in order. New pictures add to a drill rather than replacing what's there.
+                <strong>Up to six pictures per drill</strong>, added several at a time and kept in
+                order. New pictures add to a drill rather than replacing what's there.
             </li>
             <li>
-                <strong>Pictures keep their shape.</strong> Diagrams were being squashed out of
+                <strong>Pictures keep their shape</strong>, rather than being squashed out of
                 proportion.
             </li>
             <li>
-                <strong>Saving a drill takes you back to the library</strong>, rather than
-                leaving you on the form wondering whether it saved.
+                <strong>Saving a drill takes you back to the library</strong>, rather than leaving
+                you on the form wondering whether it saved.
             </li>
         </ul>
 
         <h2>Coaches: finding things</h2>
         <ul>
             <li>
-                <strong>Tags are chips now</strong>, added one at a time with suggestions from
-                tags the team already uses, each with a small x to remove it. The old single
-                comma-separated box is gone.
+                <strong>Tags are chips now</strong>, added one at a time with suggestions from tags
+                the team already uses, each with a small x to remove it. The old comma-separated
+                box is gone.
             </li>
             <li>
                 <strong>Search by name as well as by tag</strong>, on both the drill library and
-                the plan list. Use either box on its own, or both together to narrow: filter to a
-                tag, then search within those results by name.
+                the plan list. Use either on its own, or both together to narrow.
             </li>
             <li>
-                <strong>A clear banner when a filter is on.</strong> If a list looks short or
-                empty, it now tells you which filters are applied and gives you a Clear filters
-                button.
+                <strong>A clear banner when a filter is on</strong>, telling you which filters are
+                applied and giving you a Clear filters button.
             </li>
         </ul>
 
         <h2>Coaches: copying drills between teams</h2>
         <ul>
             <li>
-                <strong>Copy one drill from its own page</strong>, picking the team to send it
-                to. The page also tells you which teams already have it.
+                <strong>Copy one drill from its own page</strong>, picking the team to send it to.
+                The page also tells you which teams already have it.
             </li>
             <li>
                 <strong>Or pick several at once.</strong> Pick drills to copy opens a page where
@@ -250,9 +233,8 @@
         <h2>Smaller fixes</h2>
         <ul>
             <li>
-                <strong>There's always a way back to the team list.</strong> An All teams link in
-                the menu and in the footer of every page, and signing out of a team now returns
-                you here rather than to that team's code box.
+                <strong>There's always a way back to the team list</strong>, from the menu and the
+                footer of every page. Signing out of a team returns you there.
             </li>
             <li><strong>This page.</strong> Changes to the site get written up here from now on.</li>
             <li>An Edit plan button at the top of a plan as well as the bottom.</li>
@@ -274,9 +256,9 @@
     <div class="hp-panel hp-changelog">
         <ul>
             <li>
-                <strong>Practice plans can be tagged.</strong> Coaches can put tags on a plan,
-                like backcheck or breakout or PP entry, and then find past plans by tag instead
-                of scrolling back through the season.
+                <strong>Practice plans can be tagged</strong>, like backcheck or breakout or PP
+                entry, so past plans can be found by tag instead of scrolling back through the
+                season.
             </li>
             <li>
                 <strong>A kinder button for parents.</strong> The one that used to read
