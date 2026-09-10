@@ -363,4 +363,38 @@ podman build --platform linux/amd64 -f Dockerfile.fast -t <image>:<tag> .
 podman push <image>:<tag>
 ```
 
+### There are two apps on UpTurtle, for now
+
+| Slug | What it is | URL |
+|---|---|---|
+| `hockeypractice` | Production, and the default deploy target. | `https://ebhockeyplan.com/` |
+| `hockeypractice-restore` | Temporary scratch copy for rehearsing a restore. Delete when done. | `https://mbhockey.upturtle.app/hockeypractice-restore/` |
+
+`upturtle.yaml` pins **`hockeypractice`**, so an unqualified "deploy" means production, and that is
+deliberate rather than incidental: production is the common case and should not need a decision.
+The restore app is deployed only when its slug is named explicitly. Each app has its own 1 GiB
+volume, so their databases, uploads and `dpkeys` are unrelated.
+
+The restore app was stood up on 2026-09-10 and is expected to be short-lived. Deleting it takes its
+volume and its $5/month with it. When it goes, delete this subsection too.
+
+**The restore app deliberately has no `ARCHIVE_S3_*` variables.** That is the safety fence, and it
+is a capability the app does not have rather than a rule someone has to remember: without all five
+values `S3BackupStore.IsConfigured` is false, `NullBackupStore` is registered instead, and its
+upload, download and delete all throw. The scheduler sees `Enabled == false` and never starts, so
+it cannot write into the bucket and retention can never prune a real archive. Confirmed in its
+startup log: `Off-site backups are not configured, so nothing is scheduled.`
+
+To rehearse a restore, download the newest archive from R2 by hand and upload the zip on the
+restore app's admin page. `RestoreArchive` takes either a `key` from the bucket or an uploaded
+file, and the upload branch touches the store not at all. If you ever do give that app
+credentials, `ARCHIVE_S3_PREFIX` must not be `hockeypractice/`: retention keeps three, so three
+nights of its backups would prune every real archive.
+
+Its `SITE_ADMIN_CODE` is deliberately different from production's. That works because the code is
+read from the environment, not the database, so it survives restoring a production archive over
+the top. Restoring production data there does put real team codes, the roster and unencrypted
+`dpkeys` on a second public URL, so treat that URL as production-sensitive and delete the app when
+you are done, which takes its volume with it.
+
 Source: `github.com/wingnut691983/hockeypractice`.

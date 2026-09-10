@@ -157,6 +157,19 @@ A change that genuinely needs no README edit is fine and common (a rename, a for
 test). The *check* is what isn't optional. Say in one line what you checked and why nothing
 needed changing, so it's visible that it happened rather than silently skipped.
 
+## Deploy target
+
+**Deploy to `hockeypractice` (production, `https://ebhockeyplan.com/`) unless told otherwise.**
+That is what `upturtle.yaml` pins and it is the default on purpose. Never ask which app to deploy
+to; an unqualified "deploy" is production.
+
+**`hockeypractice-restore` is temporary** (created 2026-09-10 to rehearse a restore, expected to
+be deleted). Deploy to it only when its slug is named out loud in the request. It deliberately has
+no `ARCHIVE_S3_*` variables, so it gets `NullBackupStore` and physically cannot list, upload or
+prune anything in the R2 bucket. Do not "helpfully" give it credentials: retention keeps three, so
+its nightly runs under the production prefix would delete every real archive. When that app is
+deleted, drop this paragraph and the matching README subsection. See README's "Deploying".
+
 ## Commands
 
 ```sh
