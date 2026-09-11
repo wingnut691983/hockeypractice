@@ -254,6 +254,19 @@ answer in September.
   before and after, along with the plain paths: a new tag typed and then clicked away from, and
   Enter with nothing highlighted, still make one chip and don't submit the form. Any third commit
   path you add needs the same two guards.
+- **The suggestion panel opens on `click` as well as `focus`, and it needs both.** Reported from
+  the plan form on 2026-09-11: after adding one tag, clicking the box again showed no suggestions
+  until you clicked away and clicked back. Every path that commits a tag leaves the input focused,
+  deliberately, so the next tag can be typed straight away. Enter never moves focus, `pick()`
+  calls `focus()` back, and the Add button's handler ends with `entry.focus()`. The panel closes
+  behind each of them. That leaves the input focused with the list shut, and clicking a box that
+  is already focused fires no `focus` event, which was the only thing that reopened it. Adding a
+  second tag is the normal case, so this was most of the time. The fix is one `click` listener,
+  guarded with `if (open) return` so the first click of all, which `focus` has already handled,
+  does not render a second time. Do not delete it as redundant with `focus`: it only looks
+  redundant on the first tag. Reproduced in jsdom against the shipped script, before and after:
+  the box focused and the panel shut, then a click, panel open `false` before and `true` after,
+  with the click-away-and-back workaround still working in both.
 - **The bottom tab bar steps out of the way while a field has focus, on purpose.**
   `position: fixed` pins it to the *layout* viewport, and an on-screen keyboard does not shrink
   that: reported from a phone editing a plan, the bar stopped sitting at the bottom the moment a

@@ -404,6 +404,17 @@
                 render();
             });
 
+            // Focus is not enough on its own. Every path that commits a tag leaves this input
+            // focused (Enter keeps it, pick() refocuses, and the Add button calls focus()), and
+            // the panel closes behind it. Clicking the box again then fires no focus event,
+            // because focus never left, so the list stayed shut until the coach clicked away and
+            // back. Adding a second tag is the common case, so that was most of the time.
+            input.addEventListener('click', function () {
+                if (open) return;
+                active = -1;
+                render();
+            });
+
             input.addEventListener('input', function (e) {
                 // Ignore the event pick() just dispatched, or choosing an option would reopen
                 // the panel on top of itself.
