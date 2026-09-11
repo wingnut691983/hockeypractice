@@ -106,6 +106,22 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // A 429 renders through UseStatusCodePagesWithReExecute, which deliberately does not change
+    // the browser URL, so a join link rejected by the limiter left ?c= sitting in the address
+    // bar, which is the one thing TeamController.Index's contract says will not happen. Bounce to
+    // the same path without the code and let the retry be rejected there instead. It terminates:
+    // the retry carries no code, so it takes the plain 429 below. Verified against the framework
+    // rather than assumed. The middleware sets the rejection status before calling this and does
+    // not set it again afterwards, so the redirect written here is what goes out.
+    options.OnRejected = (context, _) =>
+    {
+        var request = context.HttpContext.Request;
+        if (request.Query.ContainsKey("c"))
+            context.HttpContext.Response.Redirect(request.PathBase + request.Path);
+        return ValueTask.CompletedTask;
+    };
+
     options.AddPolicy("code-entry", http =>
     {
         // Populated because UseRateLimiter runs after UseRouting. Requests with no slug are the
@@ -213,6 +229,20 @@ else
 // A deleted plan's old link, a mistyped team name — without this those render as a blank
 // white 404, which reads as "the site is broken" to a teenager or parent.
 app.UseStatusCodePagesWithReExecute("/Home/Error", "?status={0}");
+
+// Must stay BELOW UseExceptionHandler: it calls Response.Clear() before re-executing, so a header
+// set above it is dropped on exactly the error pages that most need it.
+//
+// strict-origin, not the browser default. The default strict-origin-when-cross-origin is only
+// origin-only across sites. Same-origin navigation still sends the FULL URL, which is every
+// internal link on a page whose address carries a plan id, a team slug, or anything else we would
+// rather not hand onward. This site has no need to send a path anywhere, so it sends none.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Referrer-Policy"] = "strict-origin";
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    await next();
+});
 
 // The vendored pdf.js viewer ships font and locale assets whose extensions ASP.NET's default
 // provider doesn't know, and unknown types are not served at all. Without these mappings the

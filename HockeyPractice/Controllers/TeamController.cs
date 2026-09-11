@@ -34,7 +34,15 @@ public class TeamController : TeamScopedController
     public async Task<IActionResult> Index(string slug, string? c)
     {
         var team = await Db.Teams.FirstOrDefaultAsync(t => t.Slug == slug);
-        if (team is null) return NotFound();
+        if (team is null)
+        {
+            // A 404 renders through UseStatusCodePagesWithReExecute, which leaves the browser URL
+            // untouched, so returning one here stranded the code in the address bar of a link
+            // whose slug was mistyped or whose team was deleted. Redirect to the same path without
+            // it and 404 on the clean URL. One extra hop, only on a path that was already an error.
+            if (!string.IsNullOrWhiteSpace(c)) return RedirectToAction(nameof(Index), new { slug });
+            return NotFound();
+        }
 
         if (!string.IsNullOrWhiteSpace(c))
         {

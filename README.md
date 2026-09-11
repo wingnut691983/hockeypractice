@@ -190,6 +190,43 @@ answer in September.
   behind. Ordinary notices still ride the query string, where they are harmless and survive a
   refresh; the rule is only about codes. Note this is `TempData` on its cookie provider, not
   `ISession`, which this app deliberately does not use.
+
+  **The same rule now covers a name.** Removing a player from the roster ended with
+  `notice = $"Removed {player.Name}."`, putting a 14-to-16-year-old's real name in the query
+  string of the redirect. That action is a hard delete of the `Player` row and every `PlanView`
+  for them, which is what makes it worse than it first looks: the name outlived the row it had
+  just been deleted from, in browser history and the gateway log, which is the one place nobody
+  would think to go and scrub. Same two-line fix through `SecretNoticeKey`. The line to hold is
+  that a notice is safe in a URL when it is about a *thing* and not when it is about a *person*.
+- **A code in `?c=` was only stripped from the URL on the paths that worked.**
+  `TeamController.Index`'s own doc comment promises the join link's code is "stripped from the URL
+  immediately" and should not sit in browser history. The success paths do redirect. Two failure
+  paths did not, because `UseStatusCodePagesWithReExecute` re-executes `/Home/Error` *without
+  changing the browser URL*, which is exactly what it is for and exactly what makes it a trap
+  here. An unknown slug (mistyped link, deleted team) hit `NotFound()` before the code was ever
+  read, and a 429 from the `code-entry` limiter was rejected in middleware before the action ran
+  at all. Either way the player was left looking at the team code in the address bar, on the one
+  screen most likely to get photographed and sent to whoever could not get in.
+
+  Both now redirect to the same path with the code dropped, and both terminate, because the retry
+  carries no code and so takes the plain 404 or 429. The 429 half is an `OnRejected` handler on the
+  rate limiter, and that is the part I checked rather than assumed: the middleware sets the
+  rejection status *before* calling `OnRejected` and does not set it again afterwards, so a
+  `Response.Redirect` written in there is what actually goes out. I proved that against a throwaway
+  app first, then measured both paths on this one: 302 to the clean path, then a clean 429. If you
+  ever move `OnRejected`, re-check that ordering; if it flips, the redirect silently becomes a 429
+  with a stale `Location` header and the code goes back in the address bar.
+- **`Referrer-Policy: strict-origin`, and it must sit below `UseExceptionHandler`.** I had this
+  filed as a nicety, reasoning that browsers already default to origin-only cross-site. That is
+  true cross-site and misses the point: the default `strict-origin-when-cross-origin` sends the
+  **full URL** on same-origin navigation, which is every internal link on the site, so it was an
+  amplifier for the two leaks above rather than something unrelated to them. The placement is the
+  half that would fail silently. `UseExceptionHandler` calls `Response.Clear()` before
+  re-executing, so a header set above it is dropped on precisely the error pages that were the
+  ones carrying codes. Verified by curling a 404 and confirming the header is still on it.
+  `X-Content-Type-Options: nosniff` went in alongside from the same known-issues bullet;
+  `frame-ancestors` deliberately did not, because the plan viewer runs pdf.js in an iframe and
+  that deserves its own look rather than a drive-by CSP.
 - **`PlanView` uniqueness is keyed on the resolved player, not the device**, once a player is
   known: `(PlanId, PlayerId)` when a player is picked, `(PlanId, ViewerKey)` only while
   anonymous. Keying purely on device (the original design) meant a shared family device could

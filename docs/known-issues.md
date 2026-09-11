@@ -5,7 +5,10 @@ uploads, the drill library, plans, email, and the backup and restore system.
 
 Two findings were fixed at the time and are not listed here: an access code travelling in a
 redirect's query string, and a crash in Re-extract / Replace file on plans that link one video
-twice. Everything below was judged safe to leave for now, with the reason recorded so the call
+twice. Three more were found on 2026-09-10 and fixed the same day rather than deferred: a removed
+player's real name travelling in a redirect's query string, a team code left in the address bar on
+the two `?c=` paths that fail, and the `Referrer-Policy` gap that amplified both. All three are
+written up in README's "What I'd flag". Everything below was judged safe to leave for now, with the reason recorded so the call
 can be re-made rather than re-derived.
 
 Each entry says what it is, why it does not bite yet, and **what changes that**. The trigger is
@@ -153,6 +156,12 @@ handful of requests rather than one per family.
 **Trigger: a 429 reported during onboarding, or a plan to have a room join together.** Fix by giving
 the `?c=` GET its own looser partition, or exempting the bare GET that carries no code.
 
+Narrowed on 2026-09-10: a rejected `?c=` request used to leave the team code sitting in the address
+bar, because the 429 renders through `UseStatusCodePagesWithReExecute` and that does not change the
+browser URL. The limiter's `OnRejected` now redirects such a request to the same path without the
+code, so what is left here is only the original complaint, that a joining player can be told to
+wait a minute because their teammates tapped first.
+
 ---
 
 ## Small items
@@ -165,9 +174,12 @@ Individually not worth a commit; worth sweeping the next time each file is open.
 - `SiteAdminController.RestoreArchive` does not catch exceptions from `IBackupStore.ListAsync` or
   `BackupRunner.FetchAsync`. A transient R2 error gives the admin a raw 500 instead of the careful
   message every other failure path in that controller produces.
-- No `X-Content-Type-Options: nosniff`, `Referrer-Policy`, or frame-ancestors headers anywhere.
-  Low risk here: uploads are manager-gated, and modern browsers already default the referrer to
-  origin-only cross-site. Three lines of middleware whenever someone is in `Program.cs`.
+- No frame-ancestors header anywhere. `nosniff` and `Referrer-Policy: strict-origin` were added
+  on 2026-09-10 and are no longer open; the reasoning that closed them (the browser default leaks
+  the full URL same-origin, and the header has to sit below `UseExceptionHandler`) is in README's
+  "What I'd flag". frame-ancestors was deliberately left: the plan viewer runs pdf.js in an
+  iframe, so a CSP here needs testing against that rather than being added in passing.
+  **Trigger: anyone adding a CSP, or an embedding concern.**
 - `MaxLength` attributes on the models are documentation only. SQLite does not enforce them, the
   controllers take raw `string` parameters so there is no `ModelState` to check, and nothing
   truncates. A manager can store a megabyte plan title. A `Truncate` helper alongside the existing

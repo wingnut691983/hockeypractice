@@ -690,7 +690,11 @@ public class CoachController : TeamScopedController
         Db.Players.Remove(player);
         await Db.SaveChangesAsync();
 
-        return RedirectToAction(nameof(Index), new { slug, notice = $"Removed {player.Name}." });
+        // Out of band, for the same reason as the access codes. The whole point of this action
+        // is that the name goes, so putting it in a query string on the way out would leave it
+        // in browser history and the gateway log after the row it came from is gone.
+        TempData[SecretNoticeKey] = $"Removed {player.Name}.";
+        return RedirectToAction(nameof(Index), new { slug });
     }
 
     // ── Branding and codes ───────────────────────────────────────────────
