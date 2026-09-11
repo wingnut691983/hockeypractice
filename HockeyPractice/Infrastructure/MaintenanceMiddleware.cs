@@ -53,7 +53,7 @@ public class MaintenanceMiddleware
         // Written here rather than handed to the shared error page, which would re-execute a GET
         // and lose the one thing worth saying: nothing was saved, and roughly when to try again.
         ctx.Response.ContentType = "text/html; charset=utf-8";
-        await ctx.Response.WriteAsync(Page(_state.MinutesLeft), Encoding.UTF8);
+        await ctx.Response.WriteAsync(Page(), Encoding.UTF8);
     }
 
     private static bool IsWrite(string method) =>
@@ -66,26 +66,28 @@ public class MaintenanceMiddleware
     /// Deliberately self-contained. Rendering this through a view would mean a database read, and
     /// the whole point of the pause is that the database is being copied or replaced right now.
     /// </summary>
-    private static string Page(int minutesLeft)
+    private static string Page()
     {
-        var wait = minutesLeft <= 1 ? "in a minute or so" : $"in about {minutesLeft} minutes";
-        return $"""
+        // No timeframe in the copy on purpose. The 30-minute window is a backstop against a pause
+        // being left on, not a promise to the person reading this, and a restore can outlast it.
+        // Retry-After above still carries the number for anything reading it mechanically.
+        return """
             <!DOCTYPE html>
             <html lang="en"><head><meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <title>Saving is paused</title></head>
+            <title>Maintenance</title></head>
             <body style="margin:0;background:#f4f6f9;color:#12161d;
                          font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;">
               <div style="max-width:32rem;margin:3rem auto;padding:1.25rem;background:#fff;
                           border:1px solid #d9dfe8;border-radius:14px;">
-                <h1 style="font-size:1.2rem;margin:0 0 .6rem;">Saving is paused right now</h1>
+                <h1 style="font-size:1.2rem;margin:0 0 .6rem;">Doing a bit of maintenance</h1>
                 <p style="margin:0 0 .6rem;line-height:1.5;">
-                  The site is being backed up, so it is read only for a few minutes.
-                  <strong>Nothing you just entered was saved.</strong>
+                  Saving and editing are disabled for now.
+                  Reading plans works as usual.
                 </p>
                 <p style="margin:0 0 1rem;line-height:1.5;">
-                  Go back, try again {wait}, and it will save normally.
-                  Reading plans still works in the meantime.
+                  <strong>Nothing you just entered was saved.</strong>
+                  Check back later and it will save normally.
                 </p>
                 <a href="javascript:history.back()"
                    style="display:inline-block;padding:.6rem 1rem;border-radius:10px;

@@ -34,8 +34,7 @@
     @if (Maintenance.IsPaused)
     {
         <div class="hp-warn hp-warn-banner">
-            Being backed up, so nothing can be saved for the next
-            @Maintenance.MinutesLeft minute@(Maintenance.MinutesLeft == 1 ? "" : "s").
+            The site is undergoing maintenance. Saving and editing are disabled.
             Reading plans works as usual.
         </div>
     }
