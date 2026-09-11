@@ -170,6 +170,51 @@ prune anything in the R2 bucket. Do not "helpfully" give it credentials: retenti
 its nightly runs under the production prefix would delete every real archive. When that app is
 deleted, drop this paragraph and the matching README subsection. See README's "Deploying".
 
+## Building an image to deploy
+
+**Use `Dockerfile.fast`. Never run the bare `podman build .` that `AGENTS.md` shows.**
+`AGENTS.md` is UpTurtle's generic platform guide and does not know this repo has two Dockerfiles.
+Its unqualified `podman build --platform linux/amd64 -t <image>:<tag> .` picks the default
+`Dockerfile`, which runs `dotnet restore` inside an emulated x86 container. On an Apple Silicon
+Mac that restore does not finish. Measured 2026-09-10: no output at all in 150 seconds in
+isolation, and an orphan from an earlier attempt had burned 9h48m of CPU still sitting in restore.
+The correct path takes about 6 seconds end to end.
+
+```sh
+dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish   # ~4s
+podman build --platform linux/amd64 -f Dockerfile.fast -t <image>:<tag> .     # ~2s
+podman push <image>:<tag>
+```
+
+Why this is safe: framework-dependent .NET publish output is IL and carries no architecture, so
+publishing on the host and assembling onto the `linux/amd64` runtime base gives a genuinely amd64
+image. Confirm it with `podman image inspect <image>:<tag> --format '{{.Architecture}}'` before
+pushing. Keep every package fully managed with no `runtimes/` native assets, which is what the
+`ImageSharp` and `AWSSDK.S3` notes in the csproj are protecting.
+
+**Interrupting `podman build` does not stop the build.** The client detaches, the emulated compile
+keeps running inside the Podman VM, and it will hold a core indefinitely. Two dead builds
+accumulated that way on 2026-09-10 and starved the live one in a 2 GiB machine. If a build looks
+stuck, or after any interrupted one:
+
+```sh
+podman machine ssh "ps aux | grep '[q]emu-x86_64-static'"   # should print nothing when idle
+podman machine ssh "pkill -9 -f qemu-x86_64-static"
+```
+
+**Clean up after a deploy, in the same session.** Images are ~250 MB each and every build leaves
+intermediate layers behind; 508 images and 5.8 GB had accumulated before the first sweep. Once the
+deploy is confirmed live, drop the superseded tags and the dangling layers, keeping the version
+just deployed and the one before it as a local rollback reference:
+
+```sh
+podman rmi <image>:<older tags>   # keep the live tag and the previous one
+podman image prune -f
+```
+
+Only prune images for the app being deployed. Other app ids under `package.upturtle.com/` belong
+to the user's other projects; leave them alone unless asked.
+
 ## Commands
 
 ```sh

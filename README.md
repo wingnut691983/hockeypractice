@@ -431,7 +431,16 @@ The app slug is pinned in `upturtle.yaml`. Two Dockerfiles exist:
 dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish
 podman build --platform linux/amd64 -f Dockerfile.fast -t <image>:<tag> .
 podman push <image>:<tag>
+
+# Then, once the deploy is confirmed live, in the same sitting:
+podman rmi <image>:<superseded tags>   # keep the live tag and the one before it
+podman image prune -f                  # drops the intermediate layers each build leaves
 ```
+
+Do that last step every time. Each image is about 250 MB and the intermediate layers are not
+reused by this path, so they only accumulate: 508 images and 5.8 GB had piled up before anyone
+looked, on 2026-09-10. Only prune the app being deployed. Other app ids under
+`package.upturtle.com/` are other projects.
 
 ### There are two apps on UpTurtle, for now
 
