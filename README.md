@@ -439,8 +439,15 @@ podman image prune -f                  # drops the intermediate layers each buil
 
 Do that last step every time. Each image is about 250 MB and the intermediate layers are not
 reused by this path, so they only accumulate: 508 images and 5.8 GB had piled up before anyone
-looked, on 2026-09-10. Only prune the app being deployed. Other app ids under
-`package.upturtle.com/` are other projects.
+looked, on 2026-09-10.
+
+Local images are keyed on the UpTurtle app **id**, not the slug, so deleting an app strands its
+images under an id nothing references again. This app was deleted and recreated when the trial
+ended on 2026-09-08, and `upturtle.yaml` never changed because the slug did not. The 68 images
+from the old id sat on disk until 2026-09-11, about 2 GB. So when sweeping, list the app ids
+present and check each one still exists (`list_slots` names every app the org has); anything
+unmatched is a dead app and all of its tags can go. The full sweep took the machine from 434
+images and 5.8 GB to 21 and 960 MB.
 
 ### There are two apps on UpTurtle, for now
 

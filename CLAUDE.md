@@ -212,8 +212,23 @@ podman rmi <image>:<older tags>   # keep the live tag and the previous one
 podman image prune -f
 ```
 
-Only prune images for the app being deployed. Other app ids under `package.upturtle.com/` belong
-to the user's other projects; leave them alone unless asked.
+Sweep the orphans at the same time. Images are stored under the app's **id**, not its slug, so an
+app that is deleted and recreated keeps its old images locally forever under an id nothing points
+at any more. That is how 68 images from a trial app that ended on 2026-09-08 were still on disk on
+2026-09-11, 2 GB of an app that no longer exists. `podman images` does not know an app is gone, so
+check rather than assume:
+
+```sh
+podman images --format '{{.Repository}}' | grep package.upturtle.com | sort -u
+```
+
+Map each id with `get_application_status(<slug>)`, which returns `applicationId`, or
+`list_slots`, which lists every app the org actually has. An id matching none of them is a dead
+app: remove all of its tags. Also worth a look is anything under `localhost/`, which is a local
+test build that was never pushed and that nothing tracks.
+
+Do not delete images for an app id that is still live, even if it is a different project, without
+asking first.
 
 ## Commands
 
