@@ -280,6 +280,11 @@ answer in September.
   real sentence. Do not add `inert` as well: it removes the node from the accessibility tree and
   takes the label with it. Third, `pointer-events: none` and a `cursor` override, because
   `.hp-btn` sets `cursor: pointer` and that is the one cue that would still say "tap me".
+  One content trap came out of this: `.hp-drill-body` is `white-space: pre-wrap`, so a coach's own
+  line breaks survive, and that applies to the illustration too. Written across several indented
+  source lines, the drill text rendered as a ragged hanging indent with breaks mid-sentence.
+  Those two lines are long on purpose. Re-wrapping them to tidy the file puts it straight back.
+
   Measured at 390 and 360 px: `scrollWidth` equals the viewport, so the page never scrolls
   sideways. The third video card deliberately runs past the frame edge and is clipped by
   `overflow: hidden`, which is how the real strip's sideways scroll is suggested without being

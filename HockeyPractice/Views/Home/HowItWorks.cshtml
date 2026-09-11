@@ -228,14 +228,16 @@
         <h3 class="hp-card-title">Build a plan from your own drills</h3>
         <p class="hp-muted">
             Drills live in a library and get reused. Each one holds how it is run, roughly how long
-            it takes, any diagrams, and a video link. Drop them into a plan, put them in order, and
-            the practice adds itself up as you go.
+            it takes, the pictures or diagrams that go with it, and a video link. A photo of the
+            whiteboard can be pasted straight in, and a drawing exported as a PDF works too. Drop
+            them into a plan, put them in order, and the practice adds itself up as you go.
         </p>
         <figure class="hp-mock">
             <div class="hp-mock-frame" role="img"
                  aria-label="Illustration of two drills from the library. The first is numbered 1,
                              titled Warm up and edges, 10 min, described as two lines with inside
-                             and outside edges, tagged skating and warm up. The second is numbered
+                             and outside edges, tagged skating and warm up, with a drill diagram
+                             below it and a button reading Watch the drill. The second is numbered
                              2, titled D to D reversal, 15 min, tagged breakouts and defence.">
                 <span class="hp-pill hp-mock-tag">Example</span>
                 <div class="hp-drill" style="margin-top:.2rem;">
@@ -244,10 +246,16 @@
                         <div class="hp-drill-title">Warm up and edges</div>
                         <span class="hp-drill-time">10 min</span>
                     </div>
-                    <div class="hp-drill-body">
-                        Two lines, inside and outside edges through the neutral zone. Knees bent,
-                        head up, full extension on the push.
-                    </div>
+                    @* On one line, and it has to stay that way: .hp-drill-body is pre-wrap so a
+                       coach's own line breaks survive, which means the source indentation of a
+                       wrapped line renders as a ragged hanging indent. *@
+                    <div class="hp-drill-body">Two lines, inside and outside edges through the neutral zone. Knees bent, head up, full extension on the push.</div>
+                    @* A drill's pictures render inline under it, and its video link sits below
+                       them. Standing in for an image rather than shipping one, so the page stays
+                       imageless; .hp-drill-diagram keeps a white backing on purpose, because
+                       diagrams are line art, so the placeholder text is dark in both schemes. *@
+                    <div class="hp-drill-diagram" style="height:5.5rem;display:flex;align-items:center;justify-content:center;color:#5c6879;font-size:.8rem;font-weight:650;">Drill diagram</div>
+                    <div class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;">&#9654; Watch the drill</div>
                     <div class="hp-row" style="margin-top:.5rem;">
                         <span class="hp-pill">skating</span>
                         <span class="hp-pill">warm up</span>
@@ -259,17 +267,14 @@
                         <div class="hp-drill-title">D to D reversal</div>
                         <span class="hp-drill-time">15 min</span>
                     </div>
-                    <div class="hp-drill-body">
-                        Start on the whistle, strong side D reverses behind the net. Wingers hold
-                        the wall until the puck moves.
-                    </div>
+                    <div class="hp-drill-body">Start on the whistle, strong side D reverses behind the net. Wingers hold the wall until the puck moves.</div>
                     <div class="hp-row" style="margin-top:.5rem;">
                         <span class="hp-pill">breakouts</span>
                         <span class="hp-pill">defence</span>
                     </div>
                 </div>
             </div>
-            <figcaption class="hp-mock-cap">Written once, then dropped into any practice.</figcaption>
+            <figcaption class="hp-mock-cap">Written once, with its pictures and video, then dropped into any practice.</figcaption>
         </figure>
         <p class="hp-muted">
             If you run more than one team, a drill can be copied across to another team you
