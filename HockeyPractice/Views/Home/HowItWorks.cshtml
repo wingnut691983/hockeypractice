@@ -1,0 +1,431 @@
+@* Null when DEMO_TEAM_SLUG names no team, or that team has no player code. *@
+@model Team
+@{ ViewBag.Title = "How it works – EBHockey Plans"; }
+@*
+    Public, no sign-in, same content rule as the What's new page: everything here is readable by
+    anyone who finds the site. No codes, no thresholds, no counts of how anything is limited, no
+    admin-only paths. See README's "What I'd flag".
+
+    The screens below are drawn, not captured. Every one is built from the real classes in
+    hockeypractice.css, which is why they follow the team palette and dark mode for free and why
+    this page carries no images at all. Nothing inside a frame is a real control: no link, button,
+    input or form, and none of the data- attributes the layout's scripts bind to, so none of that
+    script can attach to one. See the .hp-mock block at the end of the stylesheet.
+
+    Each illustration copies a real view. If you change one of these, change it here too:
+      code box      Views/Team/EnterCode.cshtml
+      roster picker Views/Team/WhoAmI.cshtml
+      plan cards    Views/Shared/_PlanCard.cshtml
+      videos, plan  Views/Plan/Details.cshtml
+      publishing    Views/Coach/_PlanPublishing.cshtml
+      roster/invite Views/Coach/Index.cshtml
+*@
+<div class="hp-rail"></div>
+<div class="hp-shell">
+    <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:1rem;"
+       asp-action="Index">&#8249; All teams</a>
+
+    <h1 class="hp-title">How it works</h1>
+    <p class="hp-muted" style="margin-top:0;">
+        Built for a phone at the rink. A coach posts the practice plan, players and parents open a
+        link and read it. There is no app to install, no account to make and no password.
+    </p>
+    <p class="hp-muted">
+        The screens below are illustrations drawn in the site's own styling, showing a made-up
+        team. They are pictures, not the live site, so nothing on them can be tapped.
+    </p>
+
+    <h2 class="hp-section">Players and parents</h2>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Getting in takes one tap</h3>
+        <p class="hp-muted">
+            Your coach shares a link in the team chat. Tapping it is all it takes, and the phone
+            stays signed in, so nobody types anything twice. If you would rather type, the same
+            team code works on the team's page.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the sign-in screen. A tile with the team initials,
+                             the team name River City Bantam A, the line Enter your team code to
+                             see practice plans, a large box for the code, and a full width button
+                             reading Let me in.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div style="max-width:17rem;margin:0 auto;text-align:center;">
+                    <div class="hp-topbar-fallback" style="margin:0 auto .5rem;">RC</div>
+                    <div class="hp-card-title">River City Bantam A</div>
+                    <p class="hp-muted" style="margin:.2rem 0 .9rem;">
+                        Enter your team code to see practice plans.
+                    </p>
+                    <div style="text-align:left;">
+                        <div class="hp-label">Team code</div>
+                        <div class="hp-input hp-code-input">&bull;&bull;&bull;&bull;&bull;&bull;</div>
+                    </div>
+                    <div class="hp-btn hp-btn-block" style="margin-top:.7rem;">Let me in</div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">The only thing a player is ever asked to type.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Tap your name, once</h3>
+        <p class="hp-muted">
+            Players pick themselves off the roster so the coach can see who has read the plan.
+            Parents watching on their own phone can skip it. It is asked once and can be changed
+            at any time.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the roster picker, headed Who's watching? A grid of
+                             large tiles, each with a jersey number and a player name: 7 Jordan P,
+                             12 Ryan M, 19 Sam O, 44 Ava T.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-card-title" style="margin-bottom:.1rem;">Who's watching?</div>
+                <p class="hp-muted" style="margin:0 0 .7rem;">
+                    Tap your name so your coach knows you've seen the plan.
+                </p>
+                <div class="hp-roster">
+                    <div class="hp-mock-tile"><span class="hp-jersey">7</span><span class="hp-roster-name">Jordan P.</span></div>
+                    <div class="hp-mock-tile"><span class="hp-jersey">12</span><span class="hp-roster-name">Ryan M.</span></div>
+                    <div class="hp-mock-tile"><span class="hp-jersey">19</span><span class="hp-roster-name">Sam O.</span></div>
+                    <div class="hp-mock-tile"><span class="hp-jersey">44</span><span class="hp-roster-name">Ava T.</span></div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">Big targets, because this gets tapped in a cold rink.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">The next practice is the first thing you see</h3>
+        <p class="hp-muted">
+            No hunting. The practice that is coming up sits at the top in the team's colours, with
+            the ones after it below and everything older further down. A plan you have already
+            opened is marked, so you know whether you have read it.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the plans list. Under a heading reading Next practice,
+                             a large card in the team colours reads Tomorrow 6:15 PM, Breakouts and
+                             small area games, River City Arena, 4 videos to watch. Under a heading
+                             reading Earlier, a plain card reads Friday 6:15 PM, Power skating,
+                             5 drills, marked as viewed.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Next practice</div>
+                <div class="hp-card hp-card-next">
+                    <div class="hp-card-when">Tomorrow, 6:15 PM</div>
+                    <div class="hp-card-title">Breakouts and small area games</div>
+                    <div class="hp-card-meta">
+                        <span>River City Arena</span>
+                        <span>4 videos to watch</span>
+                    </div>
+                </div>
+                <div class="hp-section">Earlier</div>
+                <div class="hp-card">
+                    <div class="hp-card-when">Friday, 6:15 PM</div>
+                    <div class="hp-card-title">Power skating</div>
+                    <div class="hp-card-meta"><span>5 drills</span></div>
+                    <div class="hp-row" style="margin-top:.55rem;">
+                        <span class="hp-pill hp-pill-viewed">&#10003; Viewed</span>
+                    </div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">The plans list, in the team's own colours.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Videos to watch before practice</h3>
+        <p class="hp-muted">
+            When a coach puts video links in a plan, they come out as tappable cards above the
+            plan. They play right there on the page, one after another, so a player is not left
+            in a video app with the plan lost behind it.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the videos strip. Three cards side by side, each with
+                             a thumbnail and a play symbol. The first is labelled Breakouts, D to D
+                             reversal. The second is labelled Breakouts, Wheel and up. Both say
+                             youtube.com underneath.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Watch before practice</div>
+                <div class="hp-videos">
+                    <div class="hp-video">
+                        <div class="hp-video-thumb"><span class="hp-video-play"><span>&#9654;</span></span></div>
+                        <div class="hp-video-section">Breakouts</div>
+                        <div class="hp-video-label">D to D reversal</div>
+                        <div class="hp-video-host">youtube.com</div>
+                    </div>
+                    <div class="hp-video">
+                        <div class="hp-video-thumb"><span class="hp-video-play"><span>&#9654;</span></span></div>
+                        <div class="hp-video-section">Breakouts</div>
+                        <div class="hp-video-label">Wheel and up</div>
+                        <div class="hp-video-host">youtube.com</div>
+                    </div>
+                    <div class="hp-video">
+                        <div class="hp-video-thumb"><span class="hp-video-play"><span>&#9654;</span></span></div>
+                        <div class="hp-video-section">Small area</div>
+                        <div class="hp-video-label">Two on two below the dots</div>
+                        <div class="hp-video-host">youtube.com</div>
+                    </div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">Tapping one plays it over the plan, without leaving the page.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">The plan itself, with the clock</h3>
+        <p class="hp-muted">
+            A plan built from drills shows the running order and what the clock reads as each one
+            starts. A plan uploaded as a PDF is shown in full on the page, no downloading and no
+            pinching to read it.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of a practice running order. A heading reads 5 drills,
+                             62 min. Then a numbered list, each row showing the time left on the
+                             clock, the drill name and its length: 75 minutes, Warm up and edges,
+                             10 min. 65 minutes, D to D reversal, 15 min. 50 minutes, Two on two
+                             below the dots, 20 min. A line underneath warns that the plan runs
+                             12 minutes over the 75 minute practice.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">The plan</div>
+                <div class="hp-runtime-total"><strong>5 drills</strong> &middot; 62 min</div>
+                <ol class="hp-plan-summary">
+                    <li>
+                        <span class="hp-plan-summary-clock">75:00</span>
+                        <span class="hp-mock-name">Warm up and edges</span>
+                        <span class="hp-plan-summary-time">10 min</span>
+                    </li>
+                    <li>
+                        <span class="hp-plan-summary-clock">65:00</span>
+                        <span class="hp-mock-name">D to D reversal</span>
+                        <span class="hp-plan-summary-time">15 min</span>
+                    </li>
+                    <li>
+                        <span class="hp-plan-summary-clock">50:00</span>
+                        <span class="hp-mock-name">Two on two below the dots</span>
+                        <span class="hp-plan-summary-time">20 min</span>
+                    </li>
+                </ol>
+                <div class="hp-plan-summary-foot over">
+                    Runs <strong>12 min over</strong> the 75:00 practice. Trim one of the drills.
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">The clock counts down, so a plan that overruns says so.</figcaption>
+        </figure>
+    </div>
+
+    <h2 class="hp-section">Coaches and team managers</h2>
+
+    <p class="hp-muted" style="margin-top:0;">
+        Managing a team needs a second, separate code, so sharing the team code with parents never
+        hands anyone the ability to change anything.
+    </p>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Build a plan from your own drills</h3>
+        <p class="hp-muted">
+            Drills live in a library and get reused. Each one holds how it is run, roughly how long
+            it takes, any diagrams, and a video link. Drop them into a plan, put them in order, and
+            the practice adds itself up as you go.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of two drills from the library. The first is numbered 1,
+                             titled Warm up and edges, 10 min, described as two lines with inside
+                             and outside edges, tagged skating and warm up. The second is numbered
+                             2, titled D to D reversal, 15 min, tagged breakouts and defence.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-drill" style="margin-top:.2rem;">
+                    <div class="hp-drill-head">
+                        <span class="hp-drill-num">1</span>
+                        <div class="hp-drill-title">Warm up and edges</div>
+                        <span class="hp-drill-time">10 min</span>
+                    </div>
+                    <div class="hp-drill-body">
+                        Two lines, inside and outside edges through the neutral zone. Knees bent,
+                        head up, full extension on the push.
+                    </div>
+                    <div class="hp-row" style="margin-top:.5rem;">
+                        <span class="hp-pill">skating</span>
+                        <span class="hp-pill">warm up</span>
+                    </div>
+                </div>
+                <div class="hp-drill">
+                    <div class="hp-drill-head">
+                        <span class="hp-drill-num">2</span>
+                        <div class="hp-drill-title">D to D reversal</div>
+                        <span class="hp-drill-time">15 min</span>
+                    </div>
+                    <div class="hp-drill-body">
+                        Start on the whistle, strong side D reverses behind the net. Wingers hold
+                        the wall until the puck moves.
+                    </div>
+                    <div class="hp-row" style="margin-top:.5rem;">
+                        <span class="hp-pill">breakouts</span>
+                        <span class="hp-pill">defence</span>
+                    </div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">Written once, then dropped into any practice.</figcaption>
+        </figure>
+        <p class="hp-muted">
+            If you run more than one team, a drill can be copied across to another team you
+            manage, without the two teams becoming linked afterwards.
+        </p>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Or upload the plan you have already drawn up</h3>
+        <p class="hp-muted">
+            Already have a practice plan as a PDF? Upload it as it is. Any video links in the file
+            are found and turned into those tappable cards for you, whether they were proper links
+            or just pasted in as text. You can rename or hide any of them, and replace the file
+            later without breaking the link players already have.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the links found in an uploaded plan. A heading reads
+                             Links found in the plan. Two rows, each with a tick, a section name
+                             and a label: Breakouts, D to D reversal, and Small area, Two on two
+                             below the dots.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Links found in the plan</div>
+                <ul class="hp-list">
+                    <li>
+                        <span class="hp-pill hp-pill-viewed">&#10003; Shown</span>
+                        <span class="grow">Breakouts &rsaquo; D to D reversal</span>
+                    </li>
+                    <li>
+                        <span class="hp-pill hp-pill-viewed">&#10003; Shown</span>
+                        <span class="grow">Small area &rsaquo; Two on two below the dots</span>
+                    </li>
+                </ul>
+            </div>
+            <figcaption class="hp-mock-cap">Read out of the file, then yours to rename or hide.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">Draft first, publish when it is ready</h3>
+        <p class="hp-muted">
+            A plan stays a draft while you build it, visible only to you. Nothing reaches the team
+            until you publish it.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the publishing panel. It says this is a draft that
+                             players cannot see yet, with a button reading Publish to the team.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Publishing</div>
+                <div class="hp-panel">
+                    <p style="margin-top:0;">
+                        This is a <strong>draft</strong>, so players cannot see it yet.
+                    </p>
+                    <div class="hp-btn hp-btn-accent">Publish to the team</div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">Nothing is visible to the team until you say so.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">See who has actually read it</h3>
+        <p class="hp-muted">
+            Every plan shows who on the roster has opened it. It counts a plan as read only once
+            it has been on screen properly, so a tap and a bounce does not count, and it recognises
+            a player across the family's phones rather than counting devices.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the read tracking panel. It reads 12 of 17 on the
+                             roster have opened this plan, followed by player names. Jordan P,
+                             Ryan M and Ava T are ticked, Sam O and Casey L are not.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Who's seen it</div>
+                <div class="hp-panel">
+                    <strong>12 of 17</strong> on the roster have opened this plan.
+                    <div class="hp-tracking">
+                        <span class="done">&#10003; Jordan P.</span>
+                        <span class="done">&#10003; Ryan M.</span>
+                        <span class="done">&#10003; Ava T.</span>
+                        <span>Sam O.</span>
+                        <span>Casey L.</span>
+                    </div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">Useful the night before, when you are deciding whether to chase anyone.</figcaption>
+        </figure>
+    </div>
+
+    <div class="hp-panel">
+        <h3 class="hp-card-title">The roster, and getting everyone in</h3>
+        <p class="hp-muted">
+            Add your players and share one link into the team chat. If someone leaves the team you
+            can change the code, and the old one stops working. The team's name, colours and logo
+            are yours to set, and they follow through every screen a player sees.
+        </p>
+        <figure class="hp-mock">
+            <div class="hp-mock-frame" role="img"
+                 aria-label="Illustration of the roster and invite panel. A list of players with
+                             jersey numbers 7 Jordan P and 12 Ryan M, each with a Remove button.
+                             Below, a hidden team code beside a button reading Share invite link.">
+                <span class="hp-pill hp-mock-tag">Example</span>
+                <div class="hp-section" style="margin-top:.2rem;">Roster</div>
+                <div class="hp-panel">
+                    <ul class="hp-list">
+                        <li>
+                            <span class="hp-jersey">7</span>
+                            <span class="grow">Jordan P.</span>
+                            <span class="hp-btn hp-btn-danger hp-btn-sm">Remove</span>
+                        </li>
+                        <li>
+                            <span class="hp-jersey">12</span>
+                            <span class="grow">Ryan M.</span>
+                            <span class="hp-btn hp-btn-danger hp-btn-sm">Remove</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="hp-section">Invite the team</div>
+                <div class="hp-panel">
+                    <div class="hp-row" style="align-items:center;gap:.8rem;">
+                        <span class="hp-code-display">&bull;&bull;&bull;&bull;&bull;&bull;</span>
+                        <span class="hp-btn">Share invite link</span>
+                    </div>
+                </div>
+            </div>
+            <figcaption class="hp-mock-cap">One link, straight into the team chat.</figcaption>
+        </figure>
+    </div>
+
+    @if (Model is not null)
+    {
+        @* Built from the slug and the code, exactly like the Manage page's invite link, so it
+           lands on whatever host the reader is already on and carries the path prefix. *@
+        var joinUrl = Url.Action("Index", "Team", new { slug = Model.Slug, c = Model.ViewCode });
+
+        <h2 class="hp-section">Try it yourself</h2>
+        <div class="hp-panel">
+            <p style="margin-top:0;">
+                This opens a demo team, as a player would see it. Everything in it is made up. Have
+                a look around, nothing you do there affects anyone's season.
+            </p>
+            <a class="hp-btn hp-btn-block hp-btn-accent" href="@joinUrl" rel="nofollow">
+                Open the demo team
+            </a>
+            <p class="hp-muted" style="margin-bottom:0;">
+                The coach screens above are illustrations rather than a second demo, because
+                letting anyone into the coach side of a real team would let them change it.
+            </p>
+        </div>
+    }
+
+    <div class="hp-panel" style="margin-top:1.25rem;">
+        <a asp-action="WhatsNew" style="font-weight:600;">What's new on this site &rarr;</a>
+        <div class="hp-muted" style="font-size:.85rem;margin-top:.2rem;">
+            Recent changes and additions, newest first.
+        </div>
+    </div>
+</div>

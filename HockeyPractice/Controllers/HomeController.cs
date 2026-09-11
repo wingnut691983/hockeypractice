@@ -1,3 +1,4 @@
+using HockeyPractice.Models;
 using HockeyPractice.Persistence;
 using HockeyPractice.Services;
 using HockeyPractice.ViewModels;
@@ -8,6 +9,20 @@ namespace HockeyPractice.Controllers;
 
 public class HomeController : Controller
 {
+    /// <summary>
+    /// The team offered at the end of /how-it-works, as a player would see it.
+    ///
+    /// Hardcoded rather than configured because a slug is not a secret: it is the visible part of
+    /// every link to that team. The code that opens it is a secret, and is not here. It is read
+    /// from the team's own row at request time, so rotating the demo team's code needs no change
+    /// to this file and no redeploy.
+    ///
+    /// If the demo team is renamed or deleted, change this and the last panel follows. A slug that
+    /// matches nothing simply leaves that panel out, so getting it wrong costs the panel, not the
+    /// page.
+    /// </summary>
+    private const string DemoTeamSlug = "demoteam";
+
     private readonly AppDbContext _db;
     private readonly TeamAccessService _access;
 
@@ -42,6 +57,26 @@ public class HomeController : Controller
     /// </summary>
     [Route("whats-new")]
     public IActionResult WhatsNew() => View();
+
+    /// <summary>
+    /// What the site does, for someone who has not been given a code yet.
+    ///
+    /// It exists because the two audiences cannot both be previewed the same way. The demo team's
+    /// code shows the player side, but there is no read-only manager mode, so showing anyone the
+    /// coach side would mean handing over a manager code and with it the ability to wreck the
+    /// demo team. The coach screens here are drawn, not real, which needs no access at all.
+    ///
+    /// Public and sign-in free for the same reasons as WhatsNew, and under the same content rule:
+    /// everything on it is readable by anyone who finds the site.
+    /// </summary>
+    [Route("how-it-works")]
+    public async Task<IActionResult> HowItWorks()
+    {
+        // No such team, or a team with no player code, and the last panel is simply left out. The
+        // rest of the page is worth serving either way, so this never fails the request.
+        var demo = await _db.Teams.FirstOrDefaultAsync(t => t.Slug == DemoTeamSlug);
+        return View(demo?.ViewCode is { Length: > 0 } ? demo : null);
+    }
 
     [Route("Home/Error")]
     public IActionResult Error(int? status)

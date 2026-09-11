@@ -54,6 +54,20 @@ tangled and aren't anymore.
 - **Notifications.** Parents opt in with their own address (double opt-in, one-click
   unsubscribe) from the plans page — hidden entirely from managers, and hidden site-wide until a
   mail provider is actually configured, so it's never offered and then silently never sent.
+- **How it works.** A public page at `/how-it-works`, linked from the landing page, showing both
+  sides of the site to someone who has no code yet. The demo team's code previews the player side,
+  but there is no read-only manager mode, so previewing the coach side would mean handing out a
+  manager code and with it the ability to wreck the demo team. The coach screens there are drawn
+  instead: static markup built from the real CSS classes, so they weigh nothing, reflow on a phone
+  and follow dark mode, and so no access is needed to see them. Nothing inside one is a real
+  control. See "What I'd flag" before changing how they are built.
+
+  The page ends with a link into the demo team, as a player sees it. Its slug is a constant in
+  `HomeController` (`DemoTeamSlug`), because a slug is the visible half of every link to a team and
+  is not a secret; the code that opens it is, and is not stored there. It is read from the team's
+  own row when the page renders, so rotating the demo team's code needs no code change. Rename or
+  delete that team and the panel quietly disappears, which is why nothing else on the page depends
+  on it.
 - **Team colours.** A manager sets two brand colours; every place they're used as a button
   background or as text is computed for WCAG-legible contrast rather than assumed white-on-team-
   colour, so a light team colour (gold, white, powder blue) doesn't produce unreadable buttons.
@@ -254,6 +268,22 @@ answer in September.
   before and after, along with the plain paths: a new tag typed and then clicked away from, and
   Enter with nothing highlighted, still make one chip and don't submit the form. Any third commit
   path you add needs the same two guards.
+- **The illustrations on `/how-it-works` must stay inert, and that is three separate things.**
+  They are drawn from the real classes rather than screenshotted, which keeps the page imageless
+  and self-updating with the palette, but it means a fake button is one attribute away from
+  looking exactly like a real one. First, the markup contains no `a`, `button`, `input`, `form` or
+  `details` at all, and none of the `data-` attributes the layout's scripts bind to, so no site
+  script can attach to one; `<span class="hp-btn">` renders identically because every one of those
+  rules is class-only. Second, each frame is `role="img"` with a descriptive `aria-label`, which
+  collapses the subtree to a single node so a screen reader announces a picture instead of reading
+  out a form nobody can submit. That makes the label the only thing conveyed, so it has to be a
+  real sentence. Do not add `inert` as well: it removes the node from the accessibility tree and
+  takes the label with it. Third, `pointer-events: none` and a `cursor` override, because
+  `.hp-btn` sets `cursor: pointer` and that is the one cue that would still say "tap me".
+  Measured at 390 and 360 px: `scrollWidth` equals the viewport, so the page never scrolls
+  sideways. The third video card deliberately runs past the frame edge and is clipped by
+  `overflow: hidden`, which is how the real strip's sideways scroll is suggested without being
+  scrollable. Checked in both colour schemes.
 - **The suggestion panel opens on `click` as well as `focus`, and it needs both.** Reported from
   the plan form on 2026-09-11: after adding one tag, clicking the box again showed no suggestions
   until you clicked away and clicked back. Every path that commits a tag leaves the input focused,

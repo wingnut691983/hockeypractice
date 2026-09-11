@@ -164,6 +164,27 @@ wait a minute because their teammates tapped first.
 
 ---
 
+### 9. Nothing is compressed, on any page
+
+There is no `UseResponseCompression` in `Program.cs`, and production confirms it: a request to
+`/whats-new` with `Accept-Encoding: gzip` comes back with no `Content-Encoding`, so every page goes
+over the wire as raw HTML. About 24 KB of each one is the layout's four inline script blocks, which
+are identical on every page and never cached separately because they are inline.
+
+Measured 2026-09-11 while checking the weight of the new `/how-it-works` page: 47 KB uncompressed,
+12 KB gzipped. Roughly a four-fold saving, on a site whose stated constraint is that players load
+it on rink wifi.
+
+Left alone because it is a middleware line plus a decision about which types to compress and
+whether to bother with Brotli, which is a change to every response on the site rather than
+something this page needs. Worth doing deliberately, not in passing.
+
+**Trigger: anyone reporting the site feels slow on a phone, or the next time `Program.cs`'s
+middleware order is being changed anyway.** Note that response compression has to sit before the
+pages it compresses, and that the `/health` endpoint should stay out of it.
+
+---
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.

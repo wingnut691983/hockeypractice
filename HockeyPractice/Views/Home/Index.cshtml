@@ -83,9 +83,16 @@
 
     @* Outside the team loop, so it sits under the cards rather than inside one. *@
     <div class="hp-panel" style="margin-top:1.25rem;">
-        <a asp-action="WhatsNew" style="font-weight:600;">What's new on this site &rarr;</a>
+        <a asp-action="HowItWorks" style="font-weight:600;">How this site works &rarr;</a>
         <div class="hp-muted" style="font-size:.85rem;margin-top:.2rem;">
-            Recent changes and additions, newest first.
+            What players and parents see, and what a coach does, before signing in to anything.
+        </div>
+
+        <div style="border-top:1px solid var(--hp-border);margin-top:.75rem;padding-top:.75rem;">
+            <a asp-action="WhatsNew" style="font-weight:600;">What's new on this site &rarr;</a>
+            <div class="hp-muted" style="font-size:.85rem;margin-top:.2rem;">
+                Recent changes and additions, newest first.
+            </div>
         </div>
     </div>
 </div>

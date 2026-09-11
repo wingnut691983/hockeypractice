@@ -268,7 +268,7 @@ a.hp-card:active { transform: scale(.99); }
   color: var(--hp-muted);
 }
 .hp-plan-summary li + li { border-top: 1px solid var(--hp-border); }
-.hp-plan-summary a {
+.hp-plan-summary a, .hp-plan-summary .hp-mock-name {
   flex: 1;
   min-width: 0;
   font-weight: 650;
@@ -721,7 +721,7 @@ a.hp-card:active { transform: scale(.99); }
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
   gap: .6rem;
 }
-.hp-roster button {
+.hp-roster button, .hp-roster .hp-mock-tile {
   font: inherit;
   min-height: 60px;
   display: flex; align-items: center; gap: .6rem;
@@ -1574,3 +1574,35 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   cursor: pointer;
 }
 .hp-zoom button:active { background: var(--hp-surface-2); }
+
+/* ── "How it works" illustrations ────────────────────────────────────────
+   Static pictures of the real screens on the public How it works page, built from the real
+   classes so they follow the tokens, the team colours and dark mode without a second set of
+   rules, and so they weigh nothing: there is no image here, only markup.
+
+   Nothing inside a frame is operable. The markup carries no link, button, input or form, and no
+   attribute the layout's scripts bind to, so none of them can attach. pointer-events is the
+   second line of defence, and cursor overrides .hp-btn's pointer, which is the one visual cue
+   that would otherwise say "tap me". The frame is role="img" so a screen reader announces one
+   node and its label rather than reading out a form nobody can fill in. */
+.hp-mock { margin: 0 0 1rem; }
+.hp-mock-frame {
+  position: relative;
+  border: 1px dashed var(--hp-border);
+  border-radius: var(--hp-radius);
+  background: var(--hp-surface-2);
+  padding: 1.05rem .8rem .8rem;
+}
+.hp-mock-frame, .hp-mock-frame * { pointer-events: none; cursor: default; }
+.hp-mock-frame > :last-child { margin-bottom: 0; }
+/* The real strip scrolls sideways. This one cannot, so clip it rather than leave a scrollbar
+   that does nothing. */
+.hp-mock-frame .hp-videos { overflow: hidden; }
+/* Notched onto the top edge, so the frame reads as a sketch at a glance and not as a live card
+   that has stopped working. */
+.hp-mock-tag {
+  position: absolute; top: -.6rem; left: .8rem;
+  background: var(--hp-bg);
+  border: 1px solid var(--hp-border);
+}
+.hp-mock-cap { font-size: .8rem; color: var(--hp-muted); margin: .45rem 0 0; }
