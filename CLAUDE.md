@@ -159,16 +159,31 @@ needed changing, so it's visible that it happened rather than silently skipped.
 
 ## Deploy target
 
-**Deploy to `hockeypractice` (production, `https://ebhockeyplan.com/`) unless told otherwise.**
-That is what `upturtle.yaml` pins and it is the default on purpose. Never ask which app to deploy
-to; an unqualified "deploy" is production.
+**This repo deploys to one app and one only:**
 
-**`hockeypractice-restore` is temporary** (created 2026-09-10 to rehearse a restore, expected to
-be deleted). Deploy to it only when its slug is named out loud in the request. It deliberately has
-no `ARCHIVE_S3_*` variables, so it gets `NullBackupStore` and physically cannot list, upload or
-prune anything in the R2 bucket. Do not "helpfully" give it credentials: retention keeps three, so
-its nightly runs under the production prefix would delete every real archive. When that app is
-deleted, drop this paragraph and the matching README subsection. See README's "Deploying".
+| | |
+|---|---|
+| Slug | `hockeypractice` (what `upturtle.yaml` pins) |
+| App id | `fa9fc989-ece2-4a32-97a9-11241eb35d4c` |
+| URL | `https://ebhockeyplan.com/` |
+
+An unqualified "deploy" is this app. Never ask which one; the answer is in `upturtle.yaml` and it
+is production on purpose. Confirm the app id above appears in the image ref before pushing, which
+is what catches an image built in the wrong repo. The account-wide rules are in `~/.claude/CLAUDE.md`.
+
+**There is a second UpTurtle app on this account, `statslogic`, and it is a different project in a
+different repo** (`~/Documents/git/statslogic_ut`). It is also ASP.NET Core 8 on SQLite with a
+`publish/` directory and a `Dockerfile.fast`, so a build run from the wrong directory produces a
+valid image of the wrong site. Nothing downstream catches that except the app id check.
+
+**Both apps write backups to the same R2 bucket (`ebhpbackup`), kept apart only by
+`ARCHIVE_S3_PREFIX`.** This app's is `hockeypractice/` and StatsLogic's is `statslogic/`.
+Retention keeps three per prefix, so an app pointed at the other's prefix wipes the other site's
+archives in three nights. Never copy that variable between apps. If a third app is ever stood up
+from this repo, for a restore rehearsal or anything else, leave it with no `ARCHIVE_S3_*`
+variables at all: missing any one of them registers `NullBackupStore`, whose upload, download and
+delete all throw, so it cannot reach the bucket. That is a capability it does not have rather than
+a rule someone has to remember.
 
 ## Building an image to deploy
 

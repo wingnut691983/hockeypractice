@@ -497,38 +497,50 @@ present and check each one still exists (`list_slots` names every app the org ha
 unmatched is a dead app and all of its tags can go. The full sweep took the machine from 434
 images and 5.8 GB to 21 and 960 MB.
 
-### There are two apps on UpTurtle, for now
+### Which app this repo deploys to
 
-| Slug | What it is | URL |
+| Slug | App id | URL |
 |---|---|---|
-| `hockeypractice` | Production, and the default deploy target. | `https://ebhockeyplan.com/` |
-| `hockeypractice-restore` | Temporary scratch copy for rehearsing a restore. Delete when done. | `https://mbhockey.upturtle.app/hockeypractice-restore/` |
+| `hockeypractice` | `fa9fc989-ece2-4a32-97a9-11241eb35d4c` | `https://ebhockeyplan.com/` |
 
-`upturtle.yaml` pins **`hockeypractice`**, so an unqualified "deploy" means production, and that is
-deliberate rather than incidental: production is the common case and should not need a decision.
-The restore app is deployed only when its slug is named explicitly. Each app has its own 1 GiB
-volume, so their databases, uploads and `dpkeys` are unrelated.
+`upturtle.yaml` pins that slug, so an unqualified "deploy" means production, and that is deliberate
+rather than incidental: production is the common case and should not need a decision.
 
-The restore app was stood up on 2026-09-10 and is expected to be short-lived. Deleting it takes its
-volume and its $5/month with it. When it goes, delete this subsection too.
+There is a second app on this UpTurtle account, **`statslogic`**, which is a different project
+living in `~/Documents/git/statslogic_ut`. It is also ASP.NET Core 8 on SQLite with a `publish/`
+directory and a `Dockerfile.fast`, so a build run from the wrong directory produces a valid image
+of the wrong site, and neither the registry nor the provisioner would object. The check that
+catches it is the app id: the image reference `get_registry_credentials` hands back is
+`package.upturtle.com/<app id>/app`, and that id must match the one above before anything is
+pushed. Do it every time; it is one tool call. The account-wide rules live in `~/.claude/CLAUDE.md`.
 
-**The restore app deliberately has no `ARCHIVE_S3_*` variables.** That is the safety fence, and it
-is a capability the app does not have rather than a rule someone has to remember: without all five
-values `S3BackupStore.IsConfigured` is false, `NullBackupStore` is registered instead, and its
-upload, download and delete all throw. The scheduler sees `Enabled == false` and never starts, so
-it cannot write into the bucket and retention can never prune a real archive. Confirmed in its
-startup log: `Off-site backups are not configured, so nothing is scheduled.`
+The two apps have separate 1 GiB volumes, so their databases, uploads and `dpkeys` are unrelated.
+They do share the R2 bucket `ebhpbackup`, kept apart only by `ARCHIVE_S3_PREFIX`
+(`hockeypractice/` here, `statslogic/` there). Retention keeps three archives per prefix, so an
+app pointed at the other's prefix would delete the other site's backups in three nights. Never
+copy that variable between apps.
 
-To rehearse a restore, download the newest archive from R2 by hand and upload the zip on the
-restore app's admin page. `RestoreArchive` takes either a `key` from the bucket or an uploaded
-file, and the upload branch touches the store not at all. If you ever do give that app
-credentials, `ARCHIVE_S3_PREFIX` must not be `hockeypractice/`: retention keeps three, so three
-nights of its backups would prune every real archive.
+### If you stand up a second app from this repo
 
-Its `SITE_ADMIN_CODE` is deliberately different from production's. That works because the code is
-read from the environment, not the database, so it survives restoring a production archive over
-the top. Restoring production data there does put real team codes, the roster and unencrypted
-`dpkeys` on a second public URL, so treat that URL as production-sensitive and delete the app when
-you are done, which takes its volume with it.
+There was one, `hockeypractice-restore`, created on 2026-09-10 to rehearse a restore and deleted
+once that was done. Confirmed gone on 2026-09-11: `get_application_status` returns null for the
+slug, `list_slots` shows only the two apps above, and the only trace left was a set of local
+podman images under its orphaned app id.
+
+If another one is ever needed, the one thing to carry forward is this: **give it no `ARCHIVE_S3_*`
+variables at all.** That is a capability it does not have rather than a rule someone has to
+remember. Missing any one of the four values makes `S3BackupStore.IsConfigured` false, so
+`NullBackupStore` is registered and its upload, download and delete all throw, and the scheduler
+sees `Enabled == false` and never starts. It cannot reach the bucket, so its retention can never
+prune a real archive. The restore app confirmed this in its startup log: `Off-site backups are not
+configured, so nothing is scheduled.`
+
+To rehearse a restore on such an app, download the newest archive from R2 by hand and upload the
+zip on its admin page. `RestoreArchive` takes either a `key` from the bucket or an uploaded file,
+and the upload branch touches the store not at all. Give it a `SITE_ADMIN_CODE` of its own, which
+works because the code is read from the environment rather than the database and so survives
+restoring a production archive over the top. Restoring production data onto a second public URL
+puts real team codes, the roster and unencrypted `dpkeys` there, so treat that URL as
+production-sensitive and delete the app when you are done, which takes its volume with it.
 
 Source: `github.com/wingnut691983/hockeypractice`.
