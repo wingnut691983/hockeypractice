@@ -81,18 +81,28 @@
         }
     }
 
-    @* Outside the team loop, so it sits under the cards rather than inside one. *@
-    <div class="hp-panel" style="margin-top:1.25rem;">
-        <a asp-action="HowItWorks" style="font-weight:600;">How this site works &rarr;</a>
-        <div class="hp-muted" style="font-size:.85rem;margin-top:.2rem;">
-            What players and parents see, and what a coach does, before signing in to anything.
-        </div>
-
-        <div style="border-top:1px solid var(--hp-border);margin-top:.75rem;padding-top:.75rem;">
-            <a asp-action="WhatsNew" style="font-weight:600;">What's new on this site &rarr;</a>
-            <div class="hp-muted" style="font-size:.85rem;margin-top:.2rem;">
+    @* Outside the team loop, so they sit under the team cards rather than inside one. Two
+       tappable cards side by side rather than stacked links: both are things to read before
+       signing in to anything, so they read as a pair of choices instead of small print. Whole
+       cards, not just the words, because a link the width of its own text is a poor target on a
+       phone. Two columns at every width on purpose; the titles are short enough to take it, and
+       stacking them again would undo the point. *@
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:1.25rem;">
+        <a class="hp-card" asp-action="HowItWorks" style="margin-bottom:0;">
+            <div class="hp-card-title" style="font-size:1.02rem;margin:0 0 .25rem;">
+                How it works&nbsp;&rarr;
+            </div>
+            <div class="hp-muted" style="font-size:.82rem;">
+                The player view and the coach view, before you sign in.
+            </div>
+        </a>
+        <a class="hp-card" asp-action="WhatsNew" style="margin-bottom:0;">
+            <div class="hp-card-title" style="font-size:1.02rem;margin:0 0 .25rem;">
+                What's new&nbsp;&rarr;
+            </div>
+            <div class="hp-muted" style="font-size:.82rem;">
                 Recent changes and additions, newest first.
             </div>
-        </div>
+        </a>
     </div>
 </div>
