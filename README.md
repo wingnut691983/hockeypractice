@@ -415,6 +415,17 @@ The app slug is pinned in `upturtle.yaml`. Two Dockerfiles exist:
   `dotnet restore` under emulation in the plain `Dockerfile` takes 20+ minutes; this takes
   seconds. This is the one actually used for every real deploy so far.
 
+  Two things measured on 2026-09-10, after a session followed `AGENTS.md`'s generic
+  `podman build .` and got the plain `Dockerfile` by accident. First, "20+ minutes" is optimistic:
+  that restore can simply never finish. An isolated run produced no output at all in 150 seconds,
+  and an orphan left over from an earlier attempt had burned 9h48m of CPU still sitting in
+  restore. Second, interrupting `podman build` does not stop the work. The client detaches but the
+  emulated compile keeps running inside the Podman VM, so two dead builds were pegging a core each
+  and starving the live one in a 2 GiB machine. If a build ever looks stuck, check with
+  `podman machine ssh "ps aux | grep qemu-x86_64-static"` and kill what you find. Then use
+  `Dockerfile.fast`, which is what should have happened in the first place: publish 3.7s, image
+  1.9s.
+
 ```sh
 # Dockerfile.fast path (recommended on an M-series Mac):
 dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish
