@@ -92,6 +92,66 @@ public class PlanController : TeamScopedController
     }
 
     /// <summary>
+    /// A clean sheet for paper. Its own page rather than print rules bolted onto Details,
+    /// because the coach wants to see what will come out before spending the paper, and
+    /// because the running order belongs first on a printout and last on a screen.
+    /// </summary>
+    [HttpGet("{id:int}/print")]
+    public async Task<IActionResult> Print(string slug, int id)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans
+            .Include(p => p.Links)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+
+        if (plan is null) return NotFound();
+        if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
+
+        // A PDF plan already has a printable artefact: itself. Sending the browser to the file
+        // means it prints through the native PDF viewer, which paginates properly — rather than
+        // us trying to print the pdf.js iframe, which prints whatever canvases happen to be
+        // rendered. No download flag: an attachment disposition saves the file instead of
+        // opening it. File() re-runs its own PlanKind.Pdf guard, so this adds no new path to it.
+        //
+        // The button on Details links a PDF plan straight at File, so this redirect is only
+        // reached by a bookmarked or shared /print URL — which must not be a dead end just
+        // because the reader can't tell a plan's kind from its address.
+        if (plan.Kind != PlanKind.Drills)
+            return RedirectToAction("File", new { slug, id });
+
+        // SortOrder is neither unique nor contiguous, and the same drill can legitimately
+        // appear twice in one practice, so Id is what makes the order stable.
+        var entries = await Db.PlanDrills
+            .Include(pd => pd.Drill).ThenInclude(d => d!.Diagrams)
+            .Where(pd => pd.PracticePlanId == plan.Id)
+            .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
+            .ToListAsync();
+
+        // Same omission as Details: no .ThenInclude(d => d.Tags). Tags are the coach's filing
+        // system, and a printout is the last place they belong. EmbedUrl stays null for the
+        // same reason — nothing on paper can be embedded, so resolving one is wasted work.
+        var drills = entries.Select(pd => new DrillCard
+        {
+            Drill = pd.Drill!,
+            PlanDrillId = pd.Id,
+            EmbedUrl = null
+        }).ToList();
+
+        // Deliberately no roster, no PlanViews and no HasViewedAsync: this page shows none of
+        // it, and printing is not reading — see Views/Shared/_PrintLayout.cshtml on the beacon.
+        return View(new PlanPrintViewModel
+        {
+            Ctx = ctx!,
+            Plan = plan,
+            Videos = plan.Links.Where(l => !l.IsHidden).OrderBy(l => l.SortOrder).ToList(),
+            Drills = drills,
+            WhenLabel = WhenLabel.For(plan.PracticeDateLocal, ctx!.Team.TimeZoneId)
+        });
+    }
+
+    /// <summary>
     /// Streams the PDF. Uploads live outside wwwroot precisely so this action runs first —
     /// static hosting would let anyone who guesses a path read the team's plans.
     /// </summary>

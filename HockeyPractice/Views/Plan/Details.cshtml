@@ -8,6 +8,7 @@
     var downloadUrl = Url.Action("File", "Plan",
         new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id, download = true })!;
     var beaconUrl = Url.Action("Viewed", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var printUrl = Url.Action("Print", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
     // pdf.js reads the document from ?file=; page-width is the only sane default on a phone.
     var viewerUrl = Url.Content("~/lib/pdfjs/web/viewer.html")
         + "?file=" + Uri.EscapeDataString(fileUrl) + "#zoom=page-width";
@@ -154,10 +155,11 @@
                 }
             </ol>
 
-            var endsAt = starts.Count > 0 && starts[^1] is int lastStart
-                && Model.Drills[^1].Drill.RunTimeMinutes is int lastLen
-                    ? lastStart - lastLen
-                    : (int?)null;
+            @* Shared with the print sheet, which needs the same number — see RunTime.Finish.
+               Both are null unless every drill has a time, so a partial plan reports nothing
+               rather than a confident wrong answer. *@
+            var endsAt = HockeyPractice.Infrastructure.RunTime.Finish(
+                Model.Drills.Select(c => c.Drill.RunTimeMinutes));
             @if (endsAt is int finish)
             {
                 <div class="hp-plan-summary-foot @(finish < 0 ? "over" : "")">
@@ -246,6 +248,10 @@
         }
 
         <div class="hp-row" style="margin-top:.8rem;">
+            @* Not in .hp-plan-actions above: that block is manager-only, and a parent
+               printing the plan for the car is half the audience for this. *@
+            <a class="hp-btn hp-btn-quiet" href="@printUrl"
+               target="_blank" rel="noopener">Print this plan</a>
             <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
                     hidden data-title="@Model.Plan.Title">Share</button>
         </div>
@@ -270,6 +276,12 @@
         </div>
 
         <div class="hp-row" style="margin-top:.8rem;">
+            @* Straight at the file, not at Print, and not at downloadUrl: the browser's own
+               viewer paginates a PDF better than we can, while an attachment disposition
+               would save it instead of opening it. Labelled for what the tap does — calling
+               this "Print this plan" would promise the preview the drill path gives. *@
+            <a class="hp-btn hp-btn-quiet" href="@fileUrl"
+               target="_blank" rel="noopener">Print the PDF</a>
             <a class="hp-btn hp-btn-quiet" href="@downloadUrl">Download PDF</a>
             <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
                     hidden data-title="@Model.Plan.Title">Share</button>

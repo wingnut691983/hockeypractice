@@ -185,6 +185,43 @@ pages it compresses, and that the `/health` endpoint should stay out of it.
 
 ---
 
+### 10. PDF diagrams are listed on a printout, not printed
+
+A `DrillDiagram` whose file is a PDF (`DrillDiagram.IsPdf`) has no picture to place on a sheet, so
+`Views/Plan/Print.cshtml` prints a bordered note naming which diagram it is and giving the absolute
+URL, instead of the "Open the diagram (PDF)" button the on-screen plan shows. A button on paper is a
+dead control; a URL can at least be typed. The note is rendered on screen as well as on paper on
+purpose, so a coach finds out before printing that drill 4's diagram will not be on the sheet.
+
+Doing better means rasterising page 1 of the PDF at upload time and storing it beside the original.
+PdfPig reads PDFs, it does not render them, so that is a new dependency — the same reason QR codes
+were left out of this feature.
+
+**Trigger: PDF diagrams stop being rare.** Convert on upload, not at print time: a print request is
+the wrong moment to be rendering a PDF, and the result is the same for every reader.
+
+---
+
+### 11. A very tall drill can still split across two sheets
+
+The printed diagram caps (130mm for one picture, 70mm for two, 52mm each for three or more in a
+two-column grid) were measured against a real six-drill plan on US Letter, and hold for the
+descriptions this site actually has. They are a budget, not a guarantee: `Drill.Description` allows
+4,000 characters and CSS has no "remaining page height" unit, so a card can still be taller than a
+page — and `break-inside: avoid` is ignored on a box taller than the page rather than honoured.
+
+Checked at the extreme: with a 4,000-character description the card does split, but it splits
+*mid-description*, so the diagram still follows its own text rather than being stranded on a sheet
+of its own. That is the acceptable failure, and it is why the caps were not dropped further — every
+millimetre taken off the cap to protect the 4,000-character case makes every ordinary drill's
+diagram smaller, and the diagram being readable at arm's length on the bench is the point.
+
+**Trigger: someone reports a drill printing across two pages.** The fix is to cap the number of
+diagrams printed per drill, or to give a long description its own sheet — not to shrink the
+pictures again. The signature to look for is a printed page with no text on it at all.
+
+---
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.
@@ -207,6 +244,14 @@ Individually not worth a commit; worth sweeping the next time each file is open.
   `SafeFileName` would close it.
 - `_Pager.cshtml:13` nullability warning CS8620: the dictionary should be
   `Dictionary<string, string?>`.
+- Diagram `<img>` elements on the print sheet carry no `width`/`height`, because `DrillDiagram`
+  stores only `FileName` and `Bytes` and no pixel dimensions. The page therefore reflows as the
+  pictures land. It does not affect the printed output — the Print button waits for every image
+  before it will fire — but it makes the on-screen preview jump. Closing it means a schema column.
+- The team logo on the print sheet is an `<img>` with no fallback, so a team row whose
+  `LogoFileName` points at a file that is not on the volume prints an empty box. Same exposure as
+  `_TeamHeader`, so it is consistent rather than new; noticed because the local dev database
+  references a logo that was never copied into `.localdata`.
 
 ---
 

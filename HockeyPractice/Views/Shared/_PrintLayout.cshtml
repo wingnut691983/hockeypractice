@@ -1,0 +1,41 @@
+@{
+    var team = ViewBag.Team as Team;
+    var title = ViewBag.Title as string ?? "Practice plan";
+    var primary = team?.SafePrimary ?? Team.DefaultPrimary;
+    var accent  = team?.SafeAccent  ?? Team.DefaultAccent;
+    var palette = HockeyPractice.Infrastructure.Palette.CssVariables(primary, accent);
+}
+<!DOCTYPE html>
+@* A stripped shell for the one page built for paper. No team header, no tab bar, no footer,
+   and none of _Layout's four script blocks: nothing here has a form, a tag box, a number
+   field or a fixed tab bar to dodge, so shipping them would be ~350 lines of dead weight.
+
+   Also deliberately absent: the web manifest (this must never become a PWA start URL),
+   theme-color, apple-touch-icon and viewport-fit=cover — there is no safe-area chrome here.
+
+   THERE IS NO VIEW BEACON HERE, AND THAT IS THE DECISION, NOT AN OVERSIGHT. The rule
+   everywhere else is that a bounce is not a view, and opening a print preview is the
+   definition of not having read the plan. Dedupe would not save it either: PlanView is unique
+   on (PlanId, PlayerId), so a beacon here would not double-count, it would falsely FIRST-count
+   — a player who printed without reading would show as seen on the coach's roster. Managers
+   short-circuit the beacon anyway, so every difference would land on players, in the wrong
+   direction. Nothing is lost: Print is reached from Details, which recorded the view already.
+
+   The team palette still rides on <html>, because the drill number badge and the running-order
+   clock resolve --hp-primary-text; without it every team prints in the fallback blue. The
+   hp-printpage class is on <html> rather than <body> so the print stylesheet can scope
+   root-level rules — the font size and the colour tokens — to this page alone, leaving Ctrl+P
+   on every other page exactly as it was. *@
+<html lang="en" class="hp-printpage" style="@palette">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+    <link rel="stylesheet" href="~/css/hockeypractice.css" asp-append-version="true" />
+    <link rel="icon" href="~/favicon.ico" sizes="16x16 32x32 48x48" asp-append-version="true" />
+</head>
+<body>
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

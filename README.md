@@ -49,6 +49,14 @@ tangled and aren't anymore.
   scroll with nothing to get stuck in partway down a long document. Pinch-to-zoom on the PDF is
   deliberately disabled (it fought the page's own scroll); a small floating +/- control stays
   reachable no matter how far into the document you've scrolled.
+- **Printing.** A **Print this plan** button on any plan opens a clean sheet at
+  `/t/<team>/plans/<id>/print`, so you can see what will come out before spending the paper. Page
+  one is the run sheet on its own — countdown clock, drill titles, times, and the over/under line
+  — which is the page a coach actually holds on the bench, with the coach notes and the videos as
+  URLs you can type rather than tap. Every drill then gets a card that is kept whole on one sheet,
+  its diagrams underneath the description and capped in height so the two never land on different
+  pages. A PDF plan's button reads **Print the PDF** and opens the file itself: the browser's own
+  viewer paginates it better than we can.
 - **Draft → Publish.** Nothing reaches players and no email goes out until the manager publishes.
   Republishing after an unpublish does not re-send the email.
 - **Notifications.** Parents opt in with their own address (double opt-in, one-click
@@ -158,6 +166,38 @@ plan. That answers "is last night's backup actually restorable", which is the qu
 answer in September.
 
 ## What I'd flag
+
+- **Dark mode follows you onto paper, and it overrides the colour tokens in two separate
+  places.** `prefers-color-scheme: dark` still matches while a page is printing, so a plan printed
+  from a phone in dark mode came out with the drill cards on a near-black background. The print
+  block resets the surface tokens (`--hp-bg`, `--hp-surface`, `--hp-surface-2`, `--hp-border`,
+  `--hp-text`, `--hp-muted`) — and, separately and easy to miss, `--hp-primary-text` /
+  `--hp-accent-text`, which the dark block swaps to the `-ink-dark` variants: the team colour
+  *lightened* for a dark surface, which prints almost invisibly on white. Reset the first group
+  and not the second and the running-order clock disappears. What makes the reset win is the
+  scoping — `html.hp-printpage` (0-1-1) outranks the dark block's `:root` (0-1-0) — not source
+  order; keeping the block last in the file is belt and braces. Verified by forcing all five
+  `prefers-color-scheme: dark` blocks to apply unconditionally and printing: all seven pages came
+  out byte-identical to the light-mode render.
+
+- **The printed diagram caps are measured, and the two-diagram one was wrong first time.** A drill
+  card is held together with `break-inside: avoid`, but that is *ignored* on a box taller than a
+  page — so if a diagram is not capped, the card splits and the picture ends up on a sheet of its
+  own, which is the exact complaint the print view exists to fix. The first attempt allowed 84mm
+  per picture on a two-diagram card; a 936-character description then filled the sheet and pushed
+  both pictures onto a page with no text on it at all. 70mm holds. The one-diagram (130mm) and
+  three-or-more (52mm, two across) caps were re-checked the same way and needed no change. Sized
+  for **US Letter**, not A4: Letter is 18mm shorter, and it is the paper that will be in the tray.
+  If you change a cap, re-print a real six-drill plan and check that no page comes out with no
+  text on it — that is the signature of a split card.
+
+  The other half of that rule: **never pin both dimensions of a printed diagram.** The caps keep
+  `width: auto; height: auto` so `max-width` and `max-height` resolve together, and the
+  three-or-more grid needs `justify-items: start`, because a grid item defaults to `stretch`,
+  which hands the image a definite width. Pin both and the browser drops the aspect ratio — a
+  portrait diagram comes out visibly squashed. This is the same lesson as the comment already on
+  `.hp-drill-diagram`, now in a second place because the print rules are where it will be
+  re-broken.
 
 - **The What's new page is public, and changelog entries kept leaking security detail.** It is
   served with no sign-in on purpose (`HomeController.WhatsNew`, so a player or parent can read it
@@ -417,6 +457,14 @@ answer in September.
   is an unrelated placeholder package with a template description — don't install it.
 
 ## Things worth knowing before you change anything
+
+- **The print sheet is a separate layout and deliberately records nothing.**
+  `Views/Plan/Print.cshtml` runs under `_PrintLayout`, which has no team header, no tab bar, no
+  footer and none of `_Layout`'s four script blocks — so a banner or script added to `_Layout`
+  will not appear there. That is the intent, but check whether it should. It also fires **no view
+  beacon**: opening a print preview is not reading the plan, and because `PlanView` is unique on
+  `(PlanId, PlayerId)` a beacon here would not double-count, it would falsely *first*-count, and a
+  player who printed without reading would show as seen on the coach's roster.
 
 - **All durable state lives under `DATA_DIR`.** Anything written elsewhere is wiped on redeploy.
 - **Data Protection keys are persisted to `DATA_DIR/dpkeys`.** Remove that and every redeploy

@@ -1,0 +1,304 @@
+@using HockeyPractice.Infrastructure
+@model PlanPrintViewModel
+@{
+    @* _ViewImports pulls in Models and ViewModels but NOT Infrastructure, which is why
+       Details.cshtml writes HockeyPractice.Infrastructure.RunTime in full. The @using above
+       is what lets this file say RunTime. — without it every call here is a compile error. *@
+    Layout = "_PrintLayout";
+    ViewBag.Title = Model.Plan.Title + " – " + Model.Ctx.Team.Name;
+    ViewBag.Team = Model.Ctx.Team;
+
+    var planUrl = Url.Action("Details", "Plan",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+
+    var starts = RunTime.StartTimes(Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+    var total = RunTimeTotal.From(Model.Drills);
+    var finish = RunTime.Finish(Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+}
+
+@* Screen only — the print stylesheet hides it, so it never reaches paper. *@
+<div class="hp-print-bar">
+    <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@planUrl">&larr; Back to the plan</a>
+    <span class="hp-print-hint" id="hp-print-status"></span>
+    <button type="button" class="hp-btn hp-btn-sm" id="hp-print-go">Print</button>
+</div>
+
+<div class="hp-shell hp-print-sheet">
+
+    <header class="hp-print-head">
+        @if (Model.Ctx.LogoUrl is not null)
+        {
+            <img class="hp-print-logo" src="@Model.Ctx.LogoUrl" alt="" />
+        }
+        <div class="hp-print-headtext">
+            <div class="hp-print-team">@Model.Ctx.Team.Name</div>
+            <h1 class="hp-print-title">@Model.Plan.Title</h1>
+            <div class="hp-print-meta">
+                <span>@Model.WhenLabel</span>
+                @if (!string.IsNullOrWhiteSpace(Model.Plan.Location))
+                {
+                    <span>@Model.Plan.Location</span>
+                }
+                @* A manager can print a draft. Saying so on the sheet stops an unpublished
+                   plan being carried onto the ice as though it were the final one. *@
+                @if (Model.Plan.Status == PlanStatus.Draft)
+                {
+                    <span class="hp-print-draft">Draft &mdash; not published</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Plan.CoachNotes))
+    {
+        <div class="hp-panel hp-print-notes">@Model.Plan.CoachNotes</div>
+    }
+
+    @if (Model.Drills.Count == 0)
+    {
+        <div class="hp-empty">No drills in this plan yet.</div>
+    }
+    else
+    {
+        <div class="hp-runtime-total">
+            <strong>@Model.Drills.Count drill@(Model.Drills.Count == 1 ? "" : "s")</strong>
+            @if (!string.IsNullOrEmpty(total.Label))
+            {
+                <text> · @total.Label</text>
+            }
+        </div>
+
+        <ol class="hp-plan-summary">
+            @for (var i = 0; i < Model.Drills.Count; i++)
+            {
+                var summaryDrill = Model.Drills[i].Drill;
+                var start = starts[i];
+
+                <li>
+                    <span class="hp-plan-summary-clock @(start < 0 ? "over" : "")">
+                        @if (start is int startMins)
+                        {
+                            @RunTime.Clock(startMins)
+                        }
+                        else
+                        {
+                            <text>&mdash;</text>
+                        }
+                    </span>
+                    @* A span, not the anchor Details uses: a fragment jump means nothing on
+                       paper, and an <a> would print blue and underlined for no reason. *@
+                    <span class="hp-plan-summary-name">@summaryDrill.Title</span>
+                    <span class="hp-plan-summary-time">
+                        @if (summaryDrill.RunTimeMinutes is int summaryMins)
+                        {
+                            @RunTime.Human(summaryMins)
+                        }
+                        else
+                        {
+                            <text>&mdash;</text>
+                        }
+                    </span>
+                </li>
+            }
+        </ol>
+
+        @if (finish is int finishMins)
+        {
+            <div class="hp-plan-summary-foot @(finishMins < 0 ? "over" : "")">
+                @if (finishMins < 0)
+                {
+                    <text>
+                        Runs <strong>@RunTime.Human(-finishMins) over</strong>
+                        the @RunTime.Clock(RunTime.PracticeMinutes) practice &mdash; trim one of the drills.
+                    </text>
+                }
+                else if (finishMins > 0)
+                {
+                    <text>
+                        Finishes with <strong>@RunTime.Clock(finishMins)</strong> left on the clock.
+                    </text>
+                }
+                else
+                {
+                    <text>Fills the practice exactly.</text>
+                }
+            </div>
+        }
+    }
+
+    @if (Model.Videos.Count > 0)
+    {
+        <div class="hp-section">Watch before practice</div>
+        @* Deliberately not .hp-videos: that is an overflow-x scroller, and a scroll container
+           prints only the slice that happens to be visible. Text URLs and no thumbnails — a
+           remote lazily-loaded image is the least likely thing on the page to reach paper. *@
+        <ul class="hp-print-links">
+            @foreach (var link in Model.Videos)
+            {
+                <li>
+                    <div class="hp-print-link-head">
+                        @if (!string.IsNullOrWhiteSpace(link.Section))
+                        {
+                            <span class="hp-print-link-section">@link.Section</span>
+                        }
+                        <span class="hp-print-link-label">@link.Label</span>
+                    </div>
+                    <span class="hp-print-url">@link.Url</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@if (Model.Drills.Count > 0)
+{
+    @* The page break hangs off this wrapper, so a plan with no drills produces no blank
+       trailing sheet — which is why the break is break-BEFORE here rather than break-after
+       on the running order above. *@
+    <div class="hp-shell hp-print-drills">
+        @for (var i = 0; i < Model.Drills.Count; i++)
+        {
+            var card = Model.Drills[i];
+            var drill = card.Drill;
+            var start = starts[i];
+
+            @* How much height each picture may take, so the card still fits one sheet.
+               Counted here rather than in CSS, which cannot count siblings. PDF diagrams are
+               excluded from the count: they print as a note, not a picture, so letting them
+               shrink the real images would waste the space they never use. *@
+            var pictures = card.Diagrams.Count(d => !d.IsPdf);
+            var density = pictures <= 1 ? "hp-print-d1"
+                        : pictures == 2 ? "hp-print-d2"
+                        : "hp-print-dn";
+
+            <article class="hp-drill hp-print-drill @density">
+                <div class="hp-drill-head">
+                    <span class="hp-drill-num">@(i + 1)</span>
+                    <h2 class="hp-drill-title">@drill.Title</h2>
+                    <span class="hp-drill-time">
+                        @if (start is int startMins)
+                        {
+                            <text>@RunTime.Clock(startMins) · </text>
+                        }
+                        @if (drill.RunTimeMinutes is int mins)
+                        {
+                            @RunTime.Human(mins)
+                        }
+                        else
+                        {
+                            <text>no time set</text>
+                        }
+                    </span>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(drill.Description))
+                {
+                    <div class="hp-drill-body">@drill.Description</div>
+                }
+
+                @if (card.HasVideo)
+                {
+                    <p class="hp-print-videoline">
+                        <span class="hp-print-link-label">Video:</span>
+                        <span class="hp-print-url">@drill.VideoUrl</span>
+                    </p>
+                }
+
+                @if (card.HasDiagram)
+                {
+                    <div class="hp-drill-diagrams">
+                        @{ var n = 0; }
+                        @foreach (var picture in card.Diagrams)
+                        {
+                            n++;
+
+                            if (picture.IsPdf)
+                            {
+                                @* A PDF diagram has no picture to place. On screen Details
+                                   offers a button; on paper a button is a dead control, so
+                                   name it and print a URL that can actually be typed. Shown
+                                   on screen too, so the coach finds out before printing. *@
+                                var pdfUrl = Url.Action("Diagram", "Drill",
+                                    new { slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id },
+                                    Context.Request.Scheme);
+
+                                <p class="hp-print-note">
+                                    Diagram @n is a PDF and is not on this sheet.
+                                    <span class="hp-print-url">@pdfUrl</span>
+                                </p>
+                            }
+                            else
+                            {
+                                var pictureUrl = Url.Action("Diagram", "Drill", new
+                                {
+                                    slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id
+                                });
+
+                                @* No loading="lazy" here, unlike Details: an image below the
+                                   fold that has not loaded when the print dialog opens comes
+                                   out as a blank box. Details keeps its lazy loading — that
+                                   page is the one that has to be cheap on rink wifi. *@
+                                <img class="hp-drill-diagram" src="@pictureUrl"
+                                     decoding="sync" alt="Diagram @n for @drill.Title" />
+                            }
+                        }
+                    </div>
+                }
+            </article>
+        }
+    </div>
+}
+
+@section Scripts {
+<script>
+    (function () {
+        try {
+            var go = document.getElementById('hp-print-go');
+            var status = document.getElementById('hp-print-status');
+            if (!go) return;
+
+            go.addEventListener('click', function () { window.print(); });
+
+            // Diagrams are eager here rather than lazy, which starts the fetches — but it does
+            // not mean they have ARRIVED when a coach hits the button two seconds in, and a
+            // half-loaded image prints as a blank box. So the button waits for them.
+            //
+            // Disabled from script only, never in the markup: with JS off the button still
+            // works, and the browser's own Ctrl+P is unaffected either way.
+            var pending = Array.prototype.slice.call(document.images)
+                .filter(function (img) { return !img.complete; });
+            if (!pending.length) return;
+
+            go.disabled = true;
+            if (status) { status.textContent = 'Loading diagrams…'; }
+
+            var left = pending.length;
+            var settled = false;
+
+            function done() {
+                if (settled) return;
+                if (--left > 0) return;
+                settled = true;
+                go.disabled = false;
+                if (status) { status.textContent = ''; }
+            }
+
+            pending.forEach(function (img) {
+                // 'error' as well as 'load': one missing diagram must not leave the button dead.
+                img.addEventListener('load', done);
+                img.addEventListener('error', done);
+            });
+
+            // Last resort, in case an image never settles either way.
+            window.setTimeout(function () {
+                if (settled) return;
+                settled = true;
+                go.disabled = false;
+                if (status) { status.textContent = ''; }
+            }, 8000);
+        } catch (e) {
+            // Leave the button exactly as the markup had it: enabled.
+        }
+    })();
+</script>
+}

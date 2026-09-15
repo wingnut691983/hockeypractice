@@ -54,6 +54,30 @@ public static class RunTime
         return starts;
     }
 
+    /// <summary>
+    /// What the clock reads when the last drill ends. Null when any drill has no time set —
+    /// the same honesty as StartTimes: a confident finish computed over a partial plan is
+    /// quietly wrong. Null on an empty plan too: there is no last drill, so there is no answer.
+    ///
+    /// The `any` flag is load-bearing. Without it an empty sequence returns a full practice
+    /// instead of null, and this stops being a drop-in for the arithmetic it replaced in
+    /// Plan/Details.cshtml — which guarded the empty case by where it sat rather than by value.
+    /// </summary>
+    public static int? Finish(IEnumerable<int?> durations, int practiceMinutes = PracticeMinutes)
+    {
+        var total = 0;
+        var any = false;
+
+        foreach (var duration in durations)
+        {
+            if (duration is not int minutes) return null;
+            total += minutes;
+            any = true;
+        }
+
+        return any ? practiceMinutes - total : null;
+    }
+
     public static string Human(int minutes)
     {
         if (minutes < 60) return $"{minutes} min";

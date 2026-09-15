@@ -268,7 +268,7 @@ a.hp-card:active { transform: scale(.99); }
   color: var(--hp-muted);
 }
 .hp-plan-summary li + li { border-top: 1px solid var(--hp-border); }
-.hp-plan-summary a, .hp-plan-summary .hp-mock-name {
+.hp-plan-summary a, .hp-plan-summary .hp-mock-name, .hp-plan-summary-name {
   flex: 1;
   min-width: 0;
   font-weight: 650;
@@ -1606,3 +1606,244 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   border: 1px solid var(--hp-border);
 }
 .hp-mock-cap { font-size: .8rem; color: var(--hp-muted); margin: .45rem 0 0; }
+
+
+/* ── The printable plan: on screen ──────────────────────────────────────────
+   Views/Plan/Print.cshtml, under _PrintLayout. These are the preview's own styles; the
+   @media print block at the very end of this file is what actually lands on paper. */
+
+/* The preview toolbar. Sticky rather than fixed: fixed would repeat on every printed sheet
+   in some engines, and the print block hides it anyway — but a page that only behaves
+   because something else hides it is a page waiting to be broken by a copy-paste. */
+.hp-print-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  padding: .6rem 1rem;
+  background: var(--hp-surface);
+  border-bottom: 1px solid var(--hp-border);
+}
+.hp-print-hint { font-size: .82rem; color: var(--hp-muted); }
+/* Pushes Print to the right edge, away from Back, so the destructive-ish one isn't next to
+   the way out. */
+#hp-print-go { margin-left: auto; }
+
+/* The sheet and the drills are two .hp-shell blocks so the page break can hang off the
+   second. .hp-shell's own bottom padding would open a gap between them on screen. */
+.hp-print-sheet { padding-bottom: 0; }
+.hp-print-drills { padding-top: .5rem; }
+
+.hp-print-head {
+  display: flex;
+  align-items: flex-start;
+  gap: .8rem;
+  margin: 1.2rem 0 1rem;
+}
+.hp-print-logo { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+.hp-print-headtext { min-width: 0; }
+.hp-print-team { font-size: .86rem; font-weight: 700; color: var(--hp-muted); }
+.hp-print-title { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: .1rem 0 .3rem; }
+.hp-print-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  font-size: .88rem;
+  color: var(--hp-muted);
+}
+.hp-print-meta > span + span::before { content: "· "; }
+/* A draft on paper has nothing to say it is one, and an unpublished plan carried onto the
+   ice as though it were final is the failure this prevents. */
+.hp-print-draft { font-weight: 700; color: var(--hp-danger); }
+.hp-print-draft::before { content: none !important; }
+
+.hp-print-notes { white-space: pre-wrap; border-left: 4px solid var(--hp-accent); }
+
+.hp-print-links { list-style: none; margin: .2rem 0 0; padding: 0; }
+.hp-print-links li { padding: .5rem 0; }
+.hp-print-links li + li { border-top: 1px solid var(--hp-border); }
+.hp-print-link-head { display: flex; flex-wrap: wrap; gap: .4rem; align-items: baseline; }
+.hp-print-link-section { font-size: .78rem; font-weight: 700; color: var(--hp-muted); }
+.hp-print-link-label { font-weight: 650; }
+/* A video URL is 40–90 characters with no spaces and will run straight off a sheet of
+   paper, so it has to be allowed to break anywhere. */
+.hp-print-url {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8em;
+  color: var(--hp-muted);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.hp-print-videoline { margin: .5rem 0 0; }
+
+/* A PDF diagram has no picture to print. Saying so on screen as well as on paper is the
+   point: the coach finds out before printing, not after. */
+.hp-print-note {
+  margin: .6rem 0 0;
+  padding: .5rem .7rem;
+  border: 1px dashed var(--hp-border);
+  border-radius: 8px;
+  font-size: .86rem;
+  color: var(--hp-muted);
+}
+
+.hp-drill-diagrams { display: flex; flex-direction: column; align-items: flex-start; }
+
+
+/* ── The printable plan: on paper ───────────────────────────────────────────
+   Only one page is designed for paper — Plan/Print, whose layout puts .hp-printpage on
+   <html>. Everything page-specific is scoped to that class, so printing any other page is
+   exactly as it was before this block existed.
+
+   This sits at the end of the file on purpose. The dark-mode blocks near the top redefine
+   the same tokens, and prefers-color-scheme STILL MATCHES WHILE PRINTING — a phone in dark
+   mode prints the drill cards on a near-black background. The scoping (html.hp-printpage,
+   0-1-1) is what outranks those blocks' :root (0-1-0); source order is belt and braces
+   rather than the mechanism. Keep both. */
+@media print {
+
+  @page { margin: 12mm; }
+
+  /* Ink on white, whatever the device's colour scheme. --hp-muted is darkened from #5c6879:
+     a mid grey that reads fine on a backlit screen goes to mush on a rink printer. */
+  html.hp-printpage {
+    --hp-bg:        #ffffff;
+    --hp-surface:   #ffffff;
+    --hp-surface-2: #ffffff;
+    --hp-border:    #9aa4b1;
+    --hp-text:      #000000;
+    --hp-muted:     #3f4753;
+
+    /* Separate from the tokens above, and easy to miss: the dark-mode block also swaps the
+       *-text aliases to the -ink-dark variants, which are the team colour LIGHTENED for a
+       dark surface. Reset the first group and not this one and the running-order clock
+       prints pale on white — legible on screen, nearly invisible on paper. */
+    --hp-primary-text: var(--hp-primary-ink, var(--hp-primary));
+    --hp-accent-text:  var(--hp-accent-ink,  var(--hp-accent));
+
+    /* This stylesheet is built on rem, and the 16px root is a phone-first minimum (below it
+       iOS zooms the page on focus). On paper it is far too big. */
+    font-size: 10.5pt;
+    background: #fff;
+  }
+  html.hp-printpage body { background: #fff; color: var(--hp-text); }
+
+  /* Chrome that must never reach paper. Unscoped on purpose: a position:fixed element
+     repeats on every sheet in some engines, which is a bug on any page rather than a quirk
+     of this one — and none of these exist on the print page to begin with. .hp-viewer-wrap
+     and .hp-videos are here for the same reason: a pdf.js iframe prints as whatever canvases
+     happen to be rendered, and an overflow-x scroller prints only its visible slice. */
+  .hp-topbar, .hp-rail, .hp-identity, .hp-previewbar, .hp-adminbar, .hp-tabs, .hp-menu,
+  .hp-footer, .hp-zoom, .hp-player, .hp-plan-actions, .hp-warn-banner,
+  .hp-viewer-wrap, .hp-videos, .hp-print-bar { display: none !important; }
+
+  .hp-printpage .hp-shell { max-width: none; margin: 0; padding: 0; }
+
+  /* Every URL that matters is printed as text beside its label, so the anchors left on the
+     page are decoration. Also resets the #7fb3ff dark-mode link colour. */
+  .hp-printpage a { color: inherit; text-decoration: none; }
+
+  .hp-printpage .hp-print-url { color: #000; }
+
+  /* The drills start on their own sheet, so the running order can be pulled off and kept in
+     a pocket. break-BEFORE on the drills rather than break-after on the running order: a
+     break-after on the last element of a plan with no drills leaves a blank final page. */
+  .hp-printpage .hp-print-drills {
+    break-before: page;
+    page-break-before: always;   /* WebKit still only honours the legacy property */
+  }
+
+  /* The whole point of the exercise: a drill and its diagram stay on one sheet. */
+  .hp-printpage .hp-drill {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none;
+    border-radius: 0;            /* rounded corners cost ink and say nothing on paper */
+    margin: 0 0 6mm;
+    padding: 4mm 5mm;
+  }
+  .hp-printpage .hp-plan-summary li { break-inside: avoid; page-break-inside: avoid; }
+  .hp-printpage h1, .hp-printpage h2, .hp-printpage .hp-section {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .hp-printpage p, .hp-printpage li { orphans: 3; widows: 3; }
+
+  /* break-inside: avoid is IGNORED on a box taller than a page — the engine splits it anyway,
+     which is exactly the failure this whole feature exists to stop. So the picture is capped.
+
+     Sized for US LETTER, not A4: Letter is 279.4mm against A4's 297mm, and it is the paper
+     that will be in the tray. At 12mm margins Letter leaves 255mm of content height, and the
+     card head, padding and margins take ~27mm of that. Sizing for A4 would push 18mm of
+     overflow straight back into the split.
+
+     These three numbers were MEASURED, not budgeted, by printing a real six-drill plan to
+     PDF on Letter and checking that no drill straddles a page. The first attempt used 84mm
+     for the two-diagram case and it split: a 936-character description filled the sheet and
+     pushed both pictures onto a page of their own, with no text on it at all — precisely the
+     complaint this feature exists to fix. 70mm holds. The one- and many-diagram caps were
+     re-checked the same way (130mm survives a 1,500-character description beside a single
+     picture) and needed no change.
+
+     Still a budget at the extreme, not a guarantee: Description allows 4000 characters and
+     CSS has no "remaining page height" unit, so a maximal description splits anyway. That
+     case degrades the right way — the break falls mid-description and the diagram still
+     follows its own text — and it is recorded in docs/known-issues.md.
+
+     width and height stay AUTO. Do not "tidy" this by adding width: 100%: pinning both
+     dimensions of a replaced element gives the browser two definite sizes and it drops the
+     aspect ratio — a portrait diagram comes out visibly squashed, which is what the comment
+     on .hp-drill-diagram further up this file is about. max-width and max-height resolve
+     together only while both used dimensions are auto. */
+  .hp-printpage .hp-drill-diagram {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    margin-top: 3mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .hp-printpage .hp-print-d1 .hp-drill-diagram { max-height: 130mm; }
+  .hp-printpage .hp-print-d2 .hp-drill-diagram { max-height:  70mm; }
+  .hp-printpage .hp-print-dn .hp-drill-diagram { max-height:  52mm; }
+
+  /* Three or more pictures go two across rather than six down a column nothing could fit. */
+  .hp-printpage .hp-print-dn .hp-drill-diagrams {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm;
+    align-items: start;
+    /* The same trap as align-self: flex-start on .hp-drill-diagram, one layout mode over. A
+       grid item defaults to justify-self: stretch, which hands the image a definite width;
+       paired with the max-height above that is the squashed-portrait bug all over again. */
+    justify-items: start;
+  }
+
+  /* The number badge is the one element whose text is white on a team colour, and browsers
+     drop backgrounds when printing — it came out white on white. Rather than fight that with
+     print-color-adjust (which Firefox lets the user override from the print dialog), it
+     becomes outlined ink: legible on a mono printer, on a colour one, and with background
+     graphics switched off. */
+  .hp-printpage .hp-drill-num {
+    background: transparent;
+    color: var(--hp-primary-text);
+    border: 1px solid currentColor;
+  }
+
+  /* The exception. Overrunning the ice time is the one thing on the sheet where colour
+     carries information, so force it through. It is not the only carrier — RunTime.Clock
+     signs a negative ("-5:00") and the footer says "over" in words — so greyscale still
+     works; on a colour printer the red is what makes it findable at a glance. */
+  .hp-printpage .hp-plan-summary-clock.over,
+  .hp-printpage .hp-plan-summary-foot.over {
+    color: var(--hp-danger);
+    font-weight: 800;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

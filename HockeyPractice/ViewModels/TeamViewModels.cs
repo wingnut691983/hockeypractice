@@ -117,6 +117,24 @@ public class PlanDetailViewModel
     public int AnonymousViews { get; init; }
 }
 
+/// <summary>
+/// The printable sheet. Deliberately NOT PlanDetailViewModel: this page loads no roster and
+/// no view history, and a model that advertised Viewed / NotViewed / AnonymousViews would
+/// invite the next person to print "0 of 0 on the roster have opened this plan" — a wrong
+/// number rather than a missing one.
+/// </summary>
+public class PlanPrintViewModel
+{
+    public TeamContext Ctx { get; init; } = null!;
+    public PracticePlan Plan { get; init; } = null!;
+    public List<PlanLink> Videos { get; init; } = new();
+
+    /// <summary>The plan's drills in order. A print page is only ever built for a drill plan.</summary>
+    public List<DrillCard> Drills { get; init; } = new();
+
+    public string WhenLabel { get; init; } = string.Empty;
+}
+
 /// <summary>The landing page: pick a team, then choose how you're going in.</summary>
 public class HomeViewModel
 {
