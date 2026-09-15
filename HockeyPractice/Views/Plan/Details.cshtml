@@ -5,10 +5,7 @@
     ViewBag.Team = Model.Ctx.Team;
 
     var fileUrl = Url.Action("File", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
-    var downloadUrl = Url.Action("File", "Plan",
-        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id, download = true })!;
     var beaconUrl = Url.Action("Viewed", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
-    var printUrl = Url.Action("Print", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
     // pdf.js reads the document from ?file=; page-width is the only sane default on a phone.
     var viewerUrl = Url.Content("~/lib/pdfjs/web/viewer.html")
         + "?file=" + Uri.EscapeDataString(fileUrl) + "#zoom=page-width";
@@ -34,18 +31,8 @@
         }
     </div>
 
-    @* The same action also sits at the foot of the page. A plan with a dozen drills, each with a
-       picture, is a long scroll, so a coach who opens one to change something shouldn't have to
-       travel the whole page to find the way in. Shown only to a manager, so a player never sees
-       a control they can't use. *@
-    @if (Model.Ctx.IsManager)
-    {
-        <div class="hp-plan-actions">
-            <a class="hp-btn hp-btn-quiet hp-btn-sm"
-               asp-controller="Coach" asp-action="EditPlan"
-               asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
-        </div>
-    }
+    @* The same row also sits at the foot of the page. See _PlanActions for why. *@
+    @await Html.PartialAsync("_PlanActions", Model)
 
     @if (!string.IsNullOrWhiteSpace(Model.Plan.CoachNotes))
     {
@@ -246,15 +233,6 @@
                 }
             </div>
         }
-
-        <div class="hp-row" style="margin-top:.8rem;">
-            @* Not in .hp-plan-actions above: that block is manager-only, and a parent
-               printing the plan for the car is half the audience for this. *@
-            <a class="hp-btn hp-btn-quiet" href="@printUrl"
-               target="_blank" rel="noopener">Print this plan</a>
-            <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
-                    hidden data-title="@Model.Plan.Title">Share</button>
-        </div>
     }
     else
     {
@@ -273,18 +251,6 @@
                 <button type="button" id="hp-zoom-out" aria-label="Zoom out">&#8722;</button>
                 <button type="button" id="hp-zoom-in" aria-label="Zoom in">+</button>
             </div>
-        </div>
-
-        <div class="hp-row" style="margin-top:.8rem;">
-            @* Straight at the file, not at Print, and not at downloadUrl: the browser's own
-               viewer paginates a PDF better than we can, while an attachment disposition
-               would save it instead of opening it. Labelled for what the tap does — calling
-               this "Print this plan" would promise the preview the drill path gives. *@
-            <a class="hp-btn hp-btn-quiet" href="@fileUrl"
-               target="_blank" rel="noopener">Print the PDF</a>
-            <a class="hp-btn hp-btn-quiet" href="@downloadUrl">Download PDF</a>
-            <button type="button" class="hp-btn hp-btn-quiet" id="hp-share"
-                    hidden data-title="@Model.Plan.Title">Share</button>
         </div>
     }
 
@@ -316,10 +282,11 @@
                 </div>
             }
         </div>
-
-        <a class="hp-btn hp-btn-quiet" asp-controller="Coach" asp-action="EditPlan"
-           asp-route-slug="@Model.Ctx.Team.Slug" asp-route-id="@Model.Plan.Id">Edit this plan</a>
     }
+
+    @* The foot of the page, after the roster panel so it is genuinely last. Identical to the row
+       under the title, so whichever end of a long plan you are at, the same three are to hand. *@
+    @await Html.PartialAsync("_PlanActions", Model)
 </div>
 
 <div class="hp-player" id="hp-player" hidden aria-modal="true" role="dialog" aria-label="Drill video">
@@ -701,12 +668,14 @@
     }
 
     // Native share sheet, for pasting into the team group chat. Hidden where unsupported.
-    var share = document.getElementById('hp-share');
-    if (share && navigator.share) {
-        share.hidden = false;
-        share.addEventListener('click', function () {
-            navigator.share({ title: share.dataset.title, url: window.location.href })
-                .catch(function () { /* user dismissed */ });
+    // Every copy: the action row renders at the top of the page and again at the foot.
+    if (navigator.share) {
+        Array.prototype.forEach.call(document.querySelectorAll('.hp-share'), function (share) {
+            share.hidden = false;
+            share.addEventListener('click', function () {
+                navigator.share({ title: share.dataset.title, url: window.location.href })
+                    .catch(function () { /* user dismissed */ });
+            });
         });
     }
 })();

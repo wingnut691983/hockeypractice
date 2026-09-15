@@ -49,6 +49,13 @@ tangled and aren't anymore.
   scroll with nothing to get stuck in partway down a long document. Pinch-to-zoom on the PDF is
   deliberately disabled (it fought the page's own scroll); a small floating +/- control stays
   reachable no matter how far into the document you've scrolled.
+- **The plan page's actions are one partial rendered twice.** `Views/Plan/_PlanActions.cshtml`
+  holds Print / Share / Edit (Edit only for a manager; Print and Share for everyone, since a
+  parent printing the plan for the car is half that audience), and `Details.cshtml` renders it
+  once under the title and once at the foot. Print and Edit used to sit at opposite ends of the
+  page, so either one cost a scroll past a dozen drill cards to reach. Because it renders twice,
+  the Share button is keyed on a class and the script binds every copy. An `id` there would be a
+  duplicate, and `getElementById` would wire up only the first row.
 - **Printing.** A **Print this plan** button on any plan opens a clean sheet at
   `/t/<team>/plans/<id>/print`, so you can see what will come out before spending the paper. Page
   one is the run sheet on its own — countdown clock, drill titles, times, and the over/under line

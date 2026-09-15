@@ -1,0 +1,43 @@
+@model PlanDetailViewModel
+@{
+    // Rendered twice on the plan page: once under the title and once at the foot. A plan with a
+    // dozen drills, each with a picture, is a long scroll, so neither a coach who opened it to
+    // change something nor a parent who wants it on paper should have to travel the page to find
+    // the way in. Same buttons in the same order both times, so the second one teaches nothing new.
+    var editUrl = Url.Action("EditPlan", "Coach",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var printUrl = Url.Action("Print", "Plan",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var fileUrl = Url.Action("File", "Plan",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var downloadUrl = Url.Action("File", "Plan",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id, download = true })!;
+}
+<div class="hp-plan-actions hp-row">
+    @if (Model.IsDrillPlan)
+    {
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@printUrl"
+           target="_blank" rel="noopener">Print this plan</a>
+    }
+    else
+    {
+        @* Straight at the file, not at Print, and not at downloadUrl: the browser's own viewer
+           paginates a PDF better than we can, while an attachment disposition would save it
+           instead of opening it. Labelled for what the tap does: calling this "Print this plan"
+           would promise the preview the drill path gives. *@
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@fileUrl"
+           target="_blank" rel="noopener">Print the PDF</a>
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@downloadUrl">Download PDF</a>
+    }
+
+    @* Class, not id: this partial renders twice, and the script binds every copy. *@
+    <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm hp-share"
+            hidden data-title="@Model.Plan.Title">Share</button>
+
+    @if (Model.Ctx.IsManager)
+    {
+        @* Manager-only so a player never sees a control they can't use. Print and Share are not:
+           a parent printing the plan for the car is half the audience for them. *@
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@editUrl">Edit this plan</a>
+    }
+</div>
