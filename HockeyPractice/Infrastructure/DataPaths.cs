@@ -60,8 +60,44 @@ public class DataPaths
     public string PlanDirectory(int teamId, int planId) =>
         Path.Combine(TeamDirectory(teamId), "plans", planId.ToString());
 
-    /// <summary>The single PDF for a plan. One file per plan; deleting the directory deletes the plan.</summary>
+    /// <summary>
+    /// The single PDF for a plan, keyed on the plan's row id.
+    ///
+    /// This is the LEGACY layout, still read and never written. Plans uploaded before PDFs became
+    /// content-addressed live here, and so does any plan a restore brings back from an archive
+    /// taken before that change. It is not going away: a restore rolls rows back while only ever
+    /// adding files, so a one-time move of these into the store below would turn every one of
+    /// those rows into a plan whose file cannot be found.
+    /// </summary>
     public string PlanPdf(int teamId, int planId) => Path.Combine(PlanDirectory(teamId, planId), "plan.pdf");
+
+    /// <summary>
+    /// Where a team's plan PDFs live, named by the SHA-256 of their contents. Two plans holding the
+    /// same file — which is what duplicating a plan produces — share one file here, and neither
+    /// knows about the other.
+    ///
+    /// Per team rather than one store for the site, deliberately. A shared store would mean one
+    /// team's upload could be removed by another team's deletion, and would let the existence of a
+    /// file leak across teams. It also keeps deleting a team a single recursive directory delete.
+    /// </summary>
+    public string TeamPdfStore(int teamId) => Path.Combine(TeamDirectory(teamId), "pdfs");
+
+    /// <summary>
+    /// One content-addressed plan PDF. <paramref name="key"/> is the lower-case hex SHA-256 of the
+    /// file and is checked rather than trusted: it reaches here from a database column, and a
+    /// restored or hand-edited row must not be able to steer a read or a delete out of the store.
+    /// </summary>
+    public string TeamPdf(int teamId, string key)
+    {
+        if (!IsPdfKey(key))
+            throw new ArgumentException($"'{key}' is not a plan PDF key.", nameof(key));
+
+        return Path.Combine(TeamPdfStore(teamId), key + ".pdf");
+    }
+
+    /// <summary>A SHA-256 as we write it: 64 lower-case hex characters, nothing else.</summary>
+    public static bool IsPdfKey(string? key) =>
+        key is { Length: 64 } && key.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 
     public string DrillDirectory(int teamId, int drillId) =>
         Path.Combine(TeamDirectory(teamId), "drills", drillId.ToString());

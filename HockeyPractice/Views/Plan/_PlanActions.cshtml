@@ -6,6 +6,8 @@
     // the way in. Same buttons in the same order both times, so the second one teaches nothing new.
     var editUrl = Url.Action("EditPlan", "Coach",
         new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
+    var duplicateUrl = Url.Action("DuplicatePlan", "Coach",
+        new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
     var printUrl = Url.Action("Print", "Plan",
         new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
     var fileUrl = Url.Action("File", "Plan",
@@ -39,5 +41,8 @@
         @* Manager-only so a player never sees a control they can't use. Print and Share are not:
            a parent printing the plan for the car is half the audience for them. *@
         <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@editUrl">Edit this plan</a>
+        @* A link, not a form: this opens the copy's details for filling in and writes nothing,
+           which also keeps it out of the way of the partial being rendered twice on the page. *@
+        <a class="hp-btn hp-btn-quiet hp-btn-sm" href="@duplicateUrl">Duplicate</a>
     }
 </div>

@@ -133,14 +133,14 @@
         {
             var joinUrl = Url.Action("Index", "Team", new { slug, c = viewCode }, Context.Request.Scheme);
             <p class="hp-muted" style="margin-top:0;">
-                Send this link to players and parents — one tap and they're in. Or they can type
+                Send this link to players and parents. One tap and they're in, or they can type
                 the code on the team page.
             </p>
             <div class="hp-row" style="align-items:center;gap:.8rem;">
                 <span class="hp-code-display">@viewCode</span>
                 <button type="button" class="hp-btn" id="hp-share-invite"
                         data-url="@joinUrl"
-                        data-text="Practice plans for @Model.Ctx.Team.Name — tap to join:">
+                        data-text="Practice plans for @Model.Ctx.Team.Name, tap to join:">
                     Share invite link
                 </button>
             </div>
@@ -158,7 +158,7 @@
             <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">Rotate team code</button>
         </form>
         <p class="hp-muted" style="font-size:.8rem;margin-bottom:0;">
-            If a player leaves the team, rotate — they keep access until you do.
+            If a player leaves the team, rotate. They keep access until you do.
         </p>
     </div>
 
@@ -209,7 +209,7 @@
             <p class="hp-muted" style="font-size:.8rem;margin:0;">
                 Must be an open.spotify.com playlist link. In Spotify, set the playlist to
                 <strong>Collaborative</strong> (playlist menu &rarr; &ldquo;Make collaborative&rdquo;)
-                so players can actually add songs &mdash; this site only shows the link, it can't
+                so players can actually add songs. This site only shows the link, it can't
                 grant that permission itself. Leave blank and save to remove it.
             </p>
             <button type="submit" class="hp-btn">Save</button>
@@ -226,7 +226,7 @@
             @PlanStorageService.Human(Model.UsedBytes) of @PlanStorageService.Human(Model.QuotaBytes) used
             @if (Model.StorageTight)
             {
-                <text>— delete some old plans soon.</text>
+                <text>. Delete some old plans soon.</text>
             }
         </div>
     </div>

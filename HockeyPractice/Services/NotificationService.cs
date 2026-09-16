@@ -32,13 +32,13 @@ public class NotificationService
         var text =
             $"Someone asked to get an email whenever a new {team.Name} practice plan is posted.\n\n" +
             $"Confirm here:\n{confirmUrl}\n\n" +
-            "If that wasn't you, ignore this message — nothing will be sent.";
+            "If that wasn't you, ignore this message. Nothing will be sent.";
 
         var html = Wrap(team,
             $"<p>Someone asked to get an email whenever a new <strong>{Esc(team.Name)}</strong> " +
             "practice plan is posted.</p>" +
             $"<p>{Button(confirmUrl, "Confirm", team)}</p>" +
-            "<p style=\"color:#5c6879;font-size:14px\">If that wasn't you, ignore this message — " +
+            "<p style=\"color:#5c6879;font-size:14px\">If that wasn't you, ignore this message. " +
             "nothing will be sent.</p>");
 
         return _email.SendAsync(subscriber.Email, subject, html, text);

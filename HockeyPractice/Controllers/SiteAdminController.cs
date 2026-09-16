@@ -188,7 +188,7 @@ public class SiteAdminController : Controller
         await _db.SaveChangesAsync();
 
         return SecretNotice(
-            $"Created {name.Trim()} — team code {viewCode}, coach code {coachCode}. " +
+            $"Created {name.Trim()}. Team code {viewCode}, coach code {coachCode}. " +
             "Write these down now; they are not stored and cannot be shown again.");
     }
 
@@ -265,7 +265,7 @@ public class SiteAdminController : Controller
         {
             var code = Security.NewAccessCode(8);
             team.CoachCodeHash = Security.HashCode(code);
-            notice = $"{team.Name} — new manager code {code}. " +
+            notice = $"{team.Name}: new manager code {code}. " +
                      "Anyone using the old one will need this instead.";
         }
         else
@@ -273,7 +273,7 @@ public class SiteAdminController : Controller
             var code = Security.NewAccessCode();
             team.ViewCode = code;
             team.ViewCodeHash = Security.HashCode(code);
-            notice = $"{team.Name} — new team code {code}. " +
+            notice = $"{team.Name}: new team code {code}. " +
                      "Every player and parent will need to enter this again.";
         }
 

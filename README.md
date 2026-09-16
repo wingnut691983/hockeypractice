@@ -49,9 +49,24 @@ tangled and aren't anymore.
   scroll with nothing to get stuck in partway down a long document. Pinch-to-zoom on the PDF is
   deliberately disabled (it fought the page's own scroll); a small floating +/- control stays
   reachable no matter how far into the document you've scrolled.
+- **Duplicating a plan.** Next week's practice is usually last week's with a few changes, so any
+  plan can be copied: **Duplicate this plan** in the editor's Reuse panel, or **Duplicate** on the
+  plan page. It opens a form with the title, rink, note and tags already filled in and the date
+  deliberately empty, and the copy is created when that's submitted. The copy is a fresh draft with
+  its own link and its own "who's read it" — publishing, changing or deleting it never touches the
+  plan it came from, and nothing records that it was a copy.
+
+  What comes across is the *materials*, not a second set of them. A drill plan references the same
+  library drills, exactly as one built by hand does. A PDF plan shares the same file: plan PDFs are
+  stored under the SHA-256 of their contents, so two plans holding the same document point at one
+  file on the volume, and duplicating costs no storage at all. Video labels come across too,
+  including the fact that a manager edited them, so re-reading names on the copy keeps their
+  wording. A copy of a plan uploaded *before* PDFs were content-addressed is the one case that
+  spends bytes: its file is copied into the store once, and any further copy of it is free.
 - **The plan page's actions are one partial rendered twice.** `Views/Plan/_PlanActions.cshtml`
-  holds Print / Share / Edit (Edit only for a manager; Print and Share for everyone, since a
-  parent printing the plan for the car is half that audience), and `Details.cshtml` renders it
+  holds Print / Share / Duplicate / Edit (Duplicate and Edit only for a manager; Print and Share
+  for everyone, since a parent printing the plan for the car is half that audience), and
+  `Details.cshtml` renders it
   once under the title and once at the foot. Print and Edit used to sit at opposite ends of the
   page, so either one cost a scroll past a dozen drill cards to reach. Because it renders twice,
   the Share button is keyed on a class and the script binds every copy. An `id` there would be a
@@ -129,8 +144,9 @@ There are two, and they cover different things.
 drills, roster, view history and the codes. It does not include a single uploaded PDF or drill
 picture, because those are files on the volume rather than rows.
 
-**The off-site archive** is the whole volume in one zip: that same database, every plan PDF and
-drill diagram, the team logos, and `dpkeys`. It runs nightly to Cloudflare R2, keeps the newest
+**The off-site archive** is the whole volume in one zip: that same database, every plan PDF (in
+both the content-addressed store and the older per-plan layout — the walk is recursive over
+`teams/`, so neither needed adding by hand), every drill diagram, the team logos, and `dpkeys`. It runs nightly to Cloudflare R2, keeps the newest
 three, and can also be triggered by hand or downloaded straight to your machine. This is the one to
 reach for if the app is ever lost, which is not hypothetical: the 1 GiB volume went with the app
 when the trial ended on 7 September 2026, and only a hand-downloaded database survived.
@@ -173,6 +189,54 @@ plan. That answers "is last night's backup actually restorable", which is the qu
 answer in September.
 
 ## What I'd flag
+
+- **A plan PDF is deleted only when no row still points at it, and "replaced with the same file"
+  is the case that catches you out.** Since PDFs are named by their hash, duplicating a plan gives
+  two rows one file, so deleting a plan can no longer just delete its PDF — `DeletePlan` and
+  `ReplaceFile` both go through `CoachController.DropUnreferencedPdfAsync`, after `SaveChanges`, so
+  the rows themselves answer the question and no "except this one" clause is needed. The trap is
+  `ReplaceFile`: re-uploading a file that has not actually changed hashes to the key the plan
+  already had, so the naive "delete the old blob if nothing references it" deletes the document the
+  plan has just been pointed at. Hence the `key == keeping` guard. I reproduced it before adding the
+  guard was a reflex: replace, then replace again with the identical file, then open the plan.
+  Getting this wrong loses a practice plan; failing to delete only leaves bytes the storage meter
+  already counts.
+
+- **The old per-plan PDF path is still read, and must never be "cleaned up" into the store.**
+  Backfilling every `teams/<team>/plans/<plan>/plan.pdf` into the hashed store looks like the
+  obvious tidy-up and would break restores. A restore rolls the database back and only ever *adds*
+  files, so restoring any archive taken before this change brings back rows with `PdfKey` null —
+  which resolve to the legacy path. Move those files and every one of those plans is a broken page.
+  Copying instead of moving would work and doubles the bytes for every existing PDF on a 1 GiB
+  volume, which is why it hasn't been done. Reading both layouts costs one null check in
+  `PlanStorageService.ResolvePath`. Verified end to end: an old-layout plan renders, re-extracts its
+  video names, and duplicates correctly, and the duplicate's file lands in the store while the
+  original's stays exactly where it was.
+
+- **Duplicating a plan copies `PlanLink.WasEditedByCoach`, not just the label.** The flag is what
+  tells a later Re-extract on the copy to keep the manager's wording. Copy the text and drop the
+  flag and the copy looks right until someone presses "Re-read video names", at which point every
+  name they fixed reverts — on the copy only, which is the sort of bug nobody reports accurately.
+
+- **A new plan's date starts empty on purpose; it used to default to tomorrow at 6pm.** The default
+  was convenient and wrong about as often as it was right, and a guessed date publishes exactly as
+  readily as a real one — the team gets a plan for a practice that isn't happening. The field is
+  `required`, but that is the browser's promise: `NewPlan`, `EditPlan` and `DuplicatePlan` all bind
+  `DateTime?` and refuse null themselves. Binding it as plain `DateTime` is what made this
+  dangerous before, because an empty value became year 1 and `EditPlan` assigned it straight over a
+  good date, which reads on the manage list as the plan simply vanishing to the bottom.
+
+- **There are no em dashes in the site's copy, and that is maintained on purpose.** I swept the
+  lot on 15 September 2026: 39 replacements across 12 files, covering rendered text, the notices
+  controllers hand back, the two subscription emails, and the placeholder glyph the drill summary
+  shows for an unset run time. A colon, a comma or a full stop does the same work. The rule is
+  about what a person reads, so code comments still use them freely, and `PdfTextMap` still
+  *matches* them on purpose: its three regexes strip a leading or trailing dash off a label pulled
+  out of a coach's PDF, and taking those characters out of the character classes would leave a
+  video named "— D-to-D reversal". Checked by crawling 46 rendered pages as manager, player and
+  site admin with `<script>` blocks and HTML comments stripped out first — the inline scripts do
+  ship comments containing them, which is why a naive grep over the served HTML looks like a
+  failure and isn't. Zero in visible copy.
 
 - **Dark mode follows you onto paper, and it overrides the colour tokens in two separate
   places.** `prefers-color-scheme: dark` still matches while a page is printing, so a plan printed
@@ -484,7 +548,16 @@ answer in September.
 - **Anything new and durable under `DATA_DIR` has to be added to the archive by hand.**
   `VolumeBackupService.CreateAsync` takes an explicit allowlist (the database snapshot, `dpkeys`,
   `teams/**`). A new directory is not picked up automatically, and the failure is silent until the
-  day someone restores and finds it missing.
+  day someone restores and finds it missing. The one exception is a directory *inside* `teams/`,
+  which the recursive walk already covers — `teams/<id>/pdfs/` needed no change when plan PDFs
+  moved there, and I checked a real archive rather than assuming it.
+- **Plan PDFs live under the hash of their contents, in two layouts.** A plan's file is
+  `teams/<team>/pdfs/<sha256>.pdf`, named by what is in it, and `PracticePlan.PdfKey` holds that
+  name. Two plans holding the same document — what duplicating a plan produces — share one file,
+  and neither knows about the other. A null `PdfKey` means the older layout,
+  `teams/<team>/plans/<plan>/plan.pdf`, keyed on the row id; both are read, only the store is
+  written. `PlanStorageService.ResolvePath` is the single place that decides which, so nothing
+  else should be building either path.
 - **Every way out of the plan editor's drill picker carries an anchor, and they are not all the
   same one.** The page is long: on a phone the picker sits about 3,000px below the top, so any
   round trip that forgets its anchor dumps the coach at the title field. Adding, moving or

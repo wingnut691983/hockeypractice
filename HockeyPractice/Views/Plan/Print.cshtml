@@ -43,7 +43,7 @@
                    plan being carried onto the ice as though it were the final one. *@
                 @if (Model.Plan.Status == PlanStatus.Draft)
                 {
-                    <span class="hp-print-draft">Draft &mdash; not published</span>
+                    <span class="hp-print-draft">Draft, not published</span>
                 }
             </div>
         </div>
@@ -82,7 +82,7 @@
                         }
                         else
                         {
-                            <text>&mdash;</text>
+                            <text>-</text>
                         }
                     </span>
                     @* A span, not the anchor Details uses: a fragment jump means nothing on
@@ -95,7 +95,7 @@
                         }
                         else
                         {
-                            <text>&mdash;</text>
+                            <text>-</text>
                         }
                     </span>
                 </li>
@@ -109,7 +109,7 @@
                 {
                     <text>
                         Runs <strong>@RunTime.Human(-finishMins) over</strong>
-                        the @RunTime.Clock(RunTime.PracticeMinutes) practice &mdash; trim one of the drills.
+                        the @RunTime.Clock(RunTime.PracticeMinutes) practice. Trim one of the drills.
                     </text>
                 }
                 else if (finishMins > 0)

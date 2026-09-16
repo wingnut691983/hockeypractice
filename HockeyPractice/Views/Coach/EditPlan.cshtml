@@ -1,15 +1,46 @@
 @using HockeyPractice.Services
 @model PlanEditViewModel
 @{
-    ViewBag.Title = (Model.IsNew ? "New plan" : "Edit plan") + " – " + Model.Ctx.Team.Name;
+    // Three modes, not two: editing an existing plan, starting a new one, and duplicating one.
+    // A duplicate is "new" in that no row exists yet, but it already has its content, so the page
+    // must not ask for a file or promise an upload.
+    var heading = Model.IsDuplicate ? "Duplicate plan" : Model.IsNew ? "New plan" : "Edit plan";
+    ViewBag.Title = heading + " – " + Model.Ctx.Team.Name;
     ViewBag.Team = Model.Ctx.Team;
     var slug = Model.Ctx.Team.Slug;
-    var dateValue = (Model.Plan?.PracticeDateLocal ?? Model.DefaultDate).ToString("yyyy-MM-ddTHH:mm");
+
+    // Empty when there is no date, rather than a formatted default(DateTime) — the field is
+    // required and an empty one is what makes the browser hold the coach on it.
+    var date = Model.Plan?.PracticeDateLocal ?? Model.DefaultDate;
+    var dateValue = date?.ToString("yyyy-MM-ddTHH:mm") ?? "";
 }
 @await Html.PartialAsync("_TeamHeader", Model.Ctx)
 
 <div class="hp-shell">
-    <h1 class="hp-title">@(Model.IsNew ? "New practice plan" : "Edit plan")</h1>
+    <h1 class="hp-title">@(Model.IsDuplicate ? "Duplicate plan" : Model.IsNew ? "New practice plan" : "Edit plan")</h1>
+
+    @if (Model.IsDuplicate)
+    {
+        @* Everything this copies happens after the form is submitted, so without saying so the
+           page looks like it is about to make an empty plan — the drills, the PDF and the video
+           names are all on sections that only render once a plan exists. *@
+        <p class="hp-muted" style="margin:.2rem 0 0;">
+            @if (Model.IsDrillPlan)
+            {
+                <text>
+                    The same drills, in the same order, come across from the plan you're copying.
+                    This is a new draft: changing it, or deleting it, leaves that plan alone.
+                </text>
+            }
+            else
+            {
+                <text>
+                    The same PDF and its video names come across from the plan you're copying.
+                    This is a new draft: changing it, or deleting it, leaves that plan alone.
+                </text>
+            }
+        </p>
+    }
 
     @if (Model.Notice is not null)
     {
@@ -21,8 +52,8 @@
     }
 
     <form method="post" enctype="multipart/form-data" class="hp-form" style="margin-top:1rem;"
-          asp-action="@(Model.IsNew ? "NewPlan" : "EditPlan")"
-          asp-route-slug="@slug" asp-route-id="@Model.Plan?.Id">
+          asp-action="@(Model.IsDuplicate ? "DuplicatePlan" : Model.IsNew ? "NewPlan" : "EditPlan")"
+          asp-route-slug="@slug" asp-route-id="@(Model.Plan?.Id ?? Model.SourcePlanId)">
         @Html.AntiForgeryToken()
 
         <div class="hp-field">
@@ -68,7 +99,9 @@
             <input type="hidden" name="kind" value="@Model.Kind" />
         }
 
-        @if (Model.IsNew && !Model.IsDrillPlan)
+        @* Not on a duplicate: the PDF comes from the plan being copied. Left in, its `required`
+           would block the form on a file the coach has no reason to pick. *@
+        @if (Model.IsNew && !Model.IsDuplicate && !Model.IsDrillPlan)
         {
             <div class="hp-field">
                 <label class="hp-label" for="file">Practice plan (PDF)</label>
@@ -98,7 +131,7 @@
                 <p class="hp-muted" style="margin:.5rem 0 0;">
                     That becomes a card reading <em>Breakouts › D-to-D reversal</em>. A URL alone
                     on its own line has nothing to be named after and falls back to
-                    &ldquo;Video&nbsp;1&rdquo;. Avoid link shorteners &mdash; they hide which site
+                    &ldquo;Video&nbsp;1&rdquo;. Avoid link shorteners, because they hide which site
                     the video is on, so it can&rsquo;t be played in place. You can rename anything
                     here after uploading.
                 </p>
@@ -113,7 +146,7 @@
         {
             <div class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</div>
             <p class="hp-muted" style="margin:0;">
-                Names come from the plan itself — a hyperlink's text, or the line and section
+                Names come from the plan itself: a hyperlink's text, or the line and section
                 heading it sits under. Rename anything that reads badly, and turn off anything
                 that isn't a drill video.
             </p>
@@ -173,15 +206,18 @@
             </div>
         }
 
-        @* Three cases, not two. A new drill plan isn't uploading anything, and saving it drops
+        @* Four cases, not two. A new drill plan isn't uploading anything, and saving it drops
            you straight into the add-drills step — so the button says where it's taking you
-           rather than describing a file transfer that isn't happening.
+           rather than describing a file transfer that isn't happening. A duplicate isn't
+           uploading anything either, whichever kind it is.
            data-busy: the layout's submit guard swaps this in while the request runs, so a coach
            on slow rink wifi sees something is actually happening. *@
         @{
             var submitLabel = !Model.IsNew ? "Save changes"
+                : Model.IsDuplicate ? "Create the copy"
                 : Model.IsDrillPlan ? "Add drills" : "Upload plan";
             var submitBusy = !Model.IsNew ? "Saving…"
+                : Model.IsDuplicate ? "Copying…"
                 : Model.IsDrillPlan ? "Saving…" : "Uploading…";
         }
         <button type="submit" class="hp-btn hp-btn-block" data-busy="@submitBusy">
@@ -208,7 +244,7 @@
         {
             <div class="hp-empty">
                 Nothing here yet.<br />
-                <span class="hp-muted">Add drills from your library below — they'll run in the order you set.</span>
+                <span class="hp-muted">Add drills from your library below, and they'll run in the order you set.</span>
             </div>
         }
         else
@@ -345,7 +381,7 @@
             <div class="hp-panel">
                 <p class="hp-muted" style="margin-top:0;">
                     Swap in a corrected file. The link players already have keeps working, and
-                    who's already read it isn't reset. Links are re-read from the new PDF —
+                    who's already read it isn't reset. Links are re-read from the new PDF, and
                     anything you've renamed or hidden here is kept where the same link is still
                     in the new file.
                 </p>
@@ -372,17 +408,19 @@
                     @plan.OriginalFileName · @PlanStorageService.Human(plan.ByteSize)
                 </div>
             }
+            @* Not "and its PDF": a duplicate of this plan may be holding the same file, and the
+               PDF only actually goes when nothing is left pointing at it. *@
             <form method="post" asp-action="DeletePlan" asp-route-slug="@slug" asp-route-id="@plan.Id"
                   data-confirm="@(Model.IsDrillPlan
                       ? "Delete this plan? The drills in it stay in your library. This cannot be undone."
-                      : "Delete this plan and its PDF? This cannot be undone.")">
+                      : "Delete this plan? This cannot be undone.")">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="hp-btn hp-btn-danger">Delete plan</button>
             </form>
             @if (Model.IsDrillPlan)
             {
                 <div class="hp-muted" style="font-size:.78rem;margin-top:.3rem;">
-                    Only the plan goes — every drill stays in your library.
+                    Only the plan goes. Every drill stays in your library.
                 </div>
             }
         </div>

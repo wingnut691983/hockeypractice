@@ -171,11 +171,16 @@ public class PlanController : TeamScopedController
         // through ids whose folder already holds an old plan.pdf. A PDF plan overwrites it on
         // upload, but a drill plan writes nothing, so without this check the existence test below
         // would happily stream a previous plan's PDF to anyone with the team code.
+        //
+        // Uploads are content-addressed now, which takes the row id out of the path and so out of
+        // the collision — but only for plans that have a PdfKey. Every plan predating that change
+        // still resolves to the legacy per-plan directory, so this guard is still the thing
+        // standing between a rolled-back id and the wrong team's practice.
         if (plan.Kind != PlanKind.Pdf) return NotFound();
 
-        if (!_storage.Exists(ctx!.Team.Id, plan.Id)) return NotFound();
+        if (!_storage.Exists(ctx!.Team.Id, plan.Id, plan.PdfKey)) return NotFound();
 
-        var stream = _storage.Open(ctx.Team.Id, plan.Id);
+        var stream = _storage.Open(ctx.Team.Id, plan.Id, plan.PdfKey);
 
         // Inline by default so pdf.js renders it in place. Passing a filename is what makes
         // ASP.NET set Content-Disposition: attachment, so only do it for an explicit download.

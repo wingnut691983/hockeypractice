@@ -120,7 +120,10 @@ public class CoachController : TeamScopedController
         {
             Ctx = ctx!,
             Kind = kind,
-            DefaultDate = NextPracticeSlot(ctx!.Team.TimeZoneId),
+            // No default. A guessed date that happens to be wrong is published as readily as one
+            // that is right, and nothing downstream can tell the difference; an empty required
+            // field asks the one question only the coach can answer.
+            DefaultDate = null,
             MaxUploadBytes = _storage.QuotaBytes,
             // Only a PDF plan is blocked by a full volume at this point; a drill plan writes
             // nothing until a diagram is added.
@@ -133,7 +136,7 @@ public class CoachController : TeamScopedController
     [HttpPost("plans/new")]
     [ValidateAntiForgeryToken]
     [RequestSizeLimit(20 * 1024 * 1024)]
-    public async Task<IActionResult> NewPlan(string slug, string title, DateTime practiceDate,
+    public async Task<IActionResult> NewPlan(string slug, string title, DateTime? practiceDate,
         string? location, string? coachNotes, IFormFile? file, List<string>? tags,
         PlanKind kind = PlanKind.Pdf)
     {
@@ -142,15 +145,17 @@ public class CoachController : TeamScopedController
 
         // A drill plan has no file to check — its content comes from the library afterwards.
         var error = kind == PlanKind.Pdf ? _storage.ValidateUpload(file) : null;
-        if (string.IsNullOrWhiteSpace(title)) error ??= "Give the plan a title.";
+        error ??= TitleError(title);
+        error ??= DateError(practiceDate);
 
         if (error is not null)
         {
             return View("EditPlan", new PlanEditViewModel
             {
                 Ctx = ctx!, Error = error, Kind = kind,
-                // A default(DateTime) from failed binding renders as year 1 — fall back.
-                DefaultDate = practiceDate == default ? NextPracticeSlot(ctx!.Team.TimeZoneId) : practiceDate,
+                // Whatever they typed, including nothing. Substituting a date here would answer the
+                // question the form is holding them on.
+                DefaultDate = practiceDate,
                 MaxUploadBytes = _storage.QuotaBytes,
                 RetainedTitle = title, RetainedLocation = location, RetainedNotes = coachNotes,
                 RetainedTags = tags
@@ -161,7 +166,7 @@ public class CoachController : TeamScopedController
         {
             TeamId = ctx!.Team.Id,
             Title = title.Trim(),
-            PracticeDateLocal = practiceDate,
+            PracticeDateLocal = practiceDate!.Value,
             Location = location?.Trim(),
             CoachNotes = coachNotes?.Trim(),
             Kind = kind,
@@ -182,7 +187,7 @@ public class CoachController : TeamScopedController
             return RedirectToAction(nameof(EditPlan), new { slug, id = plan.Id });
         }
 
-        var saved = await _storage.SaveAsync(ctx.Team.Id, plan.Id, file!);
+        var saved = await _storage.SaveAsync(ctx.Team.Id, file!);
         if (!saved.Ok)
         {
             Db.Plans.Remove(plan);
@@ -197,9 +202,10 @@ public class CoachController : TeamScopedController
         }
 
         plan.ByteSize = saved.Bytes;
+        plan.PdfKey = saved.Key;
 
         // Extraction is a convenience — if it finds nothing the plan still uploads and renders.
-        var extracted = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
+        var extracted = _links.Extract(_storage.ResolvePath(ctx.Team.Id, plan.Id, plan.PdfKey));
 
         // Best-effort: fills in names for bare URLs the document didn't describe. Never fatal —
         // if egress is blocked or slow, the PDF-derived names stand.
@@ -221,6 +227,190 @@ public class CoachController : TeamScopedController
 
         return RedirectToAction(nameof(EditPlan), new { slug, id = plan.Id });
     }
+
+    // ── Duplicating a plan ───────────────────────────────────────────────
+
+    /// <summary>
+    /// The form for a duplicate. A form first, rather than one press that copies the row and drops
+    /// the coach into the editor, because the practice date has to be filled in before the plan
+    /// exists — a plan with no date would have to be understood by the cards, the print view, the
+    /// ordering and the publish email, for a state that would only exist between two clicks.
+    ///
+    /// Rendered through the EditPlan view in its "new" mode, with the source's wording carried in
+    /// the Retained* fields the failed-upload path already uses for exactly this job.
+    /// </summary>
+    [HttpGet("plans/{id:int}/duplicate")]
+    public async Task<IActionResult> DuplicatePlan(string slug, int id)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var source = await Db.Plans.Include(p => p.Tags)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (source is null) return NotFound();
+
+        ViewBag.NavSection = "manage";
+        return View("EditPlan", DuplicateForm(ctx!, source));
+    }
+
+    [HttpPost("plans/{id:int}/duplicate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DuplicatePlan(string slug, int id, string title,
+        DateTime? practiceDate, string? location, string? coachNotes, List<string>? tags)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        // Re-read rather than trusted from the form: this page may have been open a while, and the
+        // plan being copied can have been edited or deleted in the meantime.
+        var source = await Db.Plans.Include(p => p.Tags).Include(p => p.Links)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (source is null) return NotFound();
+
+        var error = TitleError(title) ?? DateError(practiceDate);
+
+        // The PDF is settled before anything is written, so a plan is never created and then found
+        // to have no document. Kind comes from the row, never from the form's hidden field: trusting
+        // that would let a crafted post mint a drill-kind plan carrying a PDF's key, which is the
+        // same mismatch ReplaceFile refuses.
+        string? pdfKey = null;
+        if (error is null && source.Kind == PlanKind.Pdf)
+        {
+            if (DataPaths.IsPdfKey(source.PdfKey))
+            {
+                // Already in the store, so the copy just points at the same file. Nothing is
+                // written, which is why a full volume is no reason to refuse.
+                pdfKey = source.PdfKey;
+            }
+            else if (_storage.IsFull())
+            {
+                error = "Storage is nearly full. Delete some old practice plans before copying this one.";
+            }
+            else
+            {
+                // A plan from before PDFs were content-addressed. Its file is copied into the store
+                // for the new plan and the source is left exactly as it was — duplicating something
+                // must not rewrite it. The second copy of this plan costs nothing: the same bytes
+                // hash to the same name.
+                var adopted = await _storage.AdoptLegacyAsync(ctx!.Team.Id, source.Id);
+                if (!adopted.Ok) error = adopted.Error;
+                else pdfKey = adopted.Key;
+            }
+        }
+
+        if (error is not null)
+        {
+            // What they typed, not what the source says: a bounced submit must not quietly undo an
+            // edit they made on the way through.
+            ViewBag.NavSection = "manage";
+            return View("EditPlan", new PlanEditViewModel
+            {
+                Ctx = ctx!,
+                SourcePlanId = source.Id,
+                Kind = source.Kind,
+                Error = error,
+                DefaultDate = practiceDate,
+                RetainedTitle = title,
+                RetainedLocation = location,
+                RetainedNotes = coachNotes,
+                RetainedTags = tags
+            });
+        }
+
+        var copy = new PracticePlan
+        {
+            TeamId = ctx!.Team.Id,
+            Title = title.Trim(),
+            PracticeDateLocal = practiceDate!.Value,
+            Location = location?.Trim(),
+            CoachNotes = coachNotes?.Trim(),
+            Kind = source.Kind,
+            OriginalFileName = source.OriginalFileName,
+            ByteSize = source.ByteSize,
+            PdfKey = pdfKey,
+
+            // Always a draft, whatever the source was, and with no PublishedUtc. Publish keys
+            // "first publish" off that being null, so the copy mails the team once when it is
+            // ready rather than never.
+            Status = PlanStatus.Draft
+        };
+
+        Db.Plans.Add(copy);
+        await Db.SaveChangesAsync();
+
+        foreach (var (name, norm) in ParseTags(tags))
+            Db.PlanTags.Add(new PlanTag { PracticePlanId = copy.Id, Name = name, NormalizedName = norm });
+
+        if (source.Kind == PlanKind.Drills)
+        {
+            // Referencing the library, exactly as a plan built by hand does. A drill archived since
+            // the source was built still comes across: the source plan shows it, so the copy of that
+            // practice should too.
+            var entries = await Db.PlanDrills
+                .Where(pd => pd.PracticePlanId == source.Id)
+                .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
+                .ToListAsync();
+
+            foreach (var entry in entries)
+            {
+                Db.PlanDrills.Add(new PlanDrill
+                {
+                    PracticePlanId = copy.Id,
+                    DrillId = entry.DrillId,
+                    SortOrder = entry.SortOrder
+                });
+            }
+        }
+        else
+        {
+            // WasEditedByCoach travels with the label, and that is the point of copying these rows
+            // rather than re-reading the PDF: a name the coach fixed on the original survives a
+            // Re-extract on the copy too.
+            foreach (var link in source.Links.OrderBy(l => l.SortOrder))
+            {
+                Db.PlanLinks.Add(new PlanLink
+                {
+                    PracticePlanId = copy.Id,
+                    Url = link.Url,
+                    Label = link.Label,
+                    Section = link.Section,
+                    Kind = link.Kind,
+                    VideoId = link.VideoId,
+                    VideoTitle = link.VideoTitle,
+                    SortOrder = link.SortOrder,
+                    IsHidden = link.IsHidden,
+                    WasEditedByCoach = link.WasEditedByCoach
+                });
+            }
+        }
+
+        await Db.SaveChangesAsync();
+        _log.LogInformation("Plan {PlanId} duplicated as {CopyId} for team {TeamId}",
+            source.Id, copy.Id, ctx.Team.Id);
+
+        return RedirectToAction(nameof(EditPlan), new
+        {
+            slug,
+            id = copy.Id,
+            notice = "Copied. This is a new draft: nothing you change here touches the plan it came from."
+        });
+    }
+
+    /// <summary>The duplicate form, filled in from the plan being copied. The date is deliberately
+    /// not carried over: last week's date on next week's practice is a mistake waiting to be
+    /// published.</summary>
+    private static PlanEditViewModel DuplicateForm(TeamContext ctx, PracticePlan source) =>
+        new()
+        {
+            Ctx = ctx,
+            SourcePlanId = source.Id,
+            Kind = source.Kind,
+            DefaultDate = null,
+            RetainedTitle = source.Title,
+            RetainedLocation = source.Location,
+            RetainedNotes = source.CoachNotes,
+            RetainedTags = source.Tags.OrderBy(t => t.Name).Select(t => t.Name).ToList()
+        };
 
     [HttpGet("plans/{id:int}")]
     public async Task<IActionResult> EditPlan(string slug, int id, string? notice, string? drillTag,
@@ -372,7 +562,7 @@ public class CoachController : TeamScopedController
     [HttpPost("plans/{id:int}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditPlan(string slug, int id, string title,
-        DateTime practiceDate, string? location, string? coachNotes,
+        DateTime? practiceDate, string? location, string? coachNotes,
         int[]? linkId, string[]? linkLabel, int[]? visibleLinkId, List<string>? tags)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
@@ -382,8 +572,16 @@ public class CoachController : TeamScopedController
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
+        // Refused rather than written, and refused before anything else is touched. A blank date
+        // used to bind to year 1 and be assigned straight over a good one, which reads on the list
+        // as the plan simply vanishing to the bottom.
+        if (DateError(practiceDate) is { } dateError)
+        {
+            return RedirectToAction(nameof(EditPlan), new { slug, id, notice = dateError });
+        }
+
         plan.Title = string.IsNullOrWhiteSpace(title) ? plan.Title : title.Trim();
-        plan.PracticeDateLocal = practiceDate;
+        plan.PracticeDateLocal = practiceDate!.Value;
         plan.Location = location?.Trim();
         plan.CoachNotes = coachNotes?.Trim();
 
@@ -455,12 +653,12 @@ public class CoachController : TeamScopedController
         // PDF-only: there is nothing to re-read on a drill plan.
         if (plan.Kind != PlanKind.Pdf) return NotFound();
 
-        if (!_storage.Exists(ctx!.Team.Id, plan.Id))
+        if (!_storage.Exists(ctx!.Team.Id, plan.Id, plan.PdfKey))
             return RedirectToAction(nameof(EditPlan), new { slug, id });
 
         var edited = CoachEdits(plan.Links);
 
-        var fresh = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
+        var fresh = _links.Extract(_storage.ResolvePath(ctx.Team.Id, plan.Id, plan.PdfKey));
         await _videoTitles.PopulateTitlesAsync(fresh);
         LinkExtractionService.ApplyVideoTitles(fresh);
 
@@ -527,7 +725,7 @@ public class CoachController : TeamScopedController
         // someone already made.
         var edited = CoachEdits(plan.Links);
 
-        var saved = await _storage.SaveAsync(ctx!.Team.Id, plan.Id, file!);
+        var saved = await _storage.SaveAsync(ctx!.Team.Id, file!);
         if (!saved.Ok)
         {
             ViewBag.NavSection = "manage";
@@ -539,10 +737,13 @@ public class CoachController : TeamScopedController
             });
         }
 
+        var previousKey = plan.PdfKey;
+
         plan.OriginalFileName = SafeFileName(file!.FileName);
         plan.ByteSize = saved.Bytes;
+        plan.PdfKey = saved.Key;
 
-        var fresh = _links.Extract(_paths.PlanPdf(ctx.Team.Id, plan.Id));
+        var fresh = _links.Extract(_storage.ResolvePath(ctx.Team.Id, plan.Id, plan.PdfKey));
         await _videoTitles.PopulateTitlesAsync(fresh);
         LinkExtractionService.ApplyVideoTitles(fresh);
 
@@ -562,6 +763,10 @@ public class CoachController : TeamScopedController
         }
 
         await Db.SaveChangesAsync();
+
+        // The file this plan used to hold, now that nothing about this plan points at it any more.
+        await DropUnreferencedPdfAsync(ctx.Team.Id, previousKey, plan.PdfKey);
+
         _log.LogInformation("Replaced PDF for plan {PlanId} on team {TeamId} ({Bytes} bytes)",
             plan.Id, ctx.Team.Id, saved.Bytes);
 
@@ -641,11 +846,38 @@ public class CoachController : TeamScopedController
         var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
         if (plan is null) return NotFound();
 
+        var key = plan.PdfKey;
+
         Db.Plans.Remove(plan);
         await Db.SaveChangesAsync();
+
+        // The legacy directory belongs to this plan alone, so it always goes. The stored PDF may be
+        // shared with a duplicate of this plan, so it only goes if nothing is left pointing at it.
         _storage.DeletePlan(ctx!.Team.Id, id);
+        await DropUnreferencedPdfAsync(ctx.Team.Id, key, keeping: null);
 
         return RedirectToAction(nameof(Index), new { slug, notice = "Plan deleted." });
+    }
+
+    /// <summary>
+    /// Removes a stored PDF once no plan references it any more.
+    ///
+    /// Called AFTER the change that dropped the reference has been saved, so the rows are the
+    /// answer and no "except this one" exclusion is needed. <paramref name="keeping"/> is the key
+    /// the caller has just moved TO, and exists for one case that is easy to miss and destructive
+    /// when missed: re-uploading a file that hasn't changed hashes to the same key, so the plan's
+    /// old key and its new one are the same file, and deleting it would take out the document the
+    /// plan is now pointing at.
+    ///
+    /// Failing to delete costs orphaned bytes, which the storage meter counts and a person can
+    /// clear. Deleting one byte too eagerly costs a practice plan.
+    /// </summary>
+    private async Task DropUnreferencedPdfAsync(int teamId, string? key, string? keeping)
+    {
+        if (key is null || key == keeping) return;
+        if (await Db.Plans.AnyAsync(p => p.TeamId == teamId && p.PdfKey == key)) return;
+
+        _storage.DeleteStoredPdf(teamId, key);
     }
 
     // ── Roster ───────────────────────────────────────────────────────────
@@ -908,6 +1140,21 @@ public class CoachController : TeamScopedController
             .ToList();
     }
 
+    private static string? TitleError(string? title) =>
+        string.IsNullOrWhiteSpace(title) ? "Give the plan a title." : null;
+
+    /// <summary>
+    /// A practice with no date is not a practice, so there is no default to fall back on — the form
+    /// opens blank and this is what holds the line behind it. The field is marked required, but that
+    /// is the browser's promise, not ours: a stale tab, a posted form or a removed attribute all
+    /// reach the action with nothing, and DateTime binding turns nothing into year 1 rather than an
+    /// error. Binding as DateTime? is what makes "they left it blank" distinguishable at all.
+    /// </summary>
+    private static string? DateError(DateTime? practiceDate) =>
+        practiceDate is null || practiceDate.Value == default
+            ? "Pick a date and time for the practice."
+            : null;
+
     public const int MaxTags = 15;
 
     private static string NormalizeTag(string name) =>
@@ -989,12 +1236,5 @@ public class CoachController : TeamScopedController
         foreach (var c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
         if (string.IsNullOrWhiteSpace(name)) name = "practice-plan.pdf";
         return name.Length > 200 ? name[^200..] : name;
-    }
-
-    /// <summary>Next 6pm at or after tomorrow — a sane default the coach usually just accepts.</summary>
-    private static DateTime NextPracticeSlot(string timeZoneId)
-    {
-        var now = WhenLabel.NowIn(timeZoneId);
-        return now.Date.AddDays(1).AddHours(18);
     }
 }

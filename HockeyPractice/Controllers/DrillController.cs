@@ -257,7 +257,7 @@ public class DrillController : TeamScopedController
             {
                 slug, id,
                 notice = $"\"{drill.Title}\" is used in {used} plan{(used == 1 ? "" : "s")}, so it " +
-                         "can't be deleted. Archive it instead — it stays in those plans but stops " +
+                         "can't be deleted. Archive it instead, so it stays in those plans but stops " +
                          "showing up when you build a new one."
             });
         }
@@ -409,7 +409,7 @@ public class DrillController : TeamScopedController
             return RedirectToAction(nameof(Index), new { slug, notice = "You don't manage that team on this device." });
 
         if (_storage.IsFull())
-            return RedirectToAction(nameof(Index), new { slug, notice = "Storage is nearly full — nothing was copied." });
+            return RedirectToAction(nameof(Index), new { slug, notice = "Storage is nearly full, so nothing was copied." });
 
         var source = await Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == ctx!.Team.Id && !d.IsArchived)
@@ -844,7 +844,7 @@ public class DrillController : TeamScopedController
                 : $"the picture wasn't added: {firstError}";
 
         if (skippedForRoom > 0)
-            return $"only {added} fitted — a drill holds {MaxDiagrams} pictures.";
+            return $"only {added} fitted, because a drill holds {MaxDiagrams} pictures.";
 
         return null;
     }

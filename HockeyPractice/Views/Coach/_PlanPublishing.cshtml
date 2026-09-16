@@ -8,12 +8,26 @@
    between the plan's own drills and the picker below them, so the coach is not scrolling past the
    whole library to publish what they just built. A PDF plan has no picker, so it stays at the
    bottom where it always was. Same markup either way, rather than two copies that drift. *@
+@* Next week's practice is usually last week's with a few changes, so this sits with Publishing
+   rather than down by Delete: it belongs to what you do with a finished plan, not to tidying up.
+   Renders for both kinds and in both states — a draft is just as reusable as a published plan. *@
+<div class="hp-section">Reuse</div>
+<div class="hp-panel">
+    <p class="hp-muted" style="margin-top:0;">
+        Running this practice again? Make a copy to work from, with
+        @(Model.IsDrillPlan ? "the same drills" : "the same PDF") and a new date. The copy is a
+        separate plan, so changing it leaves this one alone.
+    </p>
+    <a class="hp-btn hp-btn-quiet" asp-action="DuplicatePlan"
+       asp-route-slug="@slug" asp-route-id="@plan.Id">Duplicate this plan</a>
+</div>
+
 <div class="hp-section">Publishing</div>
 <div class="hp-panel">
     @if (plan.Status == PlanStatus.Draft)
     {
         <p style="margin-top:0;">
-            This is a <strong>draft</strong> &mdash; players can't see it and no email has been sent.
+            This is a <strong>draft</strong>: players can't see it and no email has been sent.
         </p>
         <form method="post" asp-action="Publish" asp-route-slug="@slug" asp-route-id="@plan.Id">
             @Html.AntiForgeryToken()

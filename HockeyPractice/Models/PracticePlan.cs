@@ -28,8 +28,25 @@ public class PracticePlan
     [MaxLength(200)]
     public string? OriginalFileName { get; set; }
 
-    /// <summary>Size of the uploaded PDF. Stays 0 for a drill-built plan.</summary>
+    /// <summary>
+    /// Size of the uploaded PDF. Stays 0 for a drill-built plan.
+    ///
+    /// This plan's PDF, not this plan's share of the disk: two plans pointing at the same PdfKey
+    /// each report the full size while the volume holds one copy. The storage meter measures the
+    /// volume itself, so it stays honest regardless.
+    /// </summary>
     public long ByteSize { get; set; }
+
+    /// <summary>
+    /// SHA-256 of the plan's PDF, lower-case hex — the name of the file in the team's PDF store.
+    /// Two plans carrying the same document share one file and neither points at the other.
+    ///
+    /// Null means one of two things, and both are normal: a drill-built plan has no file at all,
+    /// and a plan uploaded before PDFs were content-addressed still reads the legacy per-plan
+    /// path. See DataPaths.PlanPdf for why that path is permanent.
+    /// </summary>
+    [MaxLength(64)]
+    public string? PdfKey { get; set; }
 
     /// <summary>
     /// Whether this plan is an uploaded PDF or built from drills. Chosen when the plan is created

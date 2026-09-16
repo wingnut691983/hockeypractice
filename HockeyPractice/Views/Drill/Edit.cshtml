@@ -22,7 +22,7 @@
     @if (!Model.IsNew && Model.UsedInPlans > 0)
     {
         <div class="hp-muted" style="margin-top:.4rem;">
-            Used in @Model.UsedInPlans plan@(Model.UsedInPlans == 1 ? "" : "s") — changes here show
+            Used in @Model.UsedInPlans plan@(Model.UsedInPlans == 1 ? "" : "s"), so changes here show
             up in @(Model.UsedInPlans == 1 ? "it" : "all of them").
         </div>
     }
@@ -73,7 +73,7 @@
                 else
                 {
                     <text>
-                        Leave blank if you're not sure &mdash; the total will say how many are
+                        Leave blank if you're not sure. The total will say how many are
                         unset.
                     </text>
                 }
@@ -114,7 +114,7 @@
                  aria-describedby="hp-pastebox-hint">
                 <span class="hp-pastebox-main">Click here, then paste a picture</span>
                 <span class="hp-pastebox-sub" id="hp-pastebox-hint">
-                    Cmd/Ctrl + V &mdash; or drag one onto the page
+                    Cmd/Ctrl + V, or drag one onto the page
                 </span>
                 <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-pick">
                     Choose files instead
@@ -146,7 +146,7 @@
 
             <span class="hp-muted" style="font-size:.8rem;">
                 Photos and screenshots show right inside the plan, and get shrunk automatically. A
-                PDF shows as a link players tap to open &mdash; images are easier to read on a phone.
+                PDF shows as a link players tap to open; images are easier to read on a phone.
                 You can pick several at once, <strong>paste screenshots</strong> straight in, or
                 drag them onto this page. Up to
                 @HockeyPractice.Controllers.DrillController.MaxDiagrams per drill, in the order you
@@ -172,7 +172,7 @@
         <div class="hp-section">Pictures on this drill</div>
         <div class="hp-panel">
             <p class="hp-muted" style="margin-top:0;font-size:.82rem;">
-                Shown to players in this order &mdash; the order they were added.
+                Shown to players in the order they were added.
             </p>
             <div class="hp-diagram-grid">
                 @foreach (var picture in d.Diagrams.OrderBy(x => x.Id))
@@ -252,7 +252,7 @@
             @if (Model.Drill.IsArchived)
             {
                 <p class="hp-muted" style="margin-top:0;">
-                    Archived — it doesn't show up when building a plan, but plans already using it
+                    Archived. It doesn't show up when building a plan, but plans already using it
                     are unaffected.
                 </p>
                 <form method="post" asp-action="Unarchive" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id">
@@ -283,7 +283,7 @@
                 {
                     <text>
                         Used in @Model.UsedInPlans plan@(Model.UsedInPlans == 1 ? "" : "s"), so it
-                        can't be deleted — archive it instead.
+                        can't be deleted. Archive it instead.
                     </text>
                 }
                 else

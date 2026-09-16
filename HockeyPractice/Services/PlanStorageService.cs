@@ -6,7 +6,11 @@ using SixLabors.ImageSharp.Processing;
 
 namespace HockeyPractice.Services;
 
-public record StorageResult(bool Ok, string? Error = null, long Bytes = 0);
+/// <summary>
+/// Result of storing a plan PDF. Key is the name it went in under — the SHA-256 of the contents —
+/// and is what the PracticePlan row must remember in order to find the file again.
+/// </summary>
+public record StorageResult(bool Ok, string? Error = null, long Bytes = 0, string? Key = null);
 
 /// <summary>Result of storing a drill diagram. FileName carries the extension, so it is what the
 /// Drill row must remember in order to find and serve the file again.</summary>
@@ -66,32 +70,120 @@ public class PlanStorageService
         return null;
     }
 
-    public async Task<StorageResult> SaveAsync(int teamId, int planId, IFormFile file, CancellationToken ct = default)
+    /// <summary>
+    /// Stores an uploaded PDF in the team's content-addressed store and returns the key it went in
+    /// under. The plan id is no longer part of the path — see DataPaths.TeamPdf — so this is safe to
+    /// call before a row exists, and two plans holding the same document end up sharing one file.
+    /// </summary>
+    public async Task<StorageResult> SaveAsync(int teamId, IFormFile file, CancellationToken ct = default)
     {
-        var dir = _paths.PlanDirectory(teamId, planId);
+        await using var source = file.OpenReadStream();
+        return await StoreAsync(teamId, source, ct);
+    }
+
+    /// <summary>
+    /// Copies a plan's PDF out of the legacy per-plan path and into the store, returning its key.
+    /// The legacy file is left exactly where it is: the plan that owns it still reads from there,
+    /// and a restore can still put it back.
+    /// </summary>
+    public async Task<StorageResult> AdoptLegacyAsync(int teamId, int planId, CancellationToken ct = default)
+    {
+        var legacy = _paths.PlanPdf(teamId, planId);
+        if (!File.Exists(legacy))
+            return new StorageResult(false, "That plan's PDF is missing, so it can't be copied.");
+
+        await using var source = new FileStream(legacy, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return await StoreAsync(teamId, source, ct);
+    }
+
+    /// <summary>
+    /// Writes a stream into the store under the hash of its contents.
+    ///
+    /// Staged under a temporary name and renamed into place rather than written straight to the
+    /// final name, and that ordering is the whole point. A torn write sitting at a valid hash name
+    /// would be reused by every later upload of that document and never repaired, which is the one
+    /// failure here that corrupts a plan rather than merely wasting space. A rename within one
+    /// directory is atomic, so the name either doesn't exist or holds the complete file.
+    ///
+    /// Finding the target already there is the ordinary case, not an error: the same document
+    /// uploaded twice, or a duplicate of a plan, both land on it. The bytes are identical by
+    /// construction, so the staged copy is dropped and the existing file reused. The existence
+    /// check and the rename are both written to tolerate losing that race to another request.
+    /// </summary>
+    private async Task<StorageResult> StoreAsync(int teamId, Stream source, CancellationToken ct)
+    {
+        var dir = _paths.TeamPdfStore(teamId);
         Directory.CreateDirectory(dir);
-        var target = _paths.PlanPdf(teamId, planId);
+
+        var staged = Path.Combine(dir, $"incoming-{Guid.NewGuid():N}.tmp");
 
         try
         {
-            await using var destination = File.Create(target);
-            await using var source = file.OpenReadStream();
-            await source.CopyToAsync(destination, ct);
-            return new StorageResult(true, Bytes: destination.Length);
+            string key;
+            long bytes;
+
+            await using (var destination = File.Create(staged))
+            using (var hash = System.Security.Cryptography.SHA256.Create())
+            await using (var hashing = new System.Security.Cryptography.CryptoStream(
+                             destination, hash, System.Security.Cryptography.CryptoStreamMode.Write,
+                             leaveOpen: true))
+            {
+                await source.CopyToAsync(hashing, ct);
+                await hashing.FlushFinalBlockAsync(ct);
+                await destination.FlushAsync(ct);
+
+                bytes = destination.Length;
+                key = Convert.ToHexString(hash.Hash!).ToLowerInvariant();
+            }
+
+            var target = _paths.TeamPdf(teamId, key);
+
+            if (File.Exists(target))
+            {
+                TryDelete(staged);
+                return new StorageResult(true, Bytes: bytes, Key: key);
+            }
+
+            try
+            {
+                File.Move(staged, target);
+            }
+            catch (IOException) when (File.Exists(target))
+            {
+                // Another request stored the same document between the check and the move. Its
+                // copy is byte-for-byte ours, so there is nothing to repair.
+                TryDelete(staged);
+            }
+
+            return new StorageResult(true, Bytes: bytes, Key: key);
         }
         catch (IOException ex)
         {
-            _log.LogError("Failed to write plan {PlanId} for team {TeamId}: {Error}", planId, teamId, ex.Message);
-            TryDelete(target);
+            _log.LogError("Failed to store a PDF for team {TeamId}: {Error}", teamId, ex.Message);
+            TryDelete(staged);
             return new StorageResult(false, "Could not save the file. The storage volume may be full.");
         }
     }
 
-    public bool Exists(int teamId, int planId) => File.Exists(_paths.PlanPdf(teamId, planId));
+    /// <summary>
+    /// Where a plan's PDF actually is: the store when the plan has a key, the legacy per-plan path
+    /// when it doesn't. Every read goes through here so the two layouts can't drift apart.
+    /// </summary>
+    public string ResolvePath(int teamId, int planId, string? pdfKey) =>
+        DataPaths.IsPdfKey(pdfKey)
+            ? _paths.TeamPdf(teamId, pdfKey!)
+            : _paths.PlanPdf(teamId, planId);
 
-    public Stream Open(int teamId, int planId) =>
-        new FileStream(_paths.PlanPdf(teamId, planId), FileMode.Open, FileAccess.Read, FileShare.Read);
+    public bool Exists(int teamId, int planId, string? pdfKey) =>
+        File.Exists(ResolvePath(teamId, planId, pdfKey));
 
+    public Stream Open(int teamId, int planId, string? pdfKey) =>
+        new FileStream(ResolvePath(teamId, planId, pdfKey), FileMode.Open, FileAccess.Read, FileShare.Read);
+
+    /// <summary>
+    /// Removes a plan's legacy directory. Says nothing about the store: a stored PDF may be shared
+    /// with another plan, and only the caller can see the rows that would tell.
+    /// </summary>
     public void DeletePlan(int teamId, int planId)
     {
         var dir = _paths.PlanDirectory(teamId, planId);
@@ -103,6 +195,16 @@ public class PlanStorageService
         {
             _log.LogWarning("Could not delete plan directory {Dir}: {Error}", dir, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Removes one stored PDF. Only call this having established that no plan still references the
+    /// key — this class has no database access and cannot check.
+    /// </summary>
+    public void DeleteStoredPdf(int teamId, string? pdfKey)
+    {
+        if (!DataPaths.IsPdfKey(pdfKey)) return;
+        TryDelete(_paths.TeamPdf(teamId, pdfKey!));
     }
 
     // ── Drill diagrams ───────────────────────────────────────────────────

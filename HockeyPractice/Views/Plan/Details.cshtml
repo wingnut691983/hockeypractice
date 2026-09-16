@@ -120,7 +120,7 @@
                             }
                             else
                             {
-                                <text>&mdash;</text>
+                                <text>-</text>
                             }
                         </span>
                         @* Jumps to the drill below. On a plan with a dozen drills and a diagram
@@ -133,9 +133,9 @@
                             }
                             else
                             {
-                                @* An em dash rather than a blank, so an unset time reads as
+                                @* A dash rather than a blank, so an unset time reads as
                                    "not estimated" instead of looking like something failed. *@
-                                <text>&mdash;</text>
+                                <text>-</text>
                             }
                         </span>
                     </li>
@@ -157,7 +157,7 @@
                         <text>
                             Runs <strong>@HockeyPractice.Infrastructure.RunTime.Human(-finish) over</strong>
                             the @HockeyPractice.Infrastructure.RunTime.Clock(HockeyPractice.Infrastructure.RunTime.PracticeMinutes)
-                            practice — trim one of the drills.
+                            practice. Trim one of the drills.
                         </text>
                     }
                     else if (finish > 0)

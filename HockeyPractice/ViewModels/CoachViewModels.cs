@@ -32,8 +32,23 @@ public class PlanEditViewModel
     public string? Error { get; init; }
     public bool IsNew => Plan is null;
 
-    /// <summary>Pre-filled with the next plausible practice slot so the coach rarely edits it.</summary>
-    public DateTime DefaultDate { get; init; }
+    /// <summary>
+    /// The plan being copied, when this form is a duplicate. Null for every other use.
+    ///
+    /// A duplicate is a "new" form — there is no row yet — but three things on the page must not
+    /// behave as if the coach were starting from nothing: it posts to a different action, it must
+    /// not demand a PDF upload, and it should say so on the button. Hence a flag of its own rather
+    /// than another reading of IsNew.
+    /// </summary>
+    public int? SourcePlanId { get; init; }
+    public bool IsDuplicate => SourcePlanId is not null;
+
+    /// <summary>
+    /// The date to show, or null to leave the field empty. Empty on a new plan and on a duplicate,
+    /// on purpose: a practice date is something only the coach knows, and a pre-filled guess gets
+    /// published as readily as a real answer.
+    /// </summary>
+    public DateTime? DefaultDate { get; init; }
     public long MaxUploadBytes { get; init; }
 
     /// <summary>

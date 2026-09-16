@@ -94,13 +94,21 @@ incrementally on write.
 
 ## Rare trigger, low consequence
 
-### 5. A failed restore strands `.incoming` files inside the archive allowlist
+### 5. Interrupted writes strand staging files inside the archive allowlist
 
 `VolumeBackupService.ApplyFiles` writes each entry to `target + ".incoming"` and renames it into
 place. The `catch` deletes it, but a process kill, an OOM, or a pod eviction part way through
 leaves them behind. Nothing removes them afterwards: `DatabaseBackupService.SweepStagingFiles`
 only scans the volume root for `snapshot-*.db` and `restore-*.db`, while
 `VolumeBackupService.CreateAsync` enumerates *every* file under `TeamsRoot`.
+
+There are two sources of these now, not one. Storing a plan PDF does the same thing for the same
+reason: `PlanStorageService.StoreAsync` writes `teams/<team>/pdfs/incoming-<guid>.tmp` and renames
+it onto the hashed name, because writing straight to the final name would let a torn write sit at
+a valid hash and be reused by every later upload of that document — a corrupted plan rather than
+a wasted file. The staging name has to be in the destination directory for the rename to be atomic,
+and that directory is inside the allowlist. A sweep that fixes this should cover both `*.incoming`
+and `pdfs/incoming-*.tmp`.
 
 So the orphans get captured into every subsequent nightly archive, and restored from it, forever.
 That undercuts the guarantee written down in CLAUDE.md that the allowlist cannot leak a transient
@@ -109,8 +117,31 @@ name, and it permanently consumes quota on a volume with no resize path.
 The consequence is wasted bytes and junk in archives, not corruption: a stray file with no
 database row pointing at it is invisible to the app.
 
-**Trigger: any restore that does not complete.** Fix by adding `*.incoming` to the startup sweep
-(recursively, unlike the current root-only scan) and skipping the suffix in `CreateAsync`.
+**Trigger: any restore, or any PDF upload, that does not complete.** Fix by adding both staging
+patterns to the startup sweep (recursively, unlike the current root-only scan) and skipping them
+in `CreateAsync`.
+
+### 5b. Plan PDFs are read from two layouts, and the old one is permanent
+
+`PlanStorageService.ResolvePath` reads `teams/<team>/pdfs/<sha256>.pdf` when a plan has a `PdfKey`
+and `teams/<team>/plans/<plan>/plan.pdf` when it does not. Only the store is ever written, so the
+legacy path is pure legacy — and it cannot simply be migrated away.
+
+A backfill that *moved* those files would break restores permanently: a restore rolls the database
+back and only ever adds files, so any archive taken before the content-addressed store existed
+brings back rows with `PdfKey` null, which resolve to the legacy path. Move the file and those
+plans are broken pages with no way back. A backfill that *copied* instead would be safe and would
+double the bytes for every existing PDF, on a 1 GiB volume with no resize path.
+
+The cost of leaving it is one null check on every read and two shapes to hold in your head. It is
+not a correctness problem: both layouts are archived, both are restored, and
+`PlanController.File`'s `PlanKind.Pdf` guard still covers the row-id collision that only the legacy
+layout can suffer.
+
+**Trigger: the volume having comfortable headroom, plus a way to be sure no archive still in
+retention predates the change** — three nights after the change is the earliest that can be true.
+Then backfill by copying, never by moving, and only delete a legacy file once its plan reads from
+the store.
 
 ### 6. Site admin actions use `Forbid()`, which lands on a 404
 
