@@ -28,11 +28,23 @@ public class DrillCard
     public int? EffectiveRunTimeMinutes =>
         HockeyPractice.Infrastructure.RunTime.Effective(Drill.RunTimeMinutes, ExtraRunTimeMinutes);
 
-    /// <summary>
-    /// Coach-facing only: this plan changed how long the drill runs. Players are never told, so
-    /// this belongs to the editor and must not reach the plan page or the print sheet.
-    /// </summary>
+    /// <summary>This plan changed how long the drill runs.</summary>
     public bool HasExtraRunTime => ExtraRunTimeMinutes is not null;
+
+    /// <summary>
+    /// The drill's own run time, for showing a breakdown beside the effective one. Exposed here so
+    /// a view never has to reach through to the Drill for a length: EffectiveRunTimeMinutes stays
+    /// the number to show, and this is only ever the smaller "normally" half of it.
+    /// </summary>
+    public int? BaseRunTimeMinutes => Drill.RunTimeMinutes;
+
+    /// <summary>
+    /// Whether to show "25 min (15 min + 10 min)" rather than a bare total. Needs BOTH halves to
+    /// mean anything: a drill with no library time has nothing to have added to, so its plan-level
+    /// minutes are simply what it runs for, and "(0 min + 25 min)" would be noise dressed up as
+    /// detail.
+    /// </summary>
+    public bool ShowsAddedTime => BaseRunTimeMinutes is not null && ExtraRunTimeMinutes is not null;
 
     /// <summary>The drill's diagrams in upload order — the order they should be read in.</summary>
     public List<DrillDiagram> Diagrams =>

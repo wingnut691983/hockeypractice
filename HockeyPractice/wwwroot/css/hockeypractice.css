@@ -31,6 +31,13 @@
     --hp-border:    #2b3441;
     --hp-text:      #eef2f7;
     --hp-muted:     #93a0b3;
+
+    /* #1a8a52 is a mid green chosen to sit on white. As TEXT on a dark surface it goes muddy,
+       and the added-time note in a plan's running order is the first place it is used that way
+       (the "viewed" pill paints its own light background, so it never had this problem).
+       Lightened here, and reset again in the print block below, or a plan printed from a phone
+       in dark mode carries this value onto white paper. */
+    --hp-success:   #3fbe7e;
   }
 }
 
@@ -279,8 +286,13 @@ a.hp-card:active { transform: scale(.99); }
   padding-bottom: .7rem;
   padding-right: .9rem;
 }
+/* Wraps because the time column is no longer always short: "25 min (15 min + 10 min)" is nowrap
+   and does not shrink, so on a narrow phone it would otherwise crush the drill name it sits
+   beside. Wrapping drops it onto its own line, right-aligned by the margin-left:auto below,
+   instead of squeezing the name to nothing. */
 .hp-plan-summary li {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: .6rem;
   padding: .28rem 0;
@@ -299,7 +311,19 @@ a.hp-card:active { transform: scale(.99); }
   font-size: .82rem;
   font-weight: 700;
   white-space: nowrap;
+  margin-left: auto;
 }
+
+/* Where a drill's time came from when a plan lengthened it: "25 min (15 min + 10 min)".
+   Lighter and smaller than the total, because the total is the number you act on and this only
+   explains it. The added half is green so it reads at a glance as something someone did on
+   purpose, rather than as a drill that is simply long. */
+.hp-time-breakdown {
+  font-weight: 500;
+  font-size: .92em;
+  color: var(--hp-muted);
+}
+.hp-time-added { color: var(--hp-success); }
 
 /* The clock reading as each drill starts. Tabular figures and a fixed width so the column lines
    up down the page — a ragged clock is hard to read at a glance on the bench. */
@@ -1739,6 +1763,11 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
     --hp-border:    #9aa4b1;
     --hp-text:      #000000;
     --hp-muted:     #3f4753;
+
+    /* Back to the on-white green. The dark-mode block lightens this for a dark surface, and
+       prefers-color-scheme still matches while printing, so without this line the added-time
+       note prints pale green on white. Same trap as the *-text aliases below. */
+    --hp-success:   #1a8a52;
 
     /* Separate from the tokens above, and easy to miss: the dark-mode block also swaps the
        *-text aliases to the -ink-dark variants, which are the team colour LIGHTENED for a

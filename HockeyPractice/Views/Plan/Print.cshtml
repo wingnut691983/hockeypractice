@@ -90,9 +90,9 @@
                        paper, and an <a> would print blue and underlined for no reason. *@
                     <span class="hp-plan-summary-name">@summaryDrill.Title</span>
                     <span class="hp-plan-summary-time">
-                        @if (summaryMinutes is int summaryMins)
+                        @if (summaryMinutes is int)
                         {
-                            @RunTime.Human(summaryMins)
+                            @await Html.PartialAsync("_DrillTime", Model.Drills[i])
                         }
                         else
                         {
@@ -181,9 +181,9 @@
                         {
                             <text>@RunTime.Clock(startMins) · </text>
                         }
-                        @if (card.EffectiveRunTimeMinutes is int mins)
+                        @if (card.EffectiveRunTimeMinutes is int)
                         {
-                            @RunTime.Human(mins)
+                            @await Html.PartialAsync("_DrillTime", card)
                         }
                         else
                         {

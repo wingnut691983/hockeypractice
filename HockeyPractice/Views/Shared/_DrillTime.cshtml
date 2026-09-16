@@ -1,0 +1,19 @@
+@using HockeyPractice.Infrastructure
+@model DrillCard
+@*
+    How long a drill runs, and where that number came from when a plan lengthened it.
+
+    Rendered in four places (the plan page's running order and its drill cards, and the same two
+    on the print sheet), which is why it is a partial: the breakdown has to say the same thing on
+    the bench sheet as it does on the phone, and four copies of this markup would not stay that way.
+
+    The CALLER decides what an unknown time looks like, because the four places disagree: the
+    running order prints a dash, a drill card on screen shows nothing at all, and the print card
+    says "no time set". So this renders only the known case and is asked for only inside an
+    `is int` check.
+*@
+@{
+    var mins = Model.EffectiveRunTimeMinutes ?? 0;
+}
+@RunTime.Human(mins)@if (Model.ShowsAddedTime)
+{<span class="hp-time-breakdown"> (@RunTime.Human(Model.BaseRunTimeMinutes!.Value) <span class="hp-time-added">+ @RunTime.Human(Model.ExtraRunTimeMinutes!.Value)</span>)</span>}

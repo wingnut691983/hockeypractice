@@ -128,9 +128,9 @@
                            each, scrolling to find the third one is the whole problem. *@
                         <a href="#hp-drill-@(i + 1)">@summaryDrill.Title</a>
                         <span class="hp-plan-summary-time">
-                            @if (summaryMinutes is int summaryMins)
+                            @if (summaryMinutes is int)
                             {
-                                @HockeyPractice.Infrastructure.RunTime.Human(summaryMins)
+                                @await Html.PartialAsync("_DrillTime", Model.Drills[i])
                             }
                             else
                             {
@@ -185,9 +185,9 @@
                         <div class="hp-drill-head">
                             <span class="hp-drill-num">@(i + 1)</span>
                             <h2 class="hp-drill-title">@drill.Title</h2>
-                            @if (card.EffectiveRunTimeMinutes is int mins)
+                            @if (card.EffectiveRunTimeMinutes is int)
                             {
-                                <span class="hp-drill-time">@HockeyPractice.Infrastructure.RunTime.Human(mins)</span>
+                                <span class="hp-drill-time">@await Html.PartialAsync("_DrillTime", card)</span>
                             }
                         </div>
 

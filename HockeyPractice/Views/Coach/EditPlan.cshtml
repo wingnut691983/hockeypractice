@@ -301,7 +301,13 @@
                                order is what a coach comes here to read. <details> costs no script
                                and works on a phone. *@
                             @{
-                                var baseMins = card.Drill.RunTimeMinutes;
+                                @* The drill's own time, taken through the card rather than by
+                                   reaching into the drill. This is the one screen that legitimately
+                                   wants the "normally" half instead of the effective total, and
+                                   going via the card is what keeps the rule in the README intact:
+                                   no view reaches past a card for a drill's length, so the grep
+                                   that checks it stays worth running. *@
+                                var baseMins = card.BaseRunTimeMinutes;
                                 var extra = card.ExtraRunTimeMinutes;
 
                                 var timeSummary = (baseMins, extra) switch

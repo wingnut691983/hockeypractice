@@ -55,8 +55,10 @@ tangled and aren't anymore.
   takes 10 minutes to teach runs 25 in that practice, and stays 15 in the library and in every
   other plan. It also gives a length to a drill that has none, which is how a plan that was showing
   "1 drill with no time set" gets its countdown clock and its finish line back. What is stored is
-  the addition, so re-timing the drill later keeps the allowance. Players and parents just see the
-  final number; only the editor says it was adjusted and what the drill normally runs.
+  the addition, so re-timing the drill later keeps the allowance. Everyone reading the plan sees
+  where the number came from: a lengthened drill reads **25 min (15 min + 10 min)** with the added
+  part in green, in the running order and on the drill card, on screen and on the printed sheet. A
+  drill with no library time at all just shows its total, since there is nothing to have added to.
 - **Duplicating a plan.** Next week's practice is usually last week's with a few changes, so any
   plan can be copied: **Duplicate this plan** in the editor's Reuse panel, or **Duplicate** on the
   plan page. It opens a form with the title, rink, note and tags already filled in and the date
@@ -248,14 +250,18 @@ answer in September.
   ship comments containing them, which is why a naive grep over the served HTML looks like a
   failure and isn't. Zero in visible copy.
 
-- **Dark mode follows you onto paper, and it overrides the colour tokens in two separate
+- **Dark mode follows you onto paper, and it overrides the colour tokens in three separate
   places.** `prefers-color-scheme: dark` still matches while a page is printing, so a plan printed
   from a phone in dark mode came out with the drill cards on a near-black background. The print
   block resets the surface tokens (`--hp-bg`, `--hp-surface`, `--hp-surface-2`, `--hp-border`,
   `--hp-text`, `--hp-muted`) — and, separately and easy to miss, `--hp-primary-text` /
   `--hp-accent-text`, which the dark block swaps to the `-ink-dark` variants: the team colour
   *lightened* for a dark surface, which prints almost invisibly on white. Reset the first group
-  and not the second and the running-order clock disappears. What makes the reset win is the
+  and not the second and the running-order clock disappears. `--hp-success` is the third and was
+  added later, when a plan's added-time note started using it as plain text: the dark block
+  lightens it to `#3fbe7e` to be legible on a dark surface, and the print block puts it back to
+  `#1a8a52` so it does not print pale on white. **Any token the dark block redefines has to be
+  reset here too**, and that is now a rule rather than two special cases. What makes the reset win is the
   scoping — `html.hp-printpage` (0-1-1) outranks the dark block's `:root` (0-1-0) — not source
   order; keeping the block last in the file is belt and braces. Verified by forcing all five
   `prefers-color-scheme: dark` blocks to apply unconditionally and printing: all seven pages came
@@ -466,6 +472,14 @@ answer in September.
   **`DrillCard.EffectiveRunTimeMinutes` is the single definition every view goes through**, and
   reading a drill's own `RunTimeMinutes` in a view is exactly how this gets re-broken.
   `grep -rn "Drill\.RunTimeMinutes" HockeyPractice/Views` should stay empty.
+
+  The breakdown beside it ("25 min (15 min + 10 min)") is `Views/Shared/_DrillTime.cshtml`, drawn
+  in four places: the running order and the drill cards, on the plan page and on the print sheet.
+  It is a partial rather than four copies because the bench sheet has to agree with the phone. The
+  **caller** keeps the not-set branch, because those four places disagree about it: a dash in the
+  running order, nothing at all on a drill card, "no time set" on the printed card. It shows the
+  breakdown only when the drill has a library time to have been added to, so a drill timed only by
+  the plan reads as a plain total instead of "(0 min + 25 min)".
 - **`_DrillRow.cshtml` renders both a plan's drills and the library's, and the plan's minutes must
   never reach the library.** It is rendered from four places: the library, Copy to team, the plan
   editor's running order, and the picker directly below that running order. The reason one plan's
