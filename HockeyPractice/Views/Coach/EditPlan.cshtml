@@ -307,9 +307,9 @@
                                 var timeSummary = (baseMins, extra) switch
                                 {
                                     (int b, int e) => $"Runs {RunTime.Human(b + e)} here, normally {RunTime.Human(b)}",
-                                    (int _, null) => "Add time for this practice",
-                                    (null, int e) => $"Set to {RunTime.Human(e)} for this practice",
-                                    _ => "Set a time for this practice"
+                                    (int _, null) => "Add extra time for this drill, this plan only",
+                                    (null, int e) => $"Set to {RunTime.Human(e)} for this drill, this plan only",
+                                    _ => "Set a time for this drill, this plan only"
                                 };
                             }
                             <details class="hp-plan-time">
