@@ -247,6 +247,25 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-runtime-total strong { color: var(--hp-text); }
 
+/* Per-plan drill time, in the plan editor's running order. flex-basis:100% drops it onto its own
+   line inside the row's existing wrap, under the drill and its move/remove buttons, rather than
+   competing with them for width on a phone. The input is capped because a minutes box stretched
+   across the row reads as if it wants a sentence. */
+.hp-plan-time { flex-basis: 100%; margin-top: .35rem; }
+.hp-plan-time > summary {
+  font-size: .78rem;
+  color: var(--hp-muted);
+  cursor: pointer;
+}
+.hp-plan-time-form {
+  display: flex;
+  gap: .4rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-top: .4rem;
+}
+.hp-plan-time-form .hp-input { max-width: 6rem; }
+
 /* The running order, above the drills themselves. Numbers come from the <ol> so they can't drift
    out of step with the numbered drills below. */
 .hp-plan-summary {

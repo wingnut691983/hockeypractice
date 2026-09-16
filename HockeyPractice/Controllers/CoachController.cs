@@ -346,6 +346,11 @@ public class CoachController : TeamScopedController
             // Referencing the library, exactly as a plan built by hand does. A drill archived since
             // the source was built still comes across: the source plan shows it, so the copy of that
             // practice should too.
+            //
+            // ExtraRunTimeMinutes comes too, and has to: it describes how long the drill ran in
+            // THIS practice, not what the drill is, so a copy made to run the same session again
+            // would otherwise quietly drop the teaching time and report a shorter practice than
+            // the one it was copied from.
             var entries = await Db.PlanDrills
                 .Where(pd => pd.PracticePlanId == source.Id)
                 .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
@@ -357,7 +362,8 @@ public class CoachController : TeamScopedController
                 {
                     PracticePlanId = copy.Id,
                     DrillId = entry.DrillId,
-                    SortOrder = entry.SortOrder
+                    SortOrder = entry.SortOrder,
+                    ExtraRunTimeMinutes = entry.ExtraRunTimeMinutes
                 });
             }
         }
@@ -529,6 +535,11 @@ public class CoachController : TeamScopedController
     /// <summary>
     /// Moves a drill one place up or down by swapping SortOrder with its neighbour — the same
     /// approach as the site-admin team reorder, which is immune to gaps and ties.
+    ///
+    /// Swapping rather than renumbering also keeps PlanDrill.Id still, which is what any per-row
+    /// state hangs off — ExtraRunTimeMinutes today. A reorder rewritten as delete-and-reinsert
+    /// would silently throw that away, so if this ever needs to become a drag-and-drop, move the
+    /// rows' SortOrder values and do not recreate the rows.
     /// </summary>
     [HttpPost("plans/{id:int}/drills/{planDrillId:int}/move")]
     [ValidateAntiForgeryToken]
@@ -558,6 +569,91 @@ public class CoachController : TeamScopedController
         await Db.SaveChangesAsync();
         return BackToPlan(slug, id, drillTag, drillName, drillPage);
     }
+
+    /// <summary>
+    /// Sets or clears the minutes this plan adds to one drill, so a drill that needs teaching can
+    /// run long in this practice without the library drill, or any other plan using it, changing.
+    ///
+    /// Takes the minutes as a string rather than an int?. Model binding turns "abc" into null,
+    /// which here would read as "clear it" and throw the coach's typo away without a word. The
+    /// drill form takes it as a string for the same reason.
+    /// </summary>
+    [HttpPost("plans/{id:int}/drills/{planDrillId:int}/time")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetDrillTime(string slug, int id, int planDrillId,
+        string? extraMinutes, string? clear, string? drillTag, string? drillName, int drillPage = 1)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        // The drill comes too: its own time is what the new minutes are added to, and its title is
+        // what a refusal has to name, since a refusal lands at the top of a long page.
+        var entry = await Db.PlanDrills.Include(pd => pd.Drill)
+            .FirstOrDefaultAsync(pd => pd.Id == planDrillId && pd.PracticePlanId == id
+                                       && pd.PracticePlan!.TeamId == ctx!.Team.Id);
+        if (entry is null) return NotFound();
+
+        var title = entry.Drill!.Title;
+        var hasBase = entry.Drill.RunTimeMinutes is not null;
+
+        // Clearing the box and saving means the same as pressing Clear: this plan has nothing to
+        // say about how long the drill takes, so it goes back to the library time.
+        if (clear is not null || string.IsNullOrWhiteSpace(extraMinutes))
+        {
+            entry.ExtraRunTimeMinutes = null;
+            await Db.SaveChangesAsync();
+            return BackToPlan(slug, id, drillTag, drillName, drillPage);
+        }
+
+        if (!int.TryParse(extraMinutes.Trim(), out var minutes))
+        {
+            return DrillTimeRefused(slug, id, hasBase
+                ? $"\"{title}\": extra time needs to be a number of minutes, like 10."
+                : $"\"{title}\": a time for this practice needs to be a number of minutes, like 25.",
+                drillTag, drillName, drillPage);
+        }
+
+        if (minutes < 1)
+        {
+            return DrillTimeRefused(slug, id, hasBase
+                ? $"\"{title}\": extra time has to be at least 1 minute. To take it off, clear the box and save."
+                : $"\"{title}\": a time for this practice has to be at least 1 minute.",
+                drillTag, drillName, drillPage);
+        }
+
+        // long, not int: int.TryParse happily accepts int.MaxValue, and adding a base to that
+        // wraps negative, which would slip past a plain "> MaxMinutes" check as a short drill.
+        // The cap is on how long the drill actually runs, so a plan cannot route around the
+        // library's limit by adding to it.
+        var effective = (long)(entry.Drill.RunTimeMinutes ?? 0) + minutes;
+        if (effective > RunTime.MaxMinutes)
+        {
+            return DrillTimeRefused(slug, id,
+                $"\"{title}\": that would make the drill {effective} minutes in this plan. " +
+                $"The most a drill can run for is {RunTime.MaxMinutes} minutes.",
+                drillTag, drillName, drillPage);
+        }
+
+        entry.ExtraRunTimeMinutes = minutes;
+        await Db.SaveChangesAsync();
+
+        // No notice on the way back. The redirect lands on the drill list, where the row's own
+        // number, its summary line and the plan total have all visibly changed.
+        return BackToPlan(slug, id, drillTag, drillName, drillPage);
+    }
+
+    /// <summary>
+    /// A refused drill time, landing at the TOP of the editor rather than on the drill list.
+    ///
+    /// Deliberately not BackToPlan. Its #hp-plan-drills anchor is right for every action that
+    /// succeeded and wrong here, because the notice renders at the top of the page and an anchored
+    /// redirect scrolls straight past the only reason the coach is back on this page. Landing at
+    /// the top is what costs them sight of the row, which is why every message names the drill.
+    /// The picker's filter and page still ride along, so the library below is where they left it.
+    /// </summary>
+    private IActionResult DrillTimeRefused(string slug, int id, string notice,
+        string? drillTag, string? drillName, int drillPage) =>
+        RedirectToAction(nameof(EditPlan), new { slug, id, notice, drillTag, drillName, drillPage });
 
     [HttpPost("plans/{id:int}")]
     [ValidateAntiForgeryToken]
@@ -1099,10 +1195,14 @@ public class CoachController : TeamScopedController
             .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
             .ToListAsync();
 
+        // ExtraRunTimeMinutes is carried here and deliberately NOT on the picker's cards below.
+        // Both render through _DrillRow, and that asymmetry is the whole reason a plan's own time
+        // cannot show up against the library copy of the same drill.
         return entries.Select(pd => new DrillCard
         {
             Drill = pd.Drill!,
             PlanDrillId = pd.Id,
+            ExtraRunTimeMinutes = pd.ExtraRunTimeMinutes,
             EmbedUrl = LinkExtractionService.EmbedUrlFor(pd.Drill!.VideoUrl)
         }).ToList();
     }

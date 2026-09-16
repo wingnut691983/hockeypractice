@@ -11,9 +11,9 @@
     var planUrl = Url.Action("Details", "Plan",
         new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
 
-    var starts = RunTime.StartTimes(Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+    var starts = RunTime.StartTimes(Model.Drills.Select(c => c.EffectiveRunTimeMinutes));
     var total = RunTimeTotal.From(Model.Drills);
-    var finish = RunTime.Finish(Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+    var finish = RunTime.Finish(Model.Drills.Select(c => c.EffectiveRunTimeMinutes));
 }
 
 @* Screen only — the print stylesheet hides it, so it never reaches paper. *@
@@ -72,6 +72,7 @@
             @for (var i = 0; i < Model.Drills.Count; i++)
             {
                 var summaryDrill = Model.Drills[i].Drill;
+                var summaryMinutes = Model.Drills[i].EffectiveRunTimeMinutes;
                 var start = starts[i];
 
                 <li>
@@ -89,7 +90,7 @@
                        paper, and an <a> would print blue and underlined for no reason. *@
                     <span class="hp-plan-summary-name">@summaryDrill.Title</span>
                     <span class="hp-plan-summary-time">
-                        @if (summaryDrill.RunTimeMinutes is int summaryMins)
+                        @if (summaryMinutes is int summaryMins)
                         {
                             @RunTime.Human(summaryMins)
                         }
@@ -180,7 +181,7 @@
                         {
                             <text>@RunTime.Clock(startMins) · </text>
                         }
-                        @if (drill.RunTimeMinutes is int mins)
+                        @if (card.EffectiveRunTimeMinutes is int mins)
                         {
                             @RunTime.Human(mins)
                         }

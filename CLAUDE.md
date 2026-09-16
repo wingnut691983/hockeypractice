@@ -111,6 +111,13 @@ No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; play
   the field being blurred.
 - **A run time is required when creating a drill, optional when editing one.** Drills that
   pre-date the rule have none, and blocking an unrelated edit over it would punish them for that.
+- **A plan can add minutes to a drill (`PlanDrill.ExtraRunTimeMinutes`), and what is stored is the
+  addition, not the total**, so re-timing the drill in the library keeps the coach's allowance. It
+  hangs off `PlanDrill.Id` because the same drill can legitimately appear twice in one practice.
+  **`DrillCard.EffectiveRunTimeMinutes` is the only definition of a drill's length any view may
+  use**: `_DrillRow.cshtml` renders plan rows and library rows alike, and reaching past the card to
+  the drill's own `RunTimeMinutes` is what shows one plan's teaching time against that drill
+  everywhere. `grep -rn "Drill\.RunTimeMinutes" HockeyPractice/Views` should stay empty.
 - **PDF auto-sizing observes `#viewer` inside the iframe, not `#viewerContainer`** — the latter's
   own box doesn't grow as content overflows it, so a ResizeObserver on it never fires.
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org is an

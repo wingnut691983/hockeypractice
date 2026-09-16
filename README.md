@@ -49,6 +49,14 @@ tangled and aren't anymore.
   scroll with nothing to get stuck in partway down a long document. Pinch-to-zoom on the PDF is
   deliberately disabled (it fought the page's own scroll); a small floating +/- control stays
   reachable no matter how far into the document you've scrolled.
+- **Stretching a drill for one practice.** A drill carries its own run time in the library, and
+  that number is what every plan using it counts. When a drill is complex enough that teaching it
+  eats into the session, the plan's running order can add minutes to it: a 15 minute drill that
+  takes 10 minutes to teach runs 25 in that practice, and stays 15 in the library and in every
+  other plan. It also gives a length to a drill that has none, which is how a plan that was showing
+  "1 drill with no time set" gets its countdown clock and its finish line back. What is stored is
+  the addition, so re-timing the drill later keeps the allowance. Players and parents just see the
+  final number; only the editor says it was adjusted and what the drill normally runs.
 - **Duplicating a plan.** Next week's practice is usually last week's with a few changes, so any
   plan can be copied: **Duplicate this plan** in the editor's Reuse panel, or **Duplicate** on the
   plan page. It opens a form with the title, rink, note and tags already filled in and the date
@@ -61,8 +69,10 @@ tangled and aren't anymore.
   stored under the SHA-256 of their contents, so two plans holding the same document point at one
   file on the volume, and duplicating costs no storage at all. Video labels come across too,
   including the fact that a manager edited them, so re-reading names on the copy keeps their
-  wording. A copy of a plan uploaded *before* PDFs were content-addressed is the one case that
-  spends bytes: its file is copied into the store once, and any further copy of it is free.
+  wording. Any minutes the plan added to a drill come across too, because they describe how long
+  that drill ran in that practice rather than what the drill is. A copy of a plan uploaded *before*
+  PDFs were content-addressed is the one case that spends bytes: its file is copied into the store
+  once, and any further copy of it is free.
 - **The plan page's actions are one partial rendered twice.** `Views/Plan/_PlanActions.cshtml`
   holds Print / Share / Duplicate / Edit (Duplicate and Edit only for a manager; Print and Share
   for everyone, since a parent printing the plan for the car is half that audience), and
@@ -443,6 +453,27 @@ answer in September.
   have no time; demanding one before a coach can fix a typo in a title would be a tax on them for
   that. So `Update` stays optional, and `RunTime.StartTimes` and `PlanTotal` must keep handling
   nulls honestly rather than treating a blank as zero.
+- **A plan can add minutes to a drill, and what is stored is the addition, not the answer.**
+  `PlanDrill.ExtraRunTimeMinutes` is what makes a complex drill run 25 in one practice while
+  staying 15 everywhere else. Storing the addition rather than the total is what makes re-timing
+  the library drill safe: 15 + 10 becomes 12 + 10, not a stale 25. It hangs off `PlanDrill.Id`
+  and not off the drill, because the same drill legitimately appears twice in one practice, and
+  because reordering swaps `SortOrder` and leaves `Id` alone, so the time stays on the row a coach
+  set it on. If the reorder is ever rewritten as delete-and-reinsert, this is what it silently
+  throws away. The same column doubles as an absolute time for a drill that has none, since there
+  is nothing to add to; `RunTime.Effective` is the one place that decides, and a drill that gains a
+  plan-level time stops counting toward the "N drills with no time set" tail and joins the sum.
+  **`DrillCard.EffectiveRunTimeMinutes` is the single definition every view goes through**, and
+  reading a drill's own `RunTimeMinutes` in a view is exactly how this gets re-broken.
+  `grep -rn "Drill\.RunTimeMinutes" HockeyPractice/Views` should stay empty.
+- **`_DrillRow.cshtml` renders both a plan's drills and the library's, and the plan's minutes must
+  never reach the library.** It is rendered from four places: the library, Copy to team, the plan
+  editor's running order, and the picker directly below that running order. The reason one plan's
+  teaching time cannot show up against the drill everywhere it appears is not a flag in the
+  partial, it is that only the three plan-side card builders set `ExtraRunTimeMinutes` at all, so a
+  library card carries none and falls back to the drill. Keep the partial context-free; a check
+  like `if (isPlanRow)` in there would be the bug waiting to happen. Verified against the library
+  page, the picker and the Copy to team page with an adjusted drill live in a plan.
 - **One plan can legitimately hold two links to the same video, so never key a dictionary on
   `PlanLink.Url` without grouping first.** Extraction keeps a separate card whenever the document
   names the same clip differently, because a warm-up video demonstrating three drills is three
@@ -567,6 +598,13 @@ answer in September.
   search is a GET form, so its anchor rides on the form's `action`: submitting replaces the query
   and leaves the fragment alone. Drop the `action` as redundant and the search silently starts
   landing at the top of the page again.
+
+  **One path deliberately has no anchor, and it looks like an oversight.** A refused drill time
+  (`CoachController.DrillTimeRefused`) redirects without `#hp-plan-drills` on purpose, because the
+  notice renders at the *top* of the editor and an anchored redirect scrolls straight past the only
+  reason the coach is back on the page. Make it consistent with its neighbours and every one of
+  those messages becomes invisible. It is also why those messages name the drill in quotes: landing
+  at the top is what costs the coach sight of the row they were editing.
 - **A failed startup migration is shown on the admin page, not just logged.** The app deliberately
   serves on rather than crash-looping, which leaves a site that looks healthy and fails on every
   write. Restoring an archive old enough to need a migration is exactly when that happens.

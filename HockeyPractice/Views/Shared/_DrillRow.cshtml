@@ -17,8 +17,13 @@
         <div class="hp-muted" style="font-size:.85rem;">@snippet</div>
     }
 
+    @* The card's time, not the drill's. This partial renders library rows, picker rows AND the
+       rows of a plan, and the only difference between them is what the card carries: a plan's
+       cards hold the minutes that plan added, a library card holds none and falls back to the
+       drill. Reaching past the card to the drill's own run time here would show one plan's
+       teaching time against that drill everywhere it appears. *@
     <div class="hp-muted" style="font-size:.78rem;margin-top:.15rem;">
-        @if (Model.Drill.RunTimeMinutes is int mins)
+        @if (Model.EffectiveRunTimeMinutes is int mins)
         {
             <text>@HockeyPractice.Infrastructure.RunTime.Human(mins) · </text>
         }

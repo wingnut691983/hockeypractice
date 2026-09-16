@@ -101,12 +101,13 @@
             </div>
 
             var starts = HockeyPractice.Infrastructure.RunTime.StartTimes(
-                Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+                Model.Drills.Select(c => c.EffectiveRunTimeMinutes));
 
             <ol class="hp-plan-summary">
                 @for (var i = 0; i < Model.Drills.Count; i++)
                 {
                     var summaryDrill = Model.Drills[i].Drill;
+                    var summaryMinutes = Model.Drills[i].EffectiveRunTimeMinutes;
                     var start = starts[i];
 
                     @* What the clock reads when this drill starts, counting down from a full
@@ -127,7 +128,7 @@
                            each, scrolling to find the third one is the whole problem. *@
                         <a href="#hp-drill-@(i + 1)">@summaryDrill.Title</a>
                         <span class="hp-plan-summary-time">
-                            @if (summaryDrill.RunTimeMinutes is int summaryMins)
+                            @if (summaryMinutes is int summaryMins)
                             {
                                 @HockeyPractice.Infrastructure.RunTime.Human(summaryMins)
                             }
@@ -146,7 +147,7 @@
                Both are null unless every drill has a time, so a partial plan reports nothing
                rather than a confident wrong answer. *@
             var endsAt = HockeyPractice.Infrastructure.RunTime.Finish(
-                Model.Drills.Select(c => c.Drill.RunTimeMinutes));
+                Model.Drills.Select(c => c.EffectiveRunTimeMinutes));
             @if (endsAt is int finish)
             {
                 <div class="hp-plan-summary-foot @(finish < 0 ? "over" : "")">
@@ -184,7 +185,7 @@
                         <div class="hp-drill-head">
                             <span class="hp-drill-num">@(i + 1)</span>
                             <h2 class="hp-drill-title">@drill.Title</h2>
-                            @if (drill.RunTimeMinutes is int mins)
+                            @if (card.EffectiveRunTimeMinutes is int mins)
                             {
                                 <span class="hp-drill-time">@HockeyPractice.Infrastructure.RunTime.Human(mins)</span>
                             }

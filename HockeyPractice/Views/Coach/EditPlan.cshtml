@@ -1,4 +1,5 @@
 @using HockeyPractice.Services
+@using HockeyPractice.Infrastructure
 @model PlanEditViewModel
 @{
     // Three modes, not two: editing an existing plan, starting a new one, and duplicating one.
@@ -291,6 +292,68 @@
                                     Remove
                                 </button>
                             </form>
+
+                            @* A sibling of the form above, never nested inside it: a form within a
+                               form is not valid and the inner one silently never posts.
+
+                               Closed by default. A dozen drills each showing an open number field
+                               and two buttons turns the running order into a wall of form, and the
+                               order is what a coach comes here to read. <details> costs no script
+                               and works on a phone. *@
+                            @{
+                                var baseMins = card.Drill.RunTimeMinutes;
+                                var extra = card.ExtraRunTimeMinutes;
+
+                                var timeSummary = (baseMins, extra) switch
+                                {
+                                    (int b, int e) => $"Runs {RunTime.Human(b + e)} here, normally {RunTime.Human(b)}",
+                                    (int _, null) => "Add time for this practice",
+                                    (null, int e) => $"Set to {RunTime.Human(e)} for this practice",
+                                    _ => "Set a time for this practice"
+                                };
+                            }
+                            <details class="hp-plan-time">
+                                <summary>@timeSummary</summary>
+                                <form method="post" class="hp-plan-time-form"
+                                      asp-action="SetDrillTime" asp-route-slug="@slug" asp-route-id="@planId"
+                                      asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter"
+                                      asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
+                                    @Html.AntiForgeryToken()
+                                    <div class="hp-field" style="margin:0;">
+                                        @* The id has to be unique per row, or every label on the
+                                           page focuses the first drill's box. *@
+                                        <label class="hp-label" for="extra-@card.PlanDrillId">
+                                            @(baseMins is null ? "Time for this practice (minutes)" : "Extra time for this practice (minutes)")
+                                        </label>
+                                        <input class="hp-input" type="number" id="extra-@card.PlanDrillId"
+                                               name="extraMinutes" min="1" max="@RunTime.MaxMinutes" step="1"
+                                               inputmode="numeric" value="@(extra?.ToString() ?? "")"
+                                               placeholder="@(baseMins is null ? "e.g. 25" : "e.g. 10")" />
+                                    </div>
+                                    <button type="submit" class="hp-btn hp-btn-sm">Save</button>
+                                    @if (card.HasExtraRunTime)
+                                    {
+                                        <button type="submit" name="clear" value="1"
+                                                class="hp-btn hp-btn-quiet hp-btn-sm">Clear</button>
+                                    }
+                                </form>
+                                <p class="hp-muted" style="font-size:.78rem;margin:.35rem 0 0;">
+                                    @if (baseMins is int shown)
+                                    {
+                                        <text>
+                                            Added to the drill's usual @RunTime.Human(shown), in this plan only.
+                                            Use it when a drill needs teaching before it flows.
+                                        </text>
+                                    }
+                                    else
+                                    {
+                                        <text>
+                                            This drill has no run time in your library, so it counts as nothing
+                                            in the total. What you set here counts in this plan only.
+                                        </text>
+                                    }
+                                </p>
+                            </details>
                         </li>
                     }
                 </ul>

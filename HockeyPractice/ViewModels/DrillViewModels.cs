@@ -13,6 +13,27 @@ public class DrillCard
     /// <summary>Set only when this card is a drill inside a plan — the row to reorder or remove.</summary>
     public int? PlanDrillId { get; init; }
 
+    /// <summary>
+    /// Minutes this plan adds to the drill, when this card came from a plan. Left null on a
+    /// library or picker card, and that is what keeps one plan's time out of the library: the
+    /// rows share _DrillRow, so a card carrying nothing is what makes that partial safe.
+    /// </summary>
+    public int? ExtraRunTimeMinutes { get; init; }
+
+    /// <summary>
+    /// The number to show wherever a drill's length is shown. Every view goes through this rather
+    /// than reading Drill.RunTimeMinutes, so a plan-level time cannot be applied in one place and
+    /// missed in another. Null still means "no estimate", which the totals depend on.
+    /// </summary>
+    public int? EffectiveRunTimeMinutes =>
+        HockeyPractice.Infrastructure.RunTime.Effective(Drill.RunTimeMinutes, ExtraRunTimeMinutes);
+
+    /// <summary>
+    /// Coach-facing only: this plan changed how long the drill runs. Players are never told, so
+    /// this belongs to the editor and must not reach the plan page or the print sheet.
+    /// </summary>
+    public bool HasExtraRunTime => ExtraRunTimeMinutes is not null;
+
     /// <summary>The drill's diagrams in upload order — the order they should be read in.</summary>
     public List<DrillDiagram> Diagrams =>
         Drill.Diagrams.OrderBy(d => d.Id).ToList();
@@ -33,6 +54,9 @@ public class DrillCard
 /// <summary>
 /// How long a set of drills runs. Carries the count of drills with no estimate alongside the
 /// sum, so the total can say what it is missing instead of silently under-reporting.
+///
+/// Totals are over EFFECTIVE minutes, so the same drill can legitimately count differently in two
+/// plans: one that added teaching time to it and one that did not.
 /// </summary>
 public class RunTimeTotal
 {
@@ -47,8 +71,14 @@ public class RunTimeTotal
         var list = cards.ToList();
         return new RunTimeTotal
         {
-            Minutes = list.Sum(c => c.Drill.RunTimeMinutes ?? 0),
-            MissingCount = list.Count(c => c.Drill.RunTimeMinutes is null)
+            Minutes = list.Sum(c => c.EffectiveRunTimeMinutes ?? 0),
+
+            // A drill with no library time but a plan-level one is NOT missing any more: the plan
+            // answered the question for this practice, so it leaves the "+ N with no time set"
+            // tail and joins the sum. Reading Drill.RunTimeMinutes here would keep counting it as
+            // missing while its minutes were already in the total, which reads as a total that
+            // does not add up.
+            MissingCount = list.Count(c => c.EffectiveRunTimeMinutes is null)
         };
     }
 }

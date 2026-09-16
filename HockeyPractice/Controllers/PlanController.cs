@@ -48,6 +48,7 @@ public class PlanController : TeamScopedController
             {
                 Drill = pd.Drill!,
                 PlanDrillId = pd.Id,
+                ExtraRunTimeMinutes = pd.ExtraRunTimeMinutes,
                 EmbedUrl = LinkExtractionService.EmbedUrlFor(pd.Drill!.VideoUrl)
             }).ToList();
         }
@@ -136,6 +137,7 @@ public class PlanController : TeamScopedController
         {
             Drill = pd.Drill!,
             PlanDrillId = pd.Id,
+            ExtraRunTimeMinutes = pd.ExtraRunTimeMinutes,
             EmbedUrl = null
         }).ToList();
 

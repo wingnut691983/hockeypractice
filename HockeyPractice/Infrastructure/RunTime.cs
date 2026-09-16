@@ -30,6 +30,20 @@ public static class RunTime
     }
 
     /// <summary>
+    /// How long a drill runs in one plan: its library time plus whatever that plan added on top.
+    ///
+    /// Null in, null out, on purpose. A drill with no library time and no plan-level time has no
+    /// answer, and this has to keep saying so rather than returning 0, because StartTimes, Finish
+    /// and PlanTotal all key their honesty off exactly that null.
+    ///
+    /// A drill with no library time but a plan-level one reads as that number outright. There is
+    /// nothing to add to, so the addition IS the time, which is what lets a drill pre-dating the
+    /// run time rule count towards one practice without being re-timed for every other plan.
+    /// </summary>
+    public static int? Effective(int? baseMinutes, int? extraMinutes) =>
+        baseMinutes is int b ? b + (extraMinutes ?? 0) : extraMinutes;
+
+    /// <summary>
     /// What the clock reads as each drill begins, counting down from a full practice.
     ///
     /// Returns null for a drill whose start can't be known — which happens from the first drill

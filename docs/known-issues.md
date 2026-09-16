@@ -251,6 +251,26 @@ diagram smaller, and the diagram being readable at arm's length on the bench is 
 diagrams printed per drill, or to give a long description its own sheet — not to shrink the
 pictures again. The signature to look for is a printed page with no text on it at all.
 
+### 12. A plan-level time typed as a total is still an addition underneath
+
+`PlanDrill.ExtraRunTimeMinutes` stores minutes to ADD to the drill's own run time. When the drill
+has no run time there is nothing to add to, so the same column reads as the whole time, which is
+what lets a plan count a drill that pre-dates the run time rule (`RunTime.Effective`).
+
+The two meanings meet badly in one case. A coach sets 25 on a drill with no library time, meaning
+"this takes 25 minutes". Someone later fills in that drill's run time as 12. The plan now reads 37,
+which is a number nobody chose: the coach typed a total and it silently became an allowance on top
+of a base that did not exist when they typed it.
+
+It needs a plan-level time on a drill that is given a library time *afterwards*, so it is rare, and
+the damage is a wrong total on one plan rather than anything lost. It was accepted deliberately:
+telling the two meanings apart needs either a second column or an intent flag, and that buys one
+edge case a permanent branch through every place a drill's length is read.
+
+**Trigger: a coach reports a plan total jumping after someone filled in a missing run time on a
+drill.** The fix is a flag recording which meaning was typed, applied at `RunTime.Effective` so
+every read site inherits it. Worth doing only if it happens more than once.
+
 ---
 
 ## Small items
