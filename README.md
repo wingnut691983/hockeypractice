@@ -135,7 +135,7 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 | `SITE_ADMIN_CODE` | yes | Gates `/admin`. Fails closed — unset means no one can sign in. |
 | `DATA_DIR` | no | Defaults to `/persisted-data`. Set to `../.localdata` in development. |
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
-| `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged and the signup box is hidden. |
+| `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged instead of sent and the signup box is hidden. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
 | `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain. |
 | `ARCHIVE_S3_ENDPOINT` | no | Cloudflare R2 S3 endpoint, `https://<accountid>.r2.cloudflarestorage.com`. **Without the bucket on the end**; the SDK appends it, and pasting the bucket's own "S3 API" value gives `.../<bucket>/<bucket>/<key>` and a missing-bucket error. |
 | `ARCHIVE_S3_BUCKET` | no | Bucket name. |
@@ -571,6 +571,33 @@ answer in September.
   them; a periodic sweep would race a download that's mid-stream.
 - The real PdfPig NuGet package id is **`PdfPig`** (Apache 2.0). `UglyToad.PdfPig` on nuget.org
   is an unrelated placeholder package with a template description — don't install it.
+- **`LoggingEmailSender` logs the message body only in Development, and it has to stay that way.**
+  The body is the whole point of that sender locally: the confirm and unsubscribe links exist
+  nowhere else, so there is no other way to walk the subscribe flow without a provider. It is also
+  exactly why it cannot be logged anywhere else. That sender is selected whenever `RESEND_API_KEY`
+  is unset, which includes **production with the key simply forgotten**, which is what production
+  is today. The body carries the confirm token, the unsubscribe token and the subscriber's address
+  in plain text, so anyone who could read the log could confirm subscriptions and unsubscribe
+  families at will. The recipient is left out of the production line too, for the same reason
+  `ResendEmailSender` never logs a provider's response body: an address is the thing worth not
+  writing down. Verified both ways against a real subscribe on a Production-mode instance: the log
+  line is the subject alone, and the address, both tokens and the confirm URL are all absent; the
+  same run in Development still prints the clickable confirm link. The tempting change is to put
+  the body back so something is easier to debug against a real deployment. Don't: send yourself a
+  test subscription locally instead.
+
+- **A plan's own drill rows need `Tags` included explicitly, and the bug hides if you test on a
+  small team.** `CoachController.PlanDrillsAsync` included `Diagrams` but not `Tags`, while
+  `_DrillRow` renders tag pills for both the plan's running order and the library picker below it.
+  Lazy loading is off, so the pills were populated only by EF's relationship fix-up from the
+  picker's query, which does include `Tags`. The result: a drill's tags showed in the running order
+  only when that same drill happened to be on the page of the picker you were looking at, and
+  vanished when you paged past it. Nothing about the code reads as broken, which is why it survived.
+  Measured on a team padded to 22 drills so the picker pages: picker page 1 rendered **0** tag
+  pills, picker page 2 rendered **29**, from the same plan on the same build. With the include, page
+  1 renders 14, which is exactly the tag count on that plan's drills. If you are tempted to drop the
+  second `Include` because "the tags are already loaded", they are not; they were borrowed.
+  Test paging, not just a team whose whole library fits on one page.
 
 ## Things worth knowing before you change anything
 

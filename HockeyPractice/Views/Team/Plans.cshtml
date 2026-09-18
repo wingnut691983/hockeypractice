@@ -7,6 +7,8 @@
 @await Html.PartialAsync("_TeamHeader", Model.Ctx)
 
 <div class="hp-shell">
+    <h1 class="hp-title">Practice plans</h1>
+
     @if (!string.IsNullOrWhiteSpace(Model.Ctx.Team.SafeSpotifyPlaylistUrl))
     {
         <a class="hp-card hp-card-spotify" style="margin-top:1.25rem;"
@@ -27,7 +29,6 @@
 
     @if (!Model.HasAny)
     {
-        <h1 class="hp-title">Practice plans</h1>
         <div class="hp-empty">
             Nothing posted yet.<br />
             <span class="hp-muted">Your coach will put the next practice plan here.</span>

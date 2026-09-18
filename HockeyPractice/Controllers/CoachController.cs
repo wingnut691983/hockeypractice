@@ -1191,6 +1191,11 @@ public class CoachController : TeamScopedController
     {
         var entries = await Db.PlanDrills
             .Include(pd => pd.Drill).ThenInclude(d => d!.Diagrams)
+            // Tags as well, because _DrillRow renders tag pills and this list feeds it. Without
+            // this they were populated only by EF's relationship fix-up from the picker query
+            // below, which includes Tags — so a drill's pills showed on the pages of the library
+            // picker that happened to contain that same drill and vanished on every other page.
+            .Include(pd => pd.Drill).ThenInclude(d => d!.Tags)
             .Where(pd => pd.PracticePlanId == planId)
             .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
             .ToListAsync();
