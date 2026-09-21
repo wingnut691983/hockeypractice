@@ -130,6 +130,23 @@ that should bring it back. Two of them are waiting on `RESEND_API_KEY` being set
 fixed *before* mail is switched on, not after. It also records what has already been audited and
 found clean, so a later pass doesn't re-derive it.
 
+## Audit work in progress
+
+`docs/audit-2026-09.md` is an open work plan from a full audit on 2026-09-17, to be picked up a
+piece at a time. It holds 33 findings grouped into 18 batches across 13 deploy units, with the
+sequencing, the file collisions that stop two batches being done at once, and per-batch checks to
+run before and after shipping. **Wave 0 shipped on 2026-09-18 as `v24`; everything else is open.**
+
+Read its "Where to resume" section first. If you are asked to work on the site generally, or to
+pick up improvements, that file is the backlog. Its highest-severity item, batch D, is that
+manager and site-admin codes are hashed with unsalted single-round SHA-256, and it needs a
+decision from the user before it can start.
+
+The division of labour: this file is for work still expected to happen; `docs/known-issues.md` is
+for decisions not to act, organised by trigger. When a batch is dropped rather than shipped, it
+moves there with its trigger and leaves the audit file. When everything is shipped or moved, the
+audit file gets deleted.
+
 ## Keep the README current, without being asked
 
 `README.md` is this project's memory of *why*, not just what. It is the reason a later session

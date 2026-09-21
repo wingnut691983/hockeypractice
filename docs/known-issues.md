@@ -325,3 +325,41 @@ Recorded so the next pass does not spend time here again:
 - `mcr.microsoft.com/dotnet/aspnet:8.0` does ship tzdata, verified by running the image, so
   `WhenLabel` resolves `America/Chicago` correctly in production rather than silently falling back
   to UTC.
+
+### Added by the full audit of 2026-09-17
+
+Findings from that pass are in `docs/audit-2026-09.md`. These are the things it checked and found
+nothing wrong with, recorded here so the next audit does not re-derive them. Where an entry
+overlaps one above, it is because the audit reached it independently and agreed.
+
+- **No broken internal links or dead routes.** Every `asp-action` value used across all views
+  resolves to an existing action method (both sets extracted and diffed). No orphaned views.
+- **No XSS.** `Html.Raw` appears exactly once in the codebase, at `Plan/Details.cshtml:327`,
+  wrapping `Json.Serialize` of a framework-generated local URL. No `MarkupString`, no `innerHTML`
+  with server data.
+- **No SQL injection.** `FromSql` / `ExecuteSql` / `Raw` return zero hits. The four hand-written
+  SQL statements are parameterised or literal. `DrillSearch.LikeEscape` neutralises `%` and `_`.
+- **No IDOR.** Every `FindAsync(id)` and `FirstOrDefaultAsync(x => x.Id == id)` in `Controllers/`
+  is team-scoped, directly or through a navigation. Subscription token lookups are unscoped by
+  design and use 24 bytes of CSPRNG.
+- **The href sinks are all constrained, with validate-on-save AND re-validate-on-read**
+  (`Team.cs:34-38,83-90`, `LinkExtractionService.Clean:277-289`,
+  `DrillController.ValidateFields:776`). The read-side check is what closes the hand-edited-row
+  and restored-row hole.
+- **RNG and constant-time comparison are correct.** `RandomNumberGenerator.GetString`
+  (rejection-sampled) and `CryptographicOperations.FixedTimeEquals`. No `System.Random` anywhere.
+  The weakness the audit does raise is the KDF, not the RNG or the comparison.
+- **Error pages do not leak.** `UseDeveloperExceptionPage` is behind `IsDevelopment()`, and neither
+  Dockerfile sets `ASPNETCORE_ENVIRONMENT`, so Production applies. `Error.cshtml` renders an int
+  and three static strings.
+- **No division by zero, and no 500-instead-of-404 on user-controlled lookups.**
+  `CoachController.Branding` writes an unvalidated time zone id, but `WhenLabel.NowIn:35-39`
+  catches and degrades to UTC, so it cannot break the plan pages.
+- **Cookie flags are right**: `HttpOnly`, `SameSite=Lax`, `Secure` by environment, `Path` scoped to
+  the prefix. The preview cookie at `TeamAccessService.cs:73` uses `request.IsHttps` instead, which
+  is a spoofable header, but that cookie carries no authority and can only clamp down.
+- **`viewport` is correct**: no `maximum-scale`, no `user-scalable=no`.
+- **All 12 `<img>` tags carry `alt`**, and decorative images correctly use `alt=""`.
+- **No unmitigated `position: fixed`.** The tab bar and the video modal both handle safe areas, the
+  keyboard, landscape, and print.
+- **No `TODO` / `FIXME` / `HACK` comments and no commented-out code** anywhere in the source.
