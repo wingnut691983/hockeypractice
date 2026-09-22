@@ -226,6 +226,96 @@
         </button>
     </form>
 
+    @* ── Overview picture ────────────────────────────────────────────────────────────────
+       Its own form, outside the plan-details form above, for the same nested-form reason set out
+       below — and so the Remove button can sit beside it without a formaction trick. *@
+    @if (!Model.IsNew && Model.IsDrillPlan && Model.Plan is not null)
+    {
+        <div class="hp-section">Overview picture</div>
+        <div class="hp-panel">
+            <p class="hp-muted" style="margin-top:0;font-size:.82rem;">
+                One picture of how the whole practice is laid out, shown on the plan between the
+                running order and the drills. Worth adding when stations run at the same time and
+                the order alone doesn't say where anyone goes. Optional: without one, nothing
+                shows.
+            </p>
+
+            @if (Model.Plan.HasOverview)
+            {
+                var overviewUrl = Url.Action("Overview", "Plan",
+                    new { slug, id = Model.Plan.Id });
+
+                <div class="hp-diagram-item" style="margin-bottom:.8rem;">
+                    <a href="@overviewUrl" target="_blank" rel="noopener noreferrer">
+                        <img class="hp-plan-overview" style="max-height:11rem;margin-top:0;"
+                             src="@overviewUrl" alt="The overview picture on this plan" />
+                    </a>
+                    <div class="hp-muted" style="font-size:.75rem;">
+                        @PlanStorageService.Human(Model.Plan.OverviewBytes)
+                    </div>
+                    <form method="post" asp-action="RemoveOverview" asp-route-slug="@slug"
+                          asp-route-id="@Model.Plan.Id"
+                          data-confirm="Remove the overview picture from this plan?">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
+                    </form>
+                </div>
+            }
+
+            <form method="post" enctype="multipart/form-data" id="hp-ov-form"
+                  asp-action="SetOverview" asp-route-slug="@slug" asp-route-id="@Model.Plan.Id">
+                @Html.AntiForgeryToken()
+
+                @* Same split as the drill form: the box arms a paste, and only the button inside
+                   it opens the file dialog. Clicking anywhere near a bare file input to aim a
+                   paste throws the picker open instead, which is what this avoids. *@
+                @* No role="button" and no tabindex, unlike the drill version: paste is bound to
+                   the document, so the box never needed focus to work, and making it a fake
+                   button around a real one meant Enter did something the click did not. The
+                   button inside is the only control, and :focus-within lights the box when it
+                   is reached. *@
+                <div class="hp-pastebox" id="hp-ov-pastebox">
+                    <span class="hp-pastebox-main">Click here, then paste a picture</span>
+                    <span class="hp-pastebox-sub" id="hp-ov-hint">
+                        Cmd/Ctrl + V, or drag one onto the page
+                    </span>
+                    <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-ov-pick">
+                        Choose a file instead
+                    </button>
+                </div>
+
+                <input type="file" id="hp-ov-file" name="overview" hidden accept="image/*" />
+
+                <div class="hp-paste-preview" id="hp-ov-preview" hidden
+                     data-ready-label="Ready to save">
+                    <img id="hp-ov-thumb" alt="The picture about to be saved" hidden />
+                    <div class="hp-paste-note">
+                        <span id="hp-ov-label"></span>
+                        @* type="button": a bare button in a form submits, so clearing the
+                           picture would save it instead. *@
+                        <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-ov-clear">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <span class="hp-muted" style="font-size:.8rem;">
+                    A photo or screenshot works well, and gets shrunk automatically. Images only,
+                    since it has to show on the plan itself.
+                    @if (Model.Plan.HasOverview)
+                    {
+                        <text>Saving a new one replaces the picture above.</text>
+                    }
+                </span>
+
+                <button type="submit" class="hp-btn hp-btn-sm" style="margin-top:.7rem;"
+                        data-busy="Saving…">
+                    @(Model.Plan.HasOverview ? "Replace the picture" : "Save the picture")
+                </button>
+            </form>
+        </div>
+    }
+
     @* ── Drills ──────────────────────────────────────────────────────────────────────────
        Everything below is OUTSIDE the form above, and has to stay that way. HTML doesn't allow
        nested forms: the parser throws the inner <form> away, so an Add or Remove button placed
@@ -498,6 +588,146 @@
 
 @section Scripts {
 <script>
+// Overview picture: paste, drag or pick. Ported from the drill diagram form, with one behavioural
+// change — a plan holds ONE picture, so a second paste replaces the first rather than adding to
+// it. Every id is namespaced hp-ov-*: the drill version owns the unprefixed ones, and if both
+// ever render on one page getElementById would silently bind to whichever came first.
+(function () {
+    var input = document.getElementById('hp-ov-file');
+    var form = document.getElementById('hp-ov-form');
+    if (!input || !form) return;
+
+    var pick = document.getElementById('hp-ov-pick');
+    var preview = document.getElementById('hp-ov-preview');
+    var thumb = document.getElementById('hp-ov-thumb');
+    var label = document.getElementById('hp-ov-label');
+    var clear = document.getElementById('hp-ov-clear');
+    var objectUrl = null;
+
+    // Assigning to input.files works everywhere current but throws on older Safari. If it does,
+    // leave the file picker exactly as it was and say nothing — the button still works.
+    function canInject() {
+        try { return typeof DataTransfer === 'function' && !!new DataTransfer(); }
+        catch (e) { return false; }
+    }
+
+    function releaseUrl() {
+        if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    }
+
+    function hidePreview() {
+        releaseUrl();
+        preview.hidden = true;
+        thumb.hidden = true;
+        thumb.removeAttribute('src');
+    }
+
+    function showPreview() {
+        releaseUrl();
+
+        var staged = input.files ? Array.prototype.slice.call(input.files) : [];
+        if (!staged.length) { hidePreview(); return; }
+
+        objectUrl = URL.createObjectURL(staged[0]);
+        thumb.src = objectUrl;
+        thumb.hidden = false;
+        label.textContent = preview.dataset.readyLabel || 'Ready to save';
+        preview.hidden = false;
+    }
+
+    // REPLACES what is staged. A plan has one overview, so the newest picture wins — appending
+    // the way the drill form does would stage several and silently save only the first.
+    function accept(newFiles) {
+        var incoming = (newFiles || []).filter(function (f) {
+            return f && f.type && f.type.indexOf('image/') === 0;
+        });
+        if (!incoming.length || !canInject()) return false;
+
+        try {
+            var dt = new DataTransfer();
+            dt.items.add(incoming[0]);
+            input.files = dt.files;
+        } catch (e) {
+            return false;   // leave whatever the picker already had alone
+        }
+
+        showPreview();
+        return true;
+    }
+
+    // Only acts on a paste carrying an image file. Pasting text into the title, the notes or a
+    // tag field has to keep behaving normally, so there is no preventDefault unless a file is
+    // really there.
+    document.addEventListener('paste', function (e) {
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+
+        var found = [];
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].kind !== 'file') continue;
+            var file = items[i].getAsFile();
+            if (file) found.push(file);
+        }
+        if (found.length && accept(found)) e.preventDefault();
+    });
+
+    function hasFiles(e) {
+        var types = e.dataTransfer && e.dataTransfer.types;
+        // A plain array in current browsers, a DOMStringList in older ones; the borrowed
+        // indexOf handles both.
+        return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+    }
+
+    // Bound to the document, not the form. Without preventDefault the browser opens a dropped
+    // file as a page and the half-filled editor is gone — and a near miss outside the form is
+    // exactly when that happens, so guarding only the form would leave the footgun loaded.
+    ['dragenter', 'dragover'].forEach(function (name) {
+        document.addEventListener(name, function (e) {
+            if (!hasFiles(e)) return;
+            e.preventDefault();
+            form.classList.add('hp-dropping');
+        });
+    });
+
+    ['dragleave', 'dragend'].forEach(function (name) {
+        document.addEventListener(name, function (e) {
+            // Only once the pointer has actually left the window, not on the stream of leave
+            // events fired while crossing elements inside it.
+            if (name === 'dragleave' && e.relatedTarget) return;
+            form.classList.remove('hp-dropping');
+        });
+    });
+
+    document.addEventListener('drop', function (e) {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        form.classList.remove('hp-dropping');
+
+        var files = e.dataTransfer.files;
+        if (files && files.length) accept(Array.prototype.slice.call(files));
+    });
+
+    input.addEventListener('change', showPreview);
+
+    clear.addEventListener('click', function () {
+        input.value = '';
+        hidePreview();
+    });
+
+    if (pick) {
+        pick.addEventListener('click', function () { input.click(); });
+    }
+
+    // Coming back via the Back button restores the page from the bfcache, but a file put into the
+    // input by script does not reliably come back with it. Without this the preview would sit
+    // there promising a picture that is no longer attached, and saving would quietly drop it.
+    window.addEventListener('pageshow', function (e) {
+        if (!e.persisted) return;
+        input.value = '';
+        hidePreview();
+    });
+})();
+
 (function () {
     var copy = document.getElementById('hp-copy');
     if (!copy) return;

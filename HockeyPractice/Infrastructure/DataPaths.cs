@@ -99,6 +99,34 @@ public class DataPaths
     public static bool IsPdfKey(string? key) =>
         key is { Length: 64 } && key.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 
+    /// <summary>
+    /// A plan's overview picture, in the plan's own directory beside the legacy PDF path.
+    ///
+    /// <paramref name="fileName"/> is checked rather than trusted, for the same reason
+    /// <see cref="TeamPdf"/> checks its key: it reaches here from a database column, and a restored
+    /// or hand-edited row must not be able to steer a read or a delete out of the team's tree.
+    /// <see cref="DrillDiagram"/> is the one helper here that does not do this; it predates the
+    /// rule rather than disagreeing with it, so do not copy it in preference to this.
+    /// </summary>
+    public string PlanOverview(int teamId, int planId, string fileName)
+    {
+        if (!IsOverviewName(fileName))
+            throw new ArgumentException($"'{fileName}' is not a plan overview file name.", nameof(fileName));
+
+        return Path.Combine(PlanDirectory(teamId, planId), fileName);
+    }
+
+    /// <summary>
+    /// An overview picture as we write it: "overview-" then 32 lower-case hex characters then
+    /// ".webp", nothing else. Anchored on the whole string, so no separator can appear anywhere
+    /// in it and there is nothing for a traversal to hide in.
+    /// </summary>
+    public static bool IsOverviewName(string? fileName) =>
+        fileName is { Length: 46 }
+        && fileName.StartsWith("overview-", StringComparison.Ordinal)
+        && fileName.EndsWith(".webp", StringComparison.Ordinal)
+        && fileName.AsSpan(9, 32).ToString().All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+
     public string DrillDirectory(int teamId, int drillId) =>
         Path.Combine(TeamDirectory(teamId), "drills", drillId.ToString());
 

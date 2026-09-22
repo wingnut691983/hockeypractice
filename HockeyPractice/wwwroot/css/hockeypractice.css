@@ -407,6 +407,21 @@ a.hp-card:active { transform: scale(.99); }
   object-fit: contain;
 }
 
+/* A plan's overview picture: how the whole practice is laid out, between the running order and
+   the drills. Same proportion guards as .hp-drill-diagram and for the same reasons — it sits in a
+   column flex container too, and a squashed rink diagram is worse than useless. */
+.hp-plan-overview {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: .9rem 0 .2rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  background: #fff;   /* usually line art on white; keep that behind transparency */
+  align-self: flex-start;
+  object-fit: contain;
+}
+
 /* A drill's pictures on the edit form: side by side on a desktop, stacking on a phone. */
 .hp-diagram-grid {
   display: grid;
@@ -522,7 +537,8 @@ a.hp-card:active { transform: scale(.99); }
   cursor: pointer;
 }
 .hp-pastebox:focus,
-.hp-pastebox:focus-visible {
+.hp-pastebox:focus-visible,
+.hp-pastebox:focus-within {   /* the plan overview box is not itself focusable; its button is */
   outline: 2px solid var(--hp-primary);
   outline-offset: 1px;
   border-color: var(--hp-primary);
@@ -1859,6 +1875,20 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
     break-inside: avoid;
     page-break-inside: avoid;
   }
+  /* The overview shares sheet 1 with the header, the notes, the running order and the video
+     list, so it cannot have the 130mm a lone drill diagram gets further down. Measure this
+     against a real print before changing it. */
+  .hp-printpage .hp-plan-overview {
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    max-height: 90mm;
+    border-radius: 0;
+    margin: 3mm 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   .hp-printpage .hp-print-d1 .hp-drill-diagram { max-height: 130mm; }
   .hp-printpage .hp-print-d2 .hp-drill-diagram { max-height:  70mm; }
   .hp-printpage .hp-print-dn .hp-drill-diagram { max-height:  52mm; }

@@ -192,6 +192,36 @@ public class PlanController : TeamScopedController
     }
 
     /// <summary>
+    /// Serves a plan's overview picture. Player level, because the whole point is that the team
+    /// can see it — and gated exactly like the plan itself, so a draft's picture is no more
+    /// visible than the draft.
+    ///
+    /// The rolled-back-id hazard File describes above does not reach here: the file name is a
+    /// GUID written on this row, so an id reused after a restore resolves to a name the old
+    /// directory does not contain and the existence check below refuses it. The Kind guard is
+    /// still worth keeping, because it makes that reasoning unnecessary rather than load-bearing.
+    /// </summary>
+    [HttpGet("{id:int}/overview")]
+    public async Task<IActionResult> Overview(string slug, int id)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+        if (plan.Status != PlanStatus.Published && !ctx!.IsManager) return NotFound();
+        if (plan.Kind != PlanKind.Drills || plan.OverviewFileName is null) return NotFound();
+
+        if (!_storage.OverviewExists(ctx!.Team.Id, plan.Id, plan.OverviewFileName)) return NotFound();
+
+        // PhysicalFile, not File(stream): it sets ETag and Last-Modified and handles range
+        // requests, so the picture isn't re-downloaded on every view of the plan.
+        // Always WebP — SaveOverviewAsync writes nothing else — so the type is a literal.
+        return PhysicalFile(_storage.OverviewPath(ctx.Team.Id, plan.Id, plan.OverviewFileName),
+            "image/webp");
+    }
+
+    /// <summary>
     /// Recorded once the viewer has actually rendered the document, not on page load —
     /// a bounce is not a view, and "12 of 17 viewed" is only useful if it means something.
     /// </summary>

@@ -49,6 +49,22 @@ public class PracticePlan
     public string? PdfKey { get; set; }
 
     /// <summary>
+    /// One optional picture showing the shape of the whole practice, for a plan whose drills run
+    /// as simultaneous stations and so cannot be read as a sequence. Filename including its
+    /// extension, always WebP, always server-generated, living in the plan's own directory the way
+    /// a drill diagram lives in the drill's. Null means the plan has none and nothing renders.
+    ///
+    /// Drill plans only. A PDF plan is already a document and has no running order to overview.
+    /// </summary>
+    [MaxLength(120)]
+    public string? OverviewFileName { get; set; }
+
+    /// <summary>Stored size of the overview picture, after shrinking. 0 when there is none.</summary>
+    public long OverviewBytes { get; set; }
+
+    public bool HasOverview => !string.IsNullOrEmpty(OverviewFileName);
+
+    /// <summary>
     /// Whether this plan is an uploaded PDF or built from drills. Chosen when the plan is created
     /// and not switched afterwards — the two render through entirely different paths.
     /// </summary>

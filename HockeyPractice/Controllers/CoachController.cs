@@ -341,6 +341,22 @@ public class CoachController : TeamScopedController
         foreach (var (name, norm) in ParseTags(tags))
             Db.PlanTags.Add(new PlanTag { PracticePlanId = copy.Id, Name = name, NormalizedName = norm });
 
+        if (source.Kind == PlanKind.Drills && source.OverviewFileName is not null)
+        {
+            // The overview describes THIS practice's layout, the same argument that brings a
+            // plan's own drill times across, so it comes with the copy. Bytes are copied rather
+            // than shared, so deleting either plan leaves the other's picture intact. A missing
+            // source file leaves the copy without one rather than pointing at nothing.
+            var copied = _storage.CopyOverview(ctx.Team.Id, source.Id, ctx.Team.Id, copy.Id,
+                source.OverviewFileName);
+
+            if (copied is not null)
+            {
+                copy.OverviewFileName = copied;
+                copy.OverviewBytes = source.OverviewBytes;
+            }
+        }
+
         if (source.Kind == PlanKind.Drills)
         {
             // Referencing the library, exactly as a plan built by hand does. A drill archived since
@@ -930,6 +946,72 @@ public class CoachController : TeamScopedController
         plan.Status = PlanStatus.Draft;
         await Db.SaveChangesAsync();
         return RedirectToAction(nameof(EditPlan), new { slug, id });
+    }
+
+    /// <summary>
+    /// Sets or replaces the plan's overview picture — the one showing the shape of the whole
+    /// practice, for a session run as simultaneous stations that no running order can describe.
+    /// </summary>
+    [HttpPost("plans/{id:int}/overview")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    public async Task<IActionResult> SetOverview(string slug, int id, IFormFile? overview)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+
+        // Drill plans only, the same way ReplaceFile is PDF-only and for the same reason: a stale
+        // tab or a crafted POST must not leave a row claiming one kind while carrying the other's
+        // content.
+        if (plan.Kind != PlanKind.Drills) return NotFound();
+
+        if (overview is null || overview.Length == 0)
+            return RedirectToAction(nameof(EditPlan),
+                new { slug, id, notice = "Pick a picture first." });
+
+        var saved = await _storage.SaveOverviewAsync(ctx!.Team.Id, plan.Id, overview);
+        if (!saved.Ok)
+            return RedirectToAction(nameof(EditPlan), new { slug, id, notice = saved.Error });
+
+        var previous = plan.OverviewFileName;
+
+        plan.OverviewFileName = saved.FileName;
+        plan.OverviewBytes = saved.Bytes;
+        await Db.SaveChangesAsync();
+
+        // Row first, then the old file. An orphaned file wastes quota; a row pointing at a file
+        // that no longer exists is a broken picture on every player's plan.
+        if (previous is not null && previous != saved.FileName)
+            _storage.DeleteOverview(ctx.Team.Id, plan.Id, previous);
+
+        return RedirectToAction(nameof(EditPlan),
+            new { slug, id, notice = "Overview picture saved." });
+    }
+
+    [HttpPost("plans/{id:int}/overview/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveOverview(string slug, int id)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        var plan = await Db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
+        if (plan is null) return NotFound();
+        if (plan.OverviewFileName is null) return NotFound();
+
+        var removing = plan.OverviewFileName;
+
+        plan.OverviewFileName = null;
+        plan.OverviewBytes = 0;
+        await Db.SaveChangesAsync();
+
+        _storage.DeleteOverview(ctx!.Team.Id, plan.Id, removing);
+
+        return RedirectToAction(nameof(EditPlan),
+            new { slug, id, notice = "Overview picture removed." });
     }
 
     [HttpPost("plans/{id:int}/delete")]

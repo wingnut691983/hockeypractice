@@ -127,6 +127,20 @@
         }
     }
 
+    @if (Model.Plan.HasOverview)
+    {
+        @* On sheet 1 under the running order, not with the drill cards: the page break hangs off
+           that wrapper, and the layout is what a coach wants beside the summary rather than three
+           sheets later.
+
+           No loading="lazy" and decoding="sync", unlike Details. The print button waits on
+           document.images before opening the dialog, and a lazy image below the fold that has not
+           loaded by then prints as a blank box. *@
+        <img class="hp-plan-overview" decoding="sync"
+             src="@Url.Action("Overview", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })"
+             alt="How @Model.Plan.Title is laid out on the ice" />
+    }
+
     @if (Model.Videos.Count > 0)
     {
         <div class="hp-section">Watch before practice</div>

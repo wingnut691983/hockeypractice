@@ -80,6 +80,15 @@
 
         @if (Model.Drills.Count == 0)
         {
+            @if (Model.Plan.HasOverview)
+            {
+                @* A coach can sketch the station layout before adding the drills, and it would be
+                   odd for the picture to stay hidden until they do. *@
+                <img class="hp-plan-overview" loading="lazy"
+                     src="@Url.Action("Overview", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })"
+                     alt="How @Model.Plan.Title is laid out on the ice" />
+            }
+
             <div class="hp-empty">
                 No drills in this plan yet.<br />
                 <span class="hp-muted">Your coach is still putting it together.</span>
@@ -173,6 +182,16 @@
                         <text>Fills the practice exactly.</text>
                     }
                 </div>
+            }
+
+            @if (Model.Plan.HasOverview)
+            {
+                @* Below the running order and above the drills: the summary says what the practice
+                   is made of, this says how it is laid out on the ice, and only then does the
+                   detail of each drill start. Nothing renders at all when there is no picture. *@
+                <img class="hp-plan-overview" loading="lazy"
+                     src="@Url.Action("Overview", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })"
+                     alt="How @Model.Plan.Title is laid out on the ice" />
             }
 
             <div id="hp-drills">

@@ -271,9 +271,13 @@ public class PlanStorageService
     /// Decodes, scales down if oversized, and re-encodes as WebP. Returns an error message when the
     /// upload isn't a usable image.
     /// </summary>
-    private async Task<string?> ShrinkToWebpAsync(IFormFile file, string target, CancellationToken ct)
+    private async Task<string?> ShrinkToWebpAsync(IFormFile file, string target, CancellationToken ct,
+        string? notAnImageMessage = null)
     {
-        const string NotAnImage =
+        // The default names PDF as acceptable because the drill path accepts one. The overview
+        // path does not, so it passes its own wording rather than telling a coach to try the one
+        // thing that is certain to be refused.
+        var notAnImage = notAnImageMessage ??
             "That needs to be a PDF or an image (JPEG, PNG, GIF or WebP). " +
             "A photo or screenshot of the diagram works well.";
 
@@ -311,7 +315,7 @@ public class PlanStorageService
         catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException
                                       or NotSupportedException)
         {
-            return NotAnImage;
+            return notAnImage;
         }
     }
 
@@ -341,6 +345,97 @@ public class PlanStorageService
             _log.LogWarning("Could not delete drill directory {Dir}: {Error}", dir, ex.Message);
         }
     }
+
+    /// <summary>
+    /// Stores a plan's overview picture, replacing whatever the caller had before. Images only:
+    /// the picture is rendered inline on the plan and on the printed sheet, and a PDF cannot be,
+    /// which is the one way this differs from <see cref="SaveDiagramAsync"/>.
+    ///
+    /// The caller owns the old file. This writes the new one and reports its name; deleting the
+    /// previous one only after the row is saved is what stops a failure here leaving a plan
+    /// pointing at nothing.
+    /// </summary>
+    public async Task<DiagramResult> SaveOverviewAsync(int teamId, int planId, IFormFile file,
+        CancellationToken ct = default)
+    {
+        if (file.Length == 0) return new DiagramResult(false, "That file is empty.");
+
+        if (file.Length > _options.MaxDiagramBytes)
+            return new DiagramResult(false,
+                $"That file is {Human(file.Length)}. The limit is {Human(_options.MaxDiagramBytes)}.");
+
+        if (IsFull())
+            return new DiagramResult(false,
+                "Storage is nearly full. Delete some old plans or drills before uploading more.");
+
+        // Caught before the decoder sees it, so the message can say why a PDF is refused here when
+        // it is accepted on a drill. Left to ShrinkToWebp it would come back as "not an image",
+        // which is both wrong and unhelpful.
+        if (await LooksLikePdfAsync(file, ct))
+            return new DiagramResult(false,
+                "A PDF can't be shown on the plan itself. A screenshot or photo of the layout works.");
+
+        Directory.CreateDirectory(_paths.PlanDirectory(teamId, planId));
+
+        // A fresh name each save, so a replaced picture can't be served from a stale cache. The
+        // shape is what DataPaths.IsOverviewName checks on the way back out.
+        var fileName = $"overview-{Guid.NewGuid():N}.webp";
+        var target = _paths.PlanOverview(teamId, planId, fileName);
+
+        try
+        {
+            var error = await ShrinkToWebpAsync(file, target, ct,
+                "That needs to be an image (JPEG, PNG, GIF or WebP). " +
+                "A screenshot of the practice layout works well.");
+
+            if (error is not null)
+            {
+                TryDelete(target);
+                return new DiagramResult(false, error);
+            }
+
+            return new DiagramResult(true, Bytes: new FileInfo(target).Length, FileName: fileName);
+        }
+        catch (IOException ex)
+        {
+            _log.LogError("Failed to write overview for plan {PlanId}: {Error}", planId, ex.Message);
+            TryDelete(target);
+            return new DiagramResult(false, "Could not save that file. The storage volume may be full.");
+        }
+    }
+
+    /// <summary>
+    /// Duplicates a plan's overview picture for a copied plan. Copies the bytes rather than
+    /// sharing them, so deleting either plan leaves the other's picture intact.
+    /// </summary>
+    public string? CopyOverview(int fromTeamId, int fromPlanId, int toTeamId, int toPlanId,
+        string fileName)
+    {
+        var source = _paths.PlanOverview(fromTeamId, fromPlanId, fileName);
+        if (!File.Exists(source)) return null;
+
+        try
+        {
+            Directory.CreateDirectory(_paths.PlanDirectory(toTeamId, toPlanId));
+            File.Copy(source, _paths.PlanOverview(toTeamId, toPlanId, fileName), overwrite: true);
+            return fileName;
+        }
+        catch (IOException ex)
+        {
+            _log.LogWarning("Could not copy overview for plan {PlanId}: {Error}", fromPlanId, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Removes one overview file — the old one, after a replacement is safely written.</summary>
+    public void DeleteOverview(int teamId, int planId, string fileName) =>
+        TryDelete(_paths.PlanOverview(teamId, planId, fileName));
+
+    public bool OverviewExists(int teamId, int planId, string fileName) =>
+        DataPaths.IsOverviewName(fileName) && File.Exists(_paths.PlanOverview(teamId, planId, fileName));
+
+    public string OverviewPath(int teamId, int planId, string fileName) =>
+        _paths.PlanOverview(teamId, planId, fileName);
 
     /// <summary>
     /// Duplicates a diagram for a copied drill. Copies rather than references so each team can

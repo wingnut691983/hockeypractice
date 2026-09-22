@@ -599,6 +599,19 @@ answer in September.
   second `Include` because "the tags are already loaded", they are not; they were borrowed.
   Test paging, not just a team whose whole library fits on one page.
 
+- **A filename read back out of the database is checked before it becomes a path, and the drill
+  diagram helper is the one place that doesn't do this.** `DataPaths.PlanOverview` validates the
+  name against the exact shape we write (`overview-` plus 32 lower-case hex plus `.webp`) and
+  throws otherwise, the way `TeamPdf` has always checked its key. `DataPaths.DrillDiagram`
+  concatenates its `FileName` column into a path unchecked; it predates the rule rather than
+  disagreeing with it, so copy `PlanOverview` for the next file type, not its neighbour.
+  This is not theoretical tidiness: a restore rolls rows back while only ever adding files, so a
+  row can arrive from an archive describing a file this deployment never wrote. I checked it with
+  four hand-edited rows, including `../../../../../../etc/passwd` and a name differing only in
+  extension: all four return a clean 404 with nothing in the log. The check sits in
+  `PlanStorageService.OverviewExists`, **before** the path is built, which is what makes the guard
+  fail closed instead of throwing a 500 out of a page render.
+
 ## Things worth knowing before you change anything
 
 - **The print sheet is a separate layout and deliberately records nothing.**
@@ -623,6 +636,19 @@ answer in September.
   day someone restores and finds it missing. The one exception is a directory *inside* `teams/`,
   which the recursive walk already covers — `teams/<id>/pdfs/` needed no change when plan PDFs
   moved there, and I checked a real archive rather than assuming it.
+- **A plan can carry one overview picture, and it lives in the plan's own directory.**
+  `teams/<team>/plans/<planId>/overview-<guid>.webp`, with the name on `PracticePlan.OverviewFileName`
+  and the stored size on `OverviewBytes`. It shows on the plan between the running order and the
+  drills, and on sheet 1 of the printout, for a practice run as simultaneous stations that no
+  running order can describe. Drill plans only, guarded in both the upload and the serve action:
+  a PDF plan is already a document, and letting one carry an overview would leave a row claiming
+  one kind while holding the other's content.
+  Per the rule above I checked rather than assumed: it is inside `teams/`, so the archive's
+  recursive walk already captures it, `PlanStorageService.DeletePlan` already removes it with the
+  plan's directory, and `DataPaths.UsedBytes()` already counts it. **No backup, delete or quota
+  code changed.** Images only, because it renders inline; a PDF is refused with a message that
+  says so rather than the drill path's "needs to be a PDF or an image".
+
 - **Plan PDFs live under the hash of their contents, in two layouts.** A plan's file is
   `teams/<team>/pdfs/<sha256>.pdf`, named by what is in it, and `PracticePlan.PdfKey` holds that
   name. Two plans holding the same document — what duplicating a plan produces — share one file,
