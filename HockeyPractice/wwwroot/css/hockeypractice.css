@@ -1768,7 +1768,20 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
    rather than the mechanism. Keep both. */
 @media print {
 
-  @page { margin: 12mm; }
+  /* Horizontal and vertical are deliberately DIFFERENT, and the vertical one must not be
+     raised without redoing a measurement.
+
+     12mm vertical is load-bearing: the diagram caps further down (130/70/52mm) were measured
+     against the 255mm of content height that 12mm top and bottom leaves on US Letter. Raise it
+     and those caps no longer hold, a tall drill splits across two sheets, and the failure this
+     whole print sheet exists to prevent comes straight back.
+
+     16mm horizontal, because a drill card's border sits flush against the page box (the card
+     has no side margin and the shell's padding is dropped below), and at 12mm it was landing
+     inside the non-printable edge on some printers and coming out with no border down the
+     side. Width has no such budget: the diagrams are capped on HEIGHT and scale to width, so a
+     narrower sheet makes them shorter, never taller. */
+  @page { margin: 12mm 16mm; }
 
   /* Ink on white, whatever the device's colour scheme. --hp-muted is darkened from #5c6879:
      a mid grey that reads fine on a backlit screen goes to mush on a rink printer. */
@@ -1808,7 +1821,11 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   .hp-footer, .hp-zoom, .hp-player, .hp-plan-actions, .hp-warn-banner,
   .hp-viewer-wrap, .hp-videos, .hp-print-bar { display: none !important; }
 
-  .hp-printpage .hp-shell { max-width: none; margin: 0; padding: 0; }
+  /* The side padding is insurance rather than layout: a print dialog set to "None" or
+     "Minimum" margins overrides the @page rule above entirely, and then the card border is back
+     on the paper edge. 3mm is not enough to save it from a printer's hardware margin, but it is
+     what stops the border being the very first thing clipped. */
+  .hp-printpage .hp-shell { max-width: none; margin: 0; padding: 0 3mm; }
 
   /* Every URL that matters is printed as text beside its label, so the anchors left on the
      page are decoration. Also resets the #7fb3ff dark-mode link colour. */
@@ -1844,8 +1861,9 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
      which is exactly the failure this whole feature exists to stop. So the picture is capped.
 
      Sized for US LETTER, not A4: Letter is 279.4mm against A4's 297mm, and it is the paper
-     that will be in the tray. At 12mm margins Letter leaves 255mm of content height, and the
-     card head, padding and margins take ~27mm of that. Sizing for A4 would push 18mm of
+     that will be in the tray. At 12mm VERTICAL margins Letter leaves 255mm of content height,
+     and the card head, padding and margins take ~27mm of that. The horizontal margin is wider
+     and does not enter this budget; see the @page rule at the top of this block. Sizing for A4 would push 18mm of
      overflow straight back into the split.
 
      These three numbers were MEASURED, not budgeted, by printing a real six-drill plan to

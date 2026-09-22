@@ -278,6 +278,18 @@ answer in September.
   If you change a cap, re-print a real six-drill plan and check that no page comes out with no
   text on it — that is the signature of a split card.
 
+  **The page margin is part of that measurement, which is why it is asymmetric.**
+  `@page { margin: 12mm 16mm }`. The 12mm is vertical and load-bearing: the caps were measured
+  against the 255mm of content height it leaves on Letter, so raising it silently invalidates
+  all three and brings the split back. The 16mm is horizontal and had to go up from 12mm,
+  because a drill card has no side margin and the print sheet drops the shell's padding, so the
+  card's border sat right on the page box and some printers clipped it, giving a card with no
+  border down one side. Measured by printing to PDF and finding the first inked pixel: 11.9mm
+  from the paper edge before, 18.8mm after, with the 3mm of shell padding added as insurance
+  against a print dialog set to "None" margins, which overrides `@page` entirely. Width carries
+  no budget, because diagrams are capped on height and scale to width, so a narrower sheet makes
+  them shorter and never taller. Do not tidy the two values into one.
+
   The other half of that rule: **never pin both dimensions of a printed diagram.** The caps keep
   `width: auto; height: auto` so `max-width` and `max-height` resolve together, and the
   three-or-more grid needs `justify-items: start`, because a grid item defaults to `stretch`,
