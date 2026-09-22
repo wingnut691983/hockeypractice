@@ -299,17 +299,19 @@
                     </div>
                 </div>
 
-                <span class="hp-muted" style="font-size:.8rem;">
+                @* A block <p>, not a <span>: this form is a plain block, so an inline hint left
+                   the button sitting on the end of the last line of text instead of under it.
+                   Same shape as the Replace the PDF panel below. *@
+                <p class="hp-muted" style="font-size:.8rem;margin:.6rem 0 .8rem;">
                     A photo or screenshot works well, and gets shrunk automatically. Images only,
                     since it has to show on the plan itself.
                     @if (Model.Plan.HasOverview)
                     {
                         <text>Saving a new one replaces the picture above.</text>
                     }
-                </span>
+                </p>
 
-                <button type="submit" class="hp-btn hp-btn-sm" style="margin-top:.7rem;"
-                        data-busy="Saving…">
+                <button type="submit" class="hp-btn hp-btn-sm" data-busy="Saving…">
                     @(Model.Plan.HasOverview ? "Replace the picture" : "Save the picture")
                 </button>
             </form>
