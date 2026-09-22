@@ -1,3 +1,4 @@
+using HockeyPractice.Controllers;
 using HockeyPractice.Persistence;
 using HockeyPractice.Infrastructure;
 using HockeyPractice.Services;
@@ -124,20 +125,48 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("code-entry", http =>
     {
-        // Populated because UseRateLimiter runs after UseRouting. Requests with no slug are the
-        // site-admin login, which shares one bucket: there is only ever one admin code, and at
-        // 14 characters it is not the thing anyone is guessing.
+        // Populated because UseRateLimiter runs after UseRouting.
         var slug = http.Request.RouteValues["slug"] as string;
-        var key = string.IsNullOrWhiteSpace(slug)
-            ? "site-admin"
-            : "team:" + slug.ToLowerInvariant();
 
-        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        if (!string.IsNullOrWhiteSpace(slug))
         {
-            PermitLimit = 30,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0
-        });
+            return RateLimitPartition.GetFixedWindowLimiter(
+                "team:" + slug.ToLowerInvariant(), _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                });
+        }
+
+        // No slug means the site-admin sign-in, and it used to share ONE bucket for everyone.
+        // That capped guessing, and it also handed any anonymous caller a way to keep the real
+        // admin out: thirty posts a minute to /admin/login, forever, and the person who needs to
+        // get in and lift a stuck maintenance pause meets a 429 every time. Locking the operator
+        // out of their own recovery tool is the worse of the two failures.
+        //
+        // Partitioned per browser now, on a cookie the sign-in page sets. That cookie is NOT a
+        // credential and proves nothing about who is holding it; it exists only so one caller's
+        // attempts cannot spend another's budget, which is what gives the admin a lane nobody
+        // else can fill.
+        //
+        // An attacker can fetch a fresh cookie and get a fresh bucket, so this deliberately does
+        // NOT cap total attempts from the internet. It cannot: without a trustworthy client
+        // identity, any single shared budget is one an attacker can exhaust, and the gateway does
+        // not reliably pass X-Forwarded-For (see the ForwardedHeaders note further down), so the
+        // address is not that identity. What caps guessing instead is the code's own length,
+        // enforced at startup by SiteAdminController.MinAdminCodeLength rather than assumed the
+        // way this comment used to assume it. The two changes only work as a pair.
+        var client = http.Request.Cookies[SiteAdminController.ClientCookie];
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            string.IsNullOrWhiteSpace(client) ? "site-admin:no-cookie" : "site-admin:" + client,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
     });
 });
 

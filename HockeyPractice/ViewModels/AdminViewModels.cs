@@ -12,6 +12,13 @@ public class AdminViewModel
     public long QuotaBytes { get; init; }
     public bool Configured { get; init; }
 
+    /// <summary>
+    /// Set when SITE_ADMIN_CODE is present but was refused, so the sign-in page can say which of
+    /// the two it is. "Not set" and "set but rejected" look identical from outside and need
+    /// opposite fixes.
+    /// </summary>
+    public string? ConfigError { get; init; }
+
     /// <summary>Whether the site is refusing writes right now, and for how much longer.</summary>
     public bool WritesPaused { get; init; }
     public int PauseMinutesLeft { get; init; }

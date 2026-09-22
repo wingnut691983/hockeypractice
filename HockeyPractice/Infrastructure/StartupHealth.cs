@@ -19,4 +19,14 @@ public class StartupHealth
     public bool MigrationsFailed => MigrationError is not null;
 
     public void RecordMigrationFailure(string error) => MigrationError = error;
+
+    /// <summary>
+    /// Null when configuration is usable. Set when a value is present but refused, which is worse
+    /// than absent: absent fails closed and says so on the sign-in page, whereas a refused value
+    /// looks configured from the outside and leaves the operator wondering why their code stopped
+    /// working.
+    /// </summary>
+    public string? ConfigError { get; private set; }
+
+    public void RecordConfigProblem(string error) => ConfigError = error;
 }

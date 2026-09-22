@@ -77,21 +77,86 @@ public class SiteAdminController : Controller
         _lifetime = lifetime;
         _log = log;
 
-        var code = config["SITE_ADMIN_CODE"];
-        _adminCodeHash = string.IsNullOrWhiteSpace(code) ? null : Security.HashCode(code);
+        // A floor, enforced rather than hoped for. The rate limiter on the sign-in form gives the
+        // admin their own budget rather than a shared one, which means an attacker can no longer
+        // lock the admin out — but it also means the limiter is no longer what caps guessing.
+        // The code's own length is, so it cannot stay a value nobody checks. 12 is short enough
+        // not to reject anything a person would actually choose and long enough that guessing is
+        // not the way in.
+        //
+        // Refused, not truncated or accepted with a warning: a short code that still works is a
+        // warning nobody reads. This fails closed the same way an unset one does.
+        var code = config["SITE_ADMIN_CODE"]?.Trim();
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            _adminCodeHash = null;
+        }
+        else if (code.Length < MinAdminCodeLength)
+        {
+            _adminCodeHash = null;
+            health.RecordConfigProblem(
+                $"SITE_ADMIN_CODE is set but is shorter than {MinAdminCodeLength} characters, " +
+                "so admin sign-in is closed. Set a longer one and restart.");
+        }
+        else
+        {
+            // HashSecret, not HashCode: this one keeps its case. See Security.HashSecret.
+            _adminCodeHash = Security.HashSecret(code);
+        }
     }
 
     /// <summary>
     /// TempData key for a notice that must NOT travel in the URL, because it carries a code.
     /// See <see cref="SecretNotice"/>.
     /// </summary>
+    /// <summary>Shortest SITE_ADMIN_CODE this app will accept. See the constructor for why.</summary>
+    public const int MinAdminCodeLength = 12;
+
+    /// <summary>
+    /// Names the browser for the sign-in rate limiter, and does nothing else.
+    ///
+    /// NOT a credential: it grants nothing, it is never checked against anything, and forging one
+    /// buys an attacker only their own rate-limit bucket. It exists so that one caller hammering
+    /// /admin/login cannot spend the budget the real admin needs to get in. See the "code-entry"
+    /// policy in Program.cs for why the address could not be used for this instead.
+    /// </summary>
+    public const string ClientCookie = "hp_admin_client";
+
+    /// <summary>
+    /// Gives this browser its own rate-limit lane, once, before it has anything to sign in with.
+    /// Issued on the sign-in page rather than on the POST, so the first attempt is already in its
+    /// own bucket rather than sharing the one every anonymous caller lands in.
+    /// </summary>
+    private void EnsureClientCookie()
+    {
+        if (!string.IsNullOrWhiteSpace(Request.Cookies[ClientCookie])) return;
+
+        Response.Cookies.Append(ClientCookie, Security.NewToken(), new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = Request.IsHttps,
+            IsEssential = true,
+            Path = string.IsNullOrEmpty(Request.PathBase) ? "/" : Request.PathBase.Value!,
+            MaxAge = TimeSpan.FromDays(365)
+        });
+    }
+
     private const string SecretNoticeKey = "hp:notice";
 
     [HttpGet("")]
     public async Task<IActionResult> Index(string? notice)
     {
         if (!_access.IsSiteAdmin(User))
-            return View("AdminLogin", new AdminViewModel { Configured = _adminCodeHash is not null });
+        {
+            EnsureClientCookie();
+            return View("AdminLogin", new AdminViewModel
+            {
+                Configured = _adminCodeHash is not null,
+                ConfigError = _health.ConfigError
+            });
+        }
 
         // A code-bearing notice arrives out of band; ordinary ones still ride the query string,
         // where they are harmless and survive a reload.
@@ -125,11 +190,16 @@ public class SiteAdminController : Controller
     [EnableRateLimiting("code-entry")]
     public async Task<IActionResult> Login(string adminCode)
     {
-        if (_adminCodeHash is null || !Security.CodeMatches(adminCode, _adminCodeHash))
+        if (_adminCodeHash is null || !Security.SecretMatches(adminCode, _adminCodeHash))
         {
+            // A wrong code re-renders the form, so make sure a browser that arrived without the
+            // cookie leaves with one. Otherwise every retry stays in the shared bucket.
+            EnsureClientCookie();
+
             return View("AdminLogin", new AdminViewModel
             {
                 Configured = _adminCodeHash is not null,
+                ConfigError = _health.ConfigError,
                 Error = _adminCodeHash is null
                     ? "Site admin is not configured. Set SITE_ADMIN_CODE and restart."
                     : "That code didn't work."

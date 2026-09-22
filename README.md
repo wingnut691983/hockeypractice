@@ -117,8 +117,11 @@ tangled and aren't anymore.
 ## Running locally
 
 ```sh
-SITE_ADMIN_CODE=devcode dotnet run --project HockeyPractice
+SITE_ADMIN_CODE=devcode-local-only dotnet run --project HockeyPractice
 ```
+
+The code has a minimum length (see Configuration below), which is why this example is not the
+`devcode` it used to be: anything shorter is refused at startup and the sign-in page tells you so.
 
 Then open http://localhost:8080/admin, sign in with that code, and create a team. The manager
 code is shown once, on creation, and can't be read back later — only re-issued. The team
@@ -132,7 +135,7 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 
 | Variable | Required | Notes |
 |---|---|---|
-| `SITE_ADMIN_CODE` | yes | Gates `/admin`. Fails closed — unset means no one can sign in. |
+| `SITE_ADMIN_CODE` | yes | Gates `/admin`. Fails closed: unset means no one can sign in. **At least 12 characters**, enforced at startup, and **case-sensitive**. A shorter one is refused rather than accepted with a warning, and the sign-in page says so rather than claiming the variable is unset. |
 | `DATA_DIR` | no | Defaults to `/persisted-data`. Set to `../.localdata` in development. |
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
 | `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged instead of sent and the signup box is hidden. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
@@ -610,6 +613,33 @@ answer in September.
   1 renders 14, which is exactly the tag count on that plan's drills. If you are tempted to drop the
   second `Include` because "the tags are already loaded", they are not; they were borrowed.
   Test paging, not just a team whose whole library fits on one page.
+
+- **The admin sign-in limiter is partitioned per browser, and that is what stops an attacker
+  locking the operator out.** It used to be one shared bucket: thirty posts a minute to
+  `/admin/login` from anyone at all, and the person who needs to get in and lift a stuck
+  maintenance pause meets a 429 every time. I reproduced it before changing anything, and then
+  again afterwards to be sure the fix was the thing that mattered: under the old code an attacker
+  sending 35 attempts left the real admin, typing the correct code, with **429**; under the new
+  one the attacker exhausts only their own bucket after 10 and the admin signs in normally.
+  The partition key is a cookie the sign-in page sets. **It is not a credential**, grants nothing
+  and is never checked against anything, so do not be tempted to "secure" it. An attacker can
+  fetch a fresh one and get a fresh bucket, which means this deliberately does not cap total
+  attempts from the internet, and it cannot: without a trustworthy client identity any single
+  shared budget is one an attacker can exhaust, and the gateway does not reliably pass
+  `X-Forwarded-For`, which is the same reason team code entry partitions on the slug.
+  What caps guessing now is the code's own length, enforced at startup rather than assumed.
+  **The two halves only work as a pair, so do not relax either on its own.**
+
+- **The site admin code keeps its case; team codes do not.** `Security.HashCode` upper-cases,
+  which is right for a team code (uppercase alphabet by construction, and a fifteen-year-old
+  reading one off a phone screen should not be punished for the shift key) and wrong for an
+  operator's passphrase, where it silently discarded close to a bit per letter. `HashSecret` is
+  the case-preserving one and only the admin code uses it. This needed no migration and never
+  will: the admin hash is derived from the environment variable at startup and compared against a
+  hash of what was just typed, so both sides move together on the next boot. **The manager codes
+  are the opposite case** and are why the wider hashing work is still open: those hashes are
+  stored, come back from archives, and cannot be changed without a dual-read window longer than
+  the archive retention.
 
 - **A filename read back out of the database is checked before it becomes a path, and the drill
   diagram helper is the one place that doesn't do this.** `DataPaths.PlanOverview` validates the

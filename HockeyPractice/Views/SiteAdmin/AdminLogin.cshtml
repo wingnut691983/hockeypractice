@@ -8,7 +8,13 @@
     {
         <div class="hp-error">@Model.Error</div>
     }
-    @if (!Model.Configured)
+    @if (Model.ConfigError is not null)
+    {
+        @* Present but refused. Saying "isn't set" here would send someone to check a variable
+           that is already there and looks fine. *@
+        <div class="hp-notice">@Model.ConfigError</div>
+    }
+    else if (!Model.Configured)
     {
         <div class="hp-notice">
             <code>SITE_ADMIN_CODE</code> isn't set, so admin is closed. Set it and restart the app.
