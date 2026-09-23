@@ -1974,8 +1974,10 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
     page-break-inside: avoid;
   }
   /* The overview shares sheet 1 with the header, the notes, the running order and the video
-     list, so it cannot have the 130mm a lone drill diagram gets further down. Measure this
-     against a real print before changing it. */
+     list, so it cannot have the 130mm a lone drill diagram gets further down. 90mm was reasoned
+     rather than measured when it was written, and confirmed on a real printer on 2026-09-23.
+     Re-check on paper if you change it; a PDF preview will not tell you about a printer's
+     non-printable edge. */
   .hp-printpage .hp-plan-overview {
     max-width: 100%;
     width: auto;

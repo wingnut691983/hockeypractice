@@ -293,8 +293,10 @@ answer in September.
   all three and brings the split back. The 16mm is horizontal and had to go up from 12mm,
   because a drill card has no side margin and the print sheet drops the shell's padding, so the
   card's border sat right on the page box and some printers clipped it, giving a card with no
-  border down one side. Measured by printing to PDF and finding the first inked pixel: 11.9mm
-  from the paper edge before, 18.8mm after, with the 3mm of shell padding added as insurance
+  border down one side. **Confirmed fixed on a real printer on 2026-09-23**, which is the test
+  that counts: a PDF preview cannot tell you where a given printer stops putting ink. Measured by
+  printing to PDF and finding the first inked pixel: 11.9mm from the paper edge before, 18.8mm
+  after, with the 3mm of shell padding added as insurance
   against a print dialog set to "None" margins, which overrides `@page` entirely. Width carries
   no budget, because diagrams are capped on height and scale to width, so a narrower sheet makes
   them shorter and never taller. Do not tidy the two values into one.
