@@ -804,6 +804,40 @@ answer in September.
 
 ## Deploying
 
+### What every response now carries
+
+Three pieces of middleware in `Program.cs`, added together because each one touches every
+response and middleware is order-sensitive:
+
+- **Response compression.** Brotli and gzip. Measured on `/whats-new`: 47.1 KB raw, 13.6 KB
+  brotli. It sits **below** the `/health` branch on purpose, because that branch is terminal and
+  the kubelet hits it every 5 seconds, and **above** everything that writes a body, because
+  compression has to wrap a response before it is produced.
+- **Static `Cache-Control`.** Two tiers on `UseStaticFiles`: a URL carrying `?v=` (what
+  `asp-append-version` writes) gets a year and `immutable`, anything else gets an hour. Before
+  this there was no `max-age` at all, so every asset was revalidated on every navigation.
+- **`frame-ancestors 'self'`**, plus `X-Frame-Options: SAMEORIGIN` for anything older.
+
+### Three things about that which are easy to undo
+
+- **`EnableForHttps = true` is required here, and its absence would be silent.** TLS terminates
+  at the gateway, but `UseForwardedHeaders` runs first and rewrites `Request.Scheme` to https from
+  `X-Forwarded-Proto`. Without the flag the middleware declines every request and compresses
+  nothing while looking perfectly configured. The flag exists because of BREACH, which needs a
+  secret and attacker-controlled input in one compressed response; ASP.NET Core randomises
+  antiforgery tokens per response, which covers the obvious target.
+- **The two compression levels differ deliberately.** Brotli is `Optimal`, gzip is `Fastest`.
+  Measured, best of three warmed requests: brotli Optimal 13.6 KB at 33 ms against gzip Fastest
+  15.8 KB at 34 ms, and on the 2.3 MB `pdf.worker.mjs`, 517 KB at 50 ms against 634 KB at 52 ms.
+  .NET maps brotli `Optimal` to a mid quality, not the pathological 11 it is famous for. **Do not
+  make them consistent:** setting both to `Fastest` hands browsers the worse of the two, because
+  brotli Fastest (16.9 KB) loses to gzip Fastest and is still the one browsers prefer.
+- **`frame-ancestors` is not the CSP that is deferred.** It governs who may frame this site, which
+  is the clickjacking direction. `frame-src`, which governs what this site may embed, is the half
+  that needs testing against the pdf.js viewer, and a full CSP additionally needs nonces because
+  every page carries inline script. Verified that `'self'` leaves the viewer working: a PDF plan
+  renders in its iframe with the header present.
+
 Deployment targets UpTurtle; see `AGENTS.md` for the platform contract and the exact tool order.
 The app slug is pinned in `upturtle.yaml`. Two Dockerfiles exist:
 

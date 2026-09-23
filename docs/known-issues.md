@@ -195,6 +195,13 @@ wait a minute because their teammates tapped first.
 
 ---
 
+### 9. Nothing is compressed, on any page — FIXED 23 September 2026
+
+Closed by audit batch E, shipped in the response-middleware change. Brotli and gzip, with
+`EnableForHttps` set because `UseForwardedHeaders` makes the app believe it is serving https.
+Measured after: `/whats-new` 47.1 KB raw to 13.6 KB brotli. `/health` is deliberately above the
+compression middleware and stays uncompressed. The original entry is kept below for the reasoning.
+
 ### 9. Nothing is compressed, on any page
 
 There is no `UseResponseCompression` in `Program.cs`, and production confirms it: a request to
@@ -283,6 +290,12 @@ Individually not worth a commit; worth sweeping the next time each file is open.
 - `SiteAdminController.RestoreArchive` does not catch exceptions from `IBackupStore.ListAsync` or
   `BackupRunner.FetchAsync`. A transient R2 error gives the admin a raw 500 instead of the careful
   message every other failure path in that controller produces.
+- ~~No frame-ancestors header anywhere.~~ **Shipped 23 September 2026** as
+  `Content-Security-Policy: frame-ancestors 'self'` plus `X-Frame-Options: SAMEORIGIN`. What
+  remains deferred is the rest of a CSP, and the reasoning below is about that half: `frame-src`
+  is what interacts with the pdf.js iframe, and a full policy needs nonces for the inline script
+  on every page. Confirmed `'self'` does not break the viewer: a PDF plan renders in its iframe
+  with the header present. Original note:
 - No frame-ancestors header anywhere. `nosniff` and `Referrer-Policy: strict-origin` were added
   on 2026-09-10 and are no longer open; the reasoning that closed them (the browser default leaks
   the full URL same-origin, and the header has to sit below `UseExceptionHandler`) is in README's

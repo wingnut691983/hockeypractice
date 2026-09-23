@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,6 +87,52 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["RESEND_API_KEY"]))
     builder.Services.AddScoped<IEmailSender, ResendEmailSender>();
 else
     builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
+// Nothing was compressed before this, on a site whose stated constraint is that players load it
+// on rink wifi. Measured on /whats-new: 47 KB raw, about 12 KB gzipped. Roughly 24 KB of every
+// page is the layout's four inline script blocks, identical on every page and never cached
+// separately precisely because they are inline.
+builder.Services.AddResponseCompression(options =>
+{
+    // The app sits behind a gateway that terminates TLS, but UseForwardedHeaders runs before this
+    // and rewrites Request.Scheme to https from X-Forwarded-Proto. Without this flag the
+    // middleware would then decline every request and compress nothing, while looking configured.
+    //
+    // The reason the flag exists is BREACH, which needs a secret and attacker-controlled input in
+    // one compressed response. ASP.NET Core's antiforgery tokens are randomised per response,
+    // which is the specific defence for the obvious target here.
+    options.EnableForHttps = true;
+
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+
+    // The defaults miss the two that matter most here: the pdf.js bundle is .mjs and its
+    // worker alone is 2.3 MB, and the viewer ships wasm.
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "text/javascript",
+        "application/javascript",
+        "image/svg+xml",
+        "application/wasm"
+    });
+});
+
+// Different levels for the two, which is not an oversight. Measured on this machine, best of
+// three warmed requests, because nothing caches the compressed bytes and every request pays:
+//
+//                      raw        gzip Fastest   brotli Optimal
+//   /whats-new         47.1 KB    15.8 KB 34ms   13.6 KB 33ms
+//   pdf.worker.mjs     2383 KB     634 KB 52ms    517 KB 50ms
+//
+// Brotli at Optimal is both smaller and no slower than gzip here: .NET maps it to a mid quality
+// rather than the pathological 11 that makes Brotli notorious. Browsers prefer it, so that is
+// what almost everyone gets. Gzip is the fallback for whatever does not, and it stays at Fastest
+// because gzip Optimal bought a further 2 KB for several times the CPU.
+//
+// Do not "make these consistent". Setting both Fastest gives browsers the WORSE of the two,
+// because brotli Fastest (16.9 KB) loses to gzip Fastest (15.8 KB) and is still preferred.
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+
 builder.Services.AddControllersWithViews();
 
 // Brute-forcing a 6-character team code is the only real attack surface here.
@@ -221,6 +269,16 @@ app.MapWhen(ctx => ctx.Request.Path == "/health", branch =>
         await ctx.Response.WriteAsync("ok");
     }));
 
+// Compression goes here, and the position is load-bearing in both directions.
+//
+// BELOW the /health branch above, deliberately: that branch is terminal, so the probe never
+// reaches this and never pays to compress "ok". The kubelet hits it every 5 seconds and a slow
+// health handler gets the pod restarted.
+//
+// ABOVE everything that writes a body, because compression has to wrap the response before it is
+// produced: the static files below, the error pages, and every view.
+app.UseResponseCompression();
+
 if (!string.IsNullOrEmpty(pathPrefix))
     app.UsePathBase(pathPrefix);
 
@@ -270,6 +328,25 @@ app.Use(async (context, next) =>
 {
     context.Response.Headers["Referrer-Policy"] = "strict-origin";
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+    // frame-ancestors ONLY, and deliberately not a Content-Security-Policy beyond it.
+    //
+    // This controls who may put THIS site in a frame, which is the clickjacking direction: every
+    // page including /admin was framable by anyone, while the layout wires single-click
+    // destructive actions through data-confirm (delete team, delete player, delete plan, the
+    // REPLACE restore).
+    //
+    // A full CSP stays deferred and the reason recorded in known-issues is still right, but it is
+    // about the opposite direction: frame-SRC governs what this site may embed, and the plan page
+    // embeds the pdf.js viewer, so that half needs testing against the viewer. It also needs
+    // nonces first, because every page carries inline script. 'self' keeps the viewer working:
+    // it is framed by its own origin.
+    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'self'";
+
+    // The pre-CSP equivalent, for anything that does not honour frame-ancestors. Browsers that
+    // understand both prefer the CSP, so the two cannot disagree in practice.
+    context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+
     await next();
 });
 
@@ -284,7 +361,28 @@ contentTypes.Mappings[".wasm"] = "application/wasm";
 contentTypes.Mappings[".icc"]  = "application/vnd.iccprofile";
 contentTypes.Mappings[".bcmap"] = "application/octet-stream";
 
-app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
+// Every static asset was revalidated on every navigation: the middleware sets ETag and
+// Last-Modified but no max-age, so the browser asked again each time and was told "unchanged".
+// That is a full round trip per asset per page, on rink wifi, for the stylesheet, the logos, the
+// icons and all ~4.5 MB of the pdf.js viewer.
+//
+// Two tiers, split on whether the URL carries a version. asp-append-version writes ?v=<hash>, so
+// a versioned URL names exactly one immutable file and can be cached for a year: a change to the
+// file changes the hash, which changes the URL. Anything without one may be replaced in place, so
+// it gets an hour: long enough to drop the repeat round trips inside a session, short enough that
+// swapping a logo is not invisible for a day. The two logos are the assets that most want
+// versioning; see audit finding 1.6.
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypes,
+    OnPrepareResponse = ctx =>
+    {
+        var versioned = ctx.Context.Request.Query.ContainsKey("v");
+        ctx.Context.Response.Headers["Cache-Control"] = versioned
+            ? "public, max-age=31536000, immutable"
+            : "public, max-age=3600";
+    }
+});
 
 // Refuses anything that could change data while a backup is being taken or restored. After
 // UsePathBase, so its allowlist can be written against plain paths; after static files, so the
