@@ -137,6 +137,9 @@
                                                data-group="hp-copy"
                                                disabled="@(!candidate.CanCopy)" />
                                         <span class="grow" style="min-width:0;">
+                                            @* Stays a plain row on purpose: this one is wrapped in
+                                               a <label> around a checkbox, and a <details> inside
+                                               a label fights it for the tap. *@
                                             @await Html.PartialAsync("_DrillRow", candidate.Card)
 
                                             @if (candidate.Status == CopyStatus.AlreadyCopied)

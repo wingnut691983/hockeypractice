@@ -73,7 +73,10 @@
                 @foreach (var card in Model.Drills)
                 {
                     <li style="flex-wrap:wrap;align-items:flex-start;">
-                        @await Html.PartialAsync("_DrillRow", card)
+                        @* _DrillPeek, not _DrillRow: the row opens in place so a coach can read a
+                           drill without going into the edit form and losing their page and
+                           filters. Edit stays its own button, outside the summary. *@
+                        @await Html.PartialAsync("_DrillPeek", card)
                         <a class="hp-btn hp-btn-quiet hp-btn-sm"
                            asp-action="Edit" asp-route-slug="@slug" asp-route-id="@card.Drill.Id">Edit</a>
                     </li>

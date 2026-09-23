@@ -14,7 +14,10 @@
 
     @if (snippet is not null)
     {
-        <div class="hp-muted" style="font-size:.85rem;">@snippet</div>
+        @* The class is a styling hook, not a context flag: _DrillPeek hides this while a peek is
+           open, because the body below repeats it in full. Still context-free, which is the rule
+           that matters here. *@
+        <div class="hp-drill-snippet hp-muted" style="font-size:.85rem;">@snippet</div>
     }
 
     @* The card's time, not the drill's. This partial renders library rows, picker rows AND the

@@ -537,6 +537,45 @@
     }
 })();
 </script>
+
+<script>
+// ── Drill peek: load a diagram only once its row is opened ───────────────
+// Its own IIFE, same reasoning as the blocks above.
+//
+// _DrillPeek renders diagrams with data-src and no src, because a library page is twelve drills
+// and a drill holds up to six pictures. Fetching all of them up front is 72 requests, and each
+// one runs the whole Diagram action: a team resolve, a diagram query and a file check. So the
+// src is withheld until a coach actually opens that row.
+//
+// This is NOT done with loading="lazy". That is a hint the spec lets a browser start early, the
+// closed-<details> mechanism has changed implementation recently, and WebKit has had bugs here
+// in both directions, including the one where the image never loads at all and the peek opens to
+// empty boxes. Withholding the attribute is the only version that behaves the same everywhere.
+//
+// Bound to 'toggle' rather than click so the browser keeps owning tap-versus-scroll, which is
+// what stops a row opening when a finger flicks past it. toggle does NOT bubble, so the listener
+// has to be registered in the capture phase; without the third argument this silently never runs.
+(function () {
+    try {
+        document.addEventListener('toggle', function (e) {
+            var peek = e.target;
+            if (!peek || peek.tagName !== 'DETAILS' || !peek.open) return;
+            if (!peek.classList || !peek.classList.contains('hp-peek')) return;
+
+            var pending = peek.querySelectorAll('img[data-src]');
+            for (var i = 0; i < pending.length; i++) {
+                // One shot: drop the attribute so re-opening the row costs nothing and the
+                // browser's own cache serves it.
+                pending[i].src = pending[i].getAttribute('data-src');
+                pending[i].removeAttribute('data-src');
+            }
+        }, true);
+    } catch (e) {
+        // No capture support: the peek still opens and reads, it just shows no pictures.
+        // The <noscript> block in the partial covers a browser with no script at all.
+    }
+})();
+</script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

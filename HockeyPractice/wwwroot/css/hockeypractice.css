@@ -407,6 +407,86 @@ a.hp-card:active { transform: scale(.99); }
   object-fit: contain;
 }
 
+/* ── Drill peek ─────────────────────────────────────────────────────────────
+   A drill row in the library or the plan picker, openable in place.
+
+   flex-basis:100% when open is the whole layout trick, and it is the same idiom .hp-plan-time
+   uses further up: the row already wraps, so an open peek claims the full width and the Edit or
+   Add button drops onto the line beneath it. Collapsed, it sits exactly where it always did.
+   The alternative, pinning the button with position:absolute, needs a hard-coded width reserve
+   that differs between the two call sites and breaks the moment anyone adds a third button. */
+/* flex-basis 0, not auto, and it matters: .hp-list .grow (the class this replaces in the row)
+   is flex:1, i.e. basis 0, which is what lets the row shrink so the Edit or Add button stays
+   beside it. With basis auto the details sizes to its content and shoves the button onto its own
+   line even when collapsed, changing every row on the page. */
+.hp-peek { flex: 1 1 0; min-width: 0; }
+.hp-peek[open] { flex-basis: 100%; }
+
+/* Killing the disclosure triangle takes all three. display:flex removes the list-item box the
+   marker hangs off, list-style:none covers anything that still draws one, and the -webkit-
+   pseudo covers Safari before 17. The last two are the pair .hp-menu > summary already uses. */
+.hp-peek-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  list-style: none;
+  cursor: pointer;
+  padding: .1rem 0;
+}
+.hp-peek-summary::-webkit-details-marker { display: none; }
+
+.hp-peek-grow { flex: 1; min-width: 0; }
+
+/* Turns to point down when the row is open. Purely decorative, hidden from assistive tech: the
+   summary already reports its own expanded state. */
+.hp-peek-chevron {
+  flex-shrink: 0;
+  align-self: center;
+  width: .55rem; height: .55rem;
+  margin-right: .15rem;
+  border-right: 2px solid var(--hp-muted);
+  border-bottom: 2px solid var(--hp-muted);
+  transform: rotate(-45deg);
+  transition: transform .15s ease;
+}
+.hp-peek[open] .hp-peek-chevron { transform: rotate(45deg); }
+
+/* The snippet in the collapsed row is the first 110 characters of the text the body shows in
+   full, so it is redundant once open. Hidden here rather than suppressed with a flag in
+   _DrillRow, which has to stay context-free. */
+.hp-peek[open] .hp-drill-snippet { display: none; }
+
+.hp-peek-body {
+  margin-top: .5rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--hp-border);
+}
+
+/* pre-wrap keeps the coach's own line breaks, exactly as the plan page does. overflow-wrap is
+   the part .hp-drill-body is still missing: a description carrying one long unbroken URL would
+   otherwise push the whole phone sideways. */
+.hp-peek-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: .9rem;
+}
+
+/* Capped on purpose. DrillDiagram stores no width or height, so nothing can be reserved before
+   the image arrives; the cap bounds how far the rest of the list is pushed down when it does,
+   and stops one tall diagram filling the screen. */
+.hp-peek-diagram {
+  display: block;
+  max-width: 100%;
+  max-height: 14rem;
+  width: auto;
+  height: auto;
+  margin-top: .6rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  background: #fff;
+  object-fit: contain;
+}
+
 /* A plan's overview picture: how the whole practice is laid out, between the running order and
    the drills. Same proportion guards as .hp-drill-diagram and for the same reasons — it sits in a
    column flex container too, and a squashed rink diagram is worse than useless. */

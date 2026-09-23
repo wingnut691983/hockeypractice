@@ -1,0 +1,90 @@
+@model DrillCard
+@{
+    // A drill row you can open in place to read the whole thing, without leaving the list and
+    // losing where you were. Wraps _DrillRow rather than replacing it, so the collapsed row stays
+    // identical to the ones that do not peek.
+    //
+    // Native <details>/<summary> with NO click handler, and that is the load-bearing decision:
+    // the browser's own tap-versus-scroll handling applies to a real summary, so a touch that
+    // turns into a scroll never opens anything, and on a phone a tap that stops momentum
+    // scrolling is consumed by the scroller. A hand-rolled click or touch handler is exactly what
+    // gets that wrong. It also brings keyboard support and the expanded state for free.
+    //
+    // A <div> inside <summary> is not strictly conforming (summary takes phrasing content) and is
+    // accepted deliberately: there is no conforming way to make a whole multi-line row the tap
+    // target, which is the thing that makes this usable one-handed.
+    // DrillCard carries no TeamContext, and both hosts of this partial are routed under
+    // t/{slug}/..., so the slug comes from the route rather than being threaded through the model.
+    var slug = ViewContext.RouteData.Values["slug"]?.ToString();
+}
+<details class="hp-peek">
+    @* aria-label replaces the computed name. Without it a screen reader reads the title, the
+       snippet, the meta line and every tag as one run-on button label, twelve times a page. *@
+    <summary class="hp-peek-summary" aria-label="@Model.Drill.Title, details">
+        <span class="hp-peek-grow">
+            @await Html.PartialAsync("_DrillRow", Model)
+        </span>
+        <span class="hp-peek-chevron" aria-hidden="true"></span>
+    </summary>
+
+    <div class="hp-peek-body">
+        @if (!string.IsNullOrWhiteSpace(Model.Drill.Description))
+        {
+            <div class="hp-peek-text">@Model.Drill.Description</div>
+        }
+        else
+        {
+            <div class="hp-muted" style="font-size:.85rem;">No description on this drill yet.</div>
+        }
+
+        @foreach (var picture in Model.Diagrams)
+        {
+            var pictureUrl = Url.Action("Diagram", "Drill",
+                new { slug, id = Model.Drill.Id, diagramId = picture.Id });
+
+            if (picture.IsPdf)
+            {
+                @* A PDF diagram has no picture to show inline, the same branch the plan page
+                   takes. An <img> here would render as broken. *@
+                <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;"
+                   href="@pictureUrl" target="_blank" rel="noopener noreferrer">
+                    Open the diagram (PDF)
+                </a>
+            }
+            else
+            {
+                @* No src until the peek is opened. Twelve drills at six diagrams is 72 requests,
+                   and each one runs the full Diagram action: a team resolve, a diagram query and
+                   a file check. loading="lazy" is NOT a substitute: it is a hint the spec lets a
+                   browser ignore, and WebKit has had bugs here in both directions, including the
+                   one where the image never loads and the peek opens to empty boxes. *@
+                <img class="hp-peek-diagram" data-src="@pictureUrl" alt="Diagram for @Model.Drill.Title" />
+            }
+        }
+
+        @if (Model.Diagrams.Any(p => !p.IsPdf))
+        {
+            <noscript>
+                @foreach (var picture in Model.Diagrams.Where(p => !p.IsPdf))
+                {
+                    <img class="hp-peek-diagram"
+                         src="@Url.Action("Diagram", "Drill", new { slug, id = Model.Drill.Id, diagramId = picture.Id })"
+                         alt="Diagram for @Model.Drill.Title" />
+                }
+            </noscript>
+        }
+
+        @if (Model.HasVideo)
+        {
+            @* Drill.VideoUrl, deliberately NOT card.EmbedUrl. The library sets EmbedUrl through
+               DrillController.ToCard; the plan editor's picker builds its cards inline and does
+               not, so an embed-based link would work in one list and silently vanish in the
+               other. The in-page player lives in Plan/Details.cshtml's own script anyway, so
+               data-embed would do nothing on either of these pages. *@
+            <a class="hp-btn hp-btn-quiet hp-btn-sm" style="margin-top:.6rem;"
+               href="@Model.Drill.VideoUrl" target="_blank" rel="noopener noreferrer">
+                &#9654; Watch the drill
+            </a>
+        }
+    </div>
+</details>

@@ -620,6 +620,42 @@ answer in September.
   second `Include` because "the tags are already loaded", they are not; they were borrowed.
   Test paging, not just a team whose whole library fits on one page.
 
+- **The drill peek links video with `Drill.VideoUrl`, never `card.EmbedUrl`, and the difference
+  is invisible until you look in the right place.** `_DrillPeek` renders in two lists. The drill
+  library builds its cards through `DrillController.ToCard`, which sets `EmbedUrl`; the plan
+  editor's picker builds them inline in `CoachController` as `new DrillCard { Drill = d }` and
+  does not. So the obvious-looking choice works in the library and silently shows no video in the
+  picker, in exactly one of the two places it renders. `EmbedUrl` would only buy an in-page
+  player, and that player's script lives inside `Plan/Details.cshtml` rather than in shared code,
+  so `data-embed` on a link here does nothing anyway. This is the same shape as the bug where
+  `Tags` was included by one card builder and forgotten by its sibling: **if you add a field to
+  one card builder, check the other two.**
+
+- **A drill's diagrams carry `data-src`, not `src`, and the layout's toggle listener promotes
+  them when a peek opens. `loading="lazy"` is not a substitute.** A library page is twelve drills
+  and a drill holds up to six pictures, so eager loading is 72 requests, each running the whole
+  `Diagram` action: a team resolve, a diagram query and a file check. Lazy loading looks like it
+  solves this, because an image inside a closed `<details>` never intersects the viewport, but it
+  is a hint the spec lets a browser start early, the closed-details mechanism changed
+  implementation recently, and WebKit has had bugs here in both directions including the one
+  where the image never loads at all and the peek opens to empty boxes. Withholding the attribute
+  is the only version that behaves the same everywhere. Measured: with every row closed, zero
+  diagram requests; opening one row fetched that row's picture and left the other five withheld.
+  The listener binds `toggle` **in the capture phase**, because `toggle` does not bubble and
+  without the third argument it silently never fires.
+
+- **The peek is a native `<details>`/`<summary>` with no click handler, and that is what stops a
+  row opening while you scroll.** The browser's own tap-versus-scroll handling applies to a real
+  summary: a touch that turns into a scroll never activates it, and on a phone a tap that stops
+  momentum scrolling is consumed by the scroller. A hand-rolled click or touch handler is exactly
+  what gets that wrong, and it was the one thing asked for when this was specified. It also
+  brings keyboard support and the expanded state for free. Two knock-on details that are easy to
+  undo by accident: `.hp-peek` is `flex: 1 1 0`, not `auto`, because basis `auto` sizes the row to
+  its content and shoves the Edit button onto its own line even when collapsed (I shipped that by
+  mistake once and caught it in a screenshot); and `.hp-peek-text` sets `overflow-wrap: anywhere`,
+  which `.hp-drill-body` still does not, so a description holding one long URL wraps here and
+  would side-scroll the phone there.
+
 - **Only the manager code is hashed with a slow KDF, and that is the whole point rather than an
   oversight.** `CoachCodeHash` is PBKDF2-HMAC-SHA256 with a per-row salt, stored self-describing
   as `pbkdf2$iterations$salt$hash` in the same column, which needed no migration because the
@@ -711,6 +747,14 @@ answer in September.
   day someone restores and finds it missing. The one exception is a directory *inside* `teams/`,
   which the recursive walk already covers — `teams/<id>/pdfs/` needed no change when plan PDFs
   moved there, and I checked a real archive rather than assuming it.
+- **`_DrillRow` now has two wrappers, and two of its four call sites deliberately do not peek.**
+  `_DrillPeek` wraps the row in a `<details>` so it opens in place; the drill library and the plan
+  editor's picker use it. `Drill/CopyTo.cshtml` does not, because its row sits inside a `<label>`
+  wrapping a checkbox and a `<details>` there fights the label for the tap. The plan's own running
+  order does not either, because it already carries move, remove and the per-drill time control
+  and the coach already chose those drills. `_DrillRow` itself stays context-free: the only thing
+  added to it was a class on the snippet so CSS can hide it while a peek is open.
+
 - **A plan can carry one overview picture, and it lives in the plan's own directory.**
   `teams/<team>/plans/<planId>/overview-<guid>.webp`, with the name on `PracticePlan.OverviewFileName`
   and the stored size on `OverviewBytes`. It shows on the plan between the running order and the

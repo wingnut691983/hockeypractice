@@ -363,6 +363,9 @@
                         var card = Model.PlanDrills[i];
                         <li style="flex-wrap:wrap;align-items:flex-start;">
                             <span class="hp-jersey" style="margin-top:.1rem;">@(i + 1)</span>
+                            @* The plan's own running order stays a plain row: it already carries
+                               move, remove and the per-drill time control, and the coach chose
+                               these drills. The picker below is where peeking earns its place. *@
                             @await Html.PartialAsync("_DrillRow", card)
 
                             @* One form, three buttons separated by formaction — the same trick the
@@ -502,7 +505,10 @@
                     @foreach (var card in Model.Library)
                     {
                         <li style="flex-wrap:wrap;align-items:flex-start;">
-                            @await Html.PartialAsync("_DrillRow", card)
+                            @* Peeks here too: picking drills for a practice is exactly when you
+                               need to see what one contains, and leaving the page to find out
+                               means abandoning the plan you are part way through building. *@
+                            @await Html.PartialAsync("_DrillPeek", card)
                             <form method="post" asp-action="AddDrill" asp-route-slug="@slug"
                                   asp-route-id="@planId" asp-route-drillTag="@tagFilter"
                                   asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
