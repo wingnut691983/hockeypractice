@@ -19,6 +19,12 @@ tangled and aren't anymore.
   reaching one requires either that team's manager code or a deliberate one-click "take manager
   access" action in the admin panel, which is visibly flagged on every page while it's active.
 
+The three are stored differently, and the differences are deliberate rather than historical. The
+**team code** is kept in plaintext beside its hash so the coach can re-share the join link all
+season. The **site admin code** is never stored at all; it is read from the environment at startup.
+The **manager code** is the only one held hash-only, which is why it is the only one hashed with a
+slow KDF. See "What I'd flag".
+
 ## How it works
 
 - **Landing page.** Each team is a card with two ways in: a primary "See practice plans" button,
@@ -613,6 +619,33 @@ answer in September.
   1 renders 14, which is exactly the tag count on that plan's drills. If you are tempted to drop the
   second `Include` because "the tags are already loaded", they are not; they were borrowed.
   Test paging, not just a team whose whole library fits on one page.
+
+- **Only the manager code is hashed with a slow KDF, and that is the whole point rather than an
+  oversight.** `CoachCodeHash` is PBKDF2-HMAC-SHA256 with a per-row salt, stored self-describing
+  as `pbkdf2$iterations$salt$hash` in the same column, which needed no migration because the
+  column has no `MaxLength`. The other two codes are deliberately left alone: `ViewCode` sits in
+  **plaintext** in the next column on purpose, so hashing it harder guards a secret that is
+  already readable, and the site admin code has no stored hash at all. **If you ever "finish the
+  job" by upgrading `ViewCodeHash`, you have done work that protects nothing.** The reason this
+  mattered only for the manager code is that it is the one code an attacker holding a downloaded
+  archive could not simply read, and under the old single-round unsalted SHA-256 they could have
+  recovered it in well under an hour.
+
+- **The old manager-hash branch in `Security.ManagerCodeMatches` is permanent. Do not remove it.**
+  It reads like a migration shim and is not one. A restore rolls the database back while only ever
+  adding files, so an archive taken before this change brings back rows in the old format, and
+  that is precisely the moment a manager has to be able to sign in. Deleting the branch would turn
+  a recovery into a site-wide lockout. `TryGrantAsync` upgrades such a row in place the first time
+  the code is used, so a restored database heals itself.
+
+- **Rehashing on sign-in is NOT how the existing hashes were upgraded, and could not have been.**
+  `TeamController.TryGrantAsync` is the only read of `CoachCodeHash` in the app: after it matches,
+  a claim goes into the access cookie and every later request authorizes from that, never
+  returning to the database. That cookie lasts 180 days **and slides**, so a coach who opens the
+  site most weeks may never type their code again. A rehash that only fires on verification
+  therefore has no end condition. What actually replaced the stored hashes was reissuing every
+  team's manager code from the admin page. If a similar change comes up again, check where the
+  value is read before assuming sign-ins will carry a migration.
 
 - **The admin sign-in limiter is partitioned per browser, and that is what stops an attacker
   locking the operator out.** It used to be one shared bucket: thirty posts a minute to

@@ -251,7 +251,10 @@ public class SiteAdminController : Controller
             Slug = candidate,
             ViewCode = viewCode,
             ViewCodeHash = Security.HashCode(viewCode),
-            CoachCodeHash = Security.HashCode(coachCode),
+
+            // HashManagerCode, not HashCode: this is the one code with no readable copy beside
+            // it, so it is the one worth attacking in a stolen archive. See Security.
+            CoachCodeHash = Security.HashManagerCode(coachCode),
             TimeZoneId = string.IsNullOrWhiteSpace(timeZoneId) ? "America/Chicago" : timeZoneId.Trim(),
             SortOrder = nextSortOrder
         });
@@ -334,7 +337,7 @@ public class SiteAdminController : Controller
         if (which == "manager")
         {
             var code = Security.NewAccessCode(8);
-            team.CoachCodeHash = Security.HashCode(code);
+            team.CoachCodeHash = Security.HashManagerCode(code);
             notice = $"{team.Name}: new manager code {code}. " +
                      "Anyone using the old one will need this instead.";
         }

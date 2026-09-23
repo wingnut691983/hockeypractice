@@ -331,8 +331,27 @@ public class TeamController : TeamScopedController
         if (string.IsNullOrWhiteSpace(code)) return TeamAccessLevel.None;
 
         var level = TeamAccessLevel.None;
-        if (Security.CodeMatches(code, team.CoachCodeHash)) level = TeamAccessLevel.Manager;
-        else if (Security.CodeMatches(code, team.ViewCodeHash)) level = TeamAccessLevel.Player;
+
+        if (Security.ManagerCodeMatches(code, team.CoachCodeHash))
+        {
+            level = TeamAccessLevel.Manager;
+
+            // Upgrade a row still in the old format, now that we have the plaintext in hand and
+            // know it is right. This is here for rows a RESTORE brings back from an archive older
+            // than the upgrade, so they heal the first time they are used. It is deliberately not
+            // the way the existing rows get upgraded: this is the only read of CoachCodeHash in
+            // the app, the access cookie lasts 180 days and slides, so a coach may simply never
+            // type their code again. Rotating the codes is what does that.
+            if (Security.IsLegacyManagerHash(team.CoachCodeHash))
+            {
+                team.CoachCodeHash = Security.HashManagerCode(code);
+                await Db.SaveChangesAsync();
+            }
+        }
+        else if (Security.CodeMatches(code, team.ViewCodeHash))
+        {
+            level = TeamAccessLevel.Player;
+        }
 
         if (level != TeamAccessLevel.None)
             await Access.GrantTeamAsync(HttpContext, team.Id, level);
