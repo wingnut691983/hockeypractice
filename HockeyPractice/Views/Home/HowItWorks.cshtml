@@ -1,6 +1,16 @@
 @* Null when DEMO_TEAM_SLUG names no team, or that team has no player code. *@
 @model Team
-@{ ViewBag.Title = "How it works – EBHockey Plans"; }
+@{
+    ViewBag.Title = "How it works – EBHockey Plans";
+
+    // Built from the slug and the code, exactly like the Manage page's invite link, so it lands
+    // on whatever host the reader is already on and carries the path prefix. Declared once here
+    // because the demo is offered twice, at the top and at the foot, and two copies of this
+    // would be two things to keep in step.
+    var joinUrl = Model is null
+        ? null
+        : Url.Action("Index", "Team", new { slug = Model.Slug, c = Model.ViewCode });
+}
 @*
     Public, no sign-in, same content rule as the What's new page: everything here is readable by
     anyone who finds the site. No codes, no thresholds, no counts of how anything is limited, no
@@ -34,6 +44,25 @@
         The screens below are illustrations drawn in the site's own styling, showing a made-up
         team. They are pictures, not the live site, so nothing on them can be tapped.
     </p>
+
+    @* The same offer as the one at the foot of the page, put where it can be seen without
+       reading everything first. Someone who wants to look rather than read would otherwise have
+       to scroll past every illustration to find out a demo exists at all. It sits directly under
+       the line saying the screens below cannot be tapped, which is the contrast worth drawing:
+       that paragraph is about pictures, this button is the real site. *@
+    @if (joinUrl is not null)
+    {
+        <div class="hp-panel" style="margin-top:1.1rem;">
+            <p style="margin-top:0;">
+                <strong>Would rather just look around?</strong> This one is the real site, not an
+                illustration. It opens a demo team the way a player sees it, and everything in it
+                is made up.
+            </p>
+            <a class="hp-btn hp-btn-block hp-btn-accent" href="@joinUrl" rel="nofollow">
+                Open the demo team
+            </a>
+        </div>
+    }
 
     <h2 class="hp-section">Players and parents</h2>
 
@@ -480,12 +509,8 @@
         </figure>
     </div>
 
-    @if (Model is not null)
+    @if (joinUrl is not null)
     {
-        @* Built from the slug and the code, exactly like the Manage page's invite link, so it
-           lands on whatever host the reader is already on and carries the path prefix. *@
-        var joinUrl = Url.Action("Index", "Team", new { slug = Model.Slug, c = Model.ViewCode });
-
         <h2 class="hp-section">Try it yourself</h2>
         <div class="hp-panel">
             <p style="margin-top:0;">
