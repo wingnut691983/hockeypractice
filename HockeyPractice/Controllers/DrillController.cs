@@ -151,7 +151,7 @@ public class DrillController : TeamScopedController
             Ctx = ctx!,
             Drill = drill,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
-            UsedInPlans = await Db.PlanDrills.CountAsync(pd => pd.DrillId == drill.Id),
+            UsedInPlans = await UsedInPlanCountAsync(drill.Id),
             CopyTargets = copyTargets,
             CopiedTo = await CopiedToAsync(drill.Id, copyTargets),
             Notice = notice
@@ -250,7 +250,7 @@ public class DrillController : TeamScopedController
         var drill = await Db.Drills.FirstOrDefaultAsync(d => d.Id == id && d.TeamId == ctx!.Team.Id);
         if (drill is null) return NotFound();
 
-        var used = await Db.PlanDrills.CountAsync(pd => pd.DrillId == drill.Id);
+        var used = await UsedInPlanCountAsync(drill.Id);
         if (used > 0)
         {
             return RedirectToAction(nameof(Edit), new
@@ -725,6 +725,19 @@ public class DrillController : TeamScopedController
         var drills = await LibraryQuery(teamId, tag, name, archived).ToListAsync();
         return drills.Select(ToCard).ToList();
     }
+
+    /// <summary>
+    /// How many PLANS use this drill — distinct plans, not PlanDrill rows.
+    ///
+    /// The same drill legitimately appears twice in one practice (see PlanDrill), so a plain row
+    /// count is not the number either caller says it is: both the edit page's "Used in N plans"
+    /// and the delete refusal's "used in N plans" read a row count as a plan count, and a drill
+    /// used as warm-up and cool-down in a single plan reported "2 plans" with only one existing.
+    /// The delete guard's own > 0 test was never affected — only the number in the sentence.
+    /// </summary>
+    private Task<int> UsedInPlanCountAsync(int drillId) =>
+        Db.PlanDrills.Where(pd => pd.DrillId == drillId)
+            .Select(pd => pd.PracticePlanId).Distinct().CountAsync();
 
     private async Task<List<string>> DistinctTagsAsync(int teamId)
     {

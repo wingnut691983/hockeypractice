@@ -71,6 +71,18 @@ public class PlanEditViewModel
     /// <summary>The team's library, filtered by ActiveDrillTag, offered for adding.</summary>
     public List<DrillCard> Library { get; init; } = new();
 
+    /// <summary>
+    /// Drill ids already in this plan, for the picker's "In this plan" marker. A set rather than
+    /// a count because the marker says whether, not how many; the running order above is where a
+    /// coach reads how many.
+    ///
+    /// Deliberately NOT carried on the picker's own DrillCards, which stay free of plan context
+    /// for the same reason they carry no ExtraRunTimeMinutes — see PlanDrillsAsync. The marker is
+    /// drawn by the picker's markup, never by _DrillRow, which renders from four call sites and
+    /// has to stay context-free.
+    /// </summary>
+    public HashSet<int> DrillIdsInPlan { get; init; } = new();
+
     /// <summary>Drill tags — a separate vocabulary from the plan tags above, hence the name.</summary>
     public List<string> AllDrillTags { get; init; } = new();
     public string? ActiveDrillTag { get; init; }

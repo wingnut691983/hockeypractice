@@ -511,6 +511,36 @@ answer in September.
   library card carries none and falls back to the drill. Keep the partial context-free; a check
   like `if (isPlanRow)` in there would be the bug waiting to happen. Verified against the library
   page, the picker and the Copy to team page with an adjusted drill live in a plan.
+- **A drill can be added to one plan more than once, that has always worked, and the thing that
+  was missing was any sign of it.** I went looking for the constraint that forbade it and there
+  isn't one: no unique index on `(PracticePlanId, DrillId)`, no check in `AddDrill`, and no
+  filtering of the picker's library. Remove, move and the per-drill time control were already
+  keyed on `PlanDrill.Id`, the plan page and print sheet already number and anchor by position
+  (`hp-drill-@(i+1)`), and the totals already sum over rows. Verified end to end: the same drill
+  added twice, given +10 min on one row and nothing on the other, printed as "Tight turns 25 min
+  (15 min + 10 min)" at position 1 and "Tight turns 15 min" at position 3, with the countdown
+  clocks and finish time right; moving the second copy up swapped the rows and left both times on
+  the rows they were set on; removing one left the other intact.
+
+  So the fix was a marker, not a feature. The picker now shows **"In this plan"** on a library row
+  already in the plan, and the Add button beside it is deliberately unchanged — same label, same
+  styling, always present. That sameness is the whole point: a checkmark, a disabled button or the
+  word "Added" all read as a door that has closed, which is exactly the misreading that had a
+  coach believing a second add was forbidden. The marker says whether, not how many; the running
+  order above is where you read how many. It is drawn by the picker's own markup in
+  `EditPlan.cshtml` and **not** by `_DrillRow` or `_DrillPeek`, for the reason in the entry above.
+  The ids come from `PlanEditViewModel.DrillIdsInPlan`, built from the plan's rows that were
+  already loaded, so it costs no extra query.
+- **"Used in N plans" counted `PlanDrill` rows and called them plans.** A drill used as both
+  warm-up and cool-down in a single practice reported "Used in 2 plans, so changes here show up in
+  all of them" when there was one plan, and the delete refusal said the same. Measured: three rows
+  across two plans read as "3 plans". Both sites now go through
+  `DrillController.UsedInPlanCountAsync`, which is
+  `.Select(pd => pd.PracticePlanId).Distinct().CountAsync()`, and the same case reads "2 plans".
+  The delete guard's own `> 0` test was never wrong — only the number in the sentence — so the
+  refusal behaviour is unchanged and the drill is still undeletable while any plan holds it. If
+  either string is ever rebuilt from a fresh query, this is the mistake to not make again: rows
+  are appearances, not plans.
 - **One plan can legitimately hold two links to the same video, so never key a dictionary on
   `PlanLink.Url` without grouping first.** Extraction keeps a separate card whenever the document
   names the same clip differently, because a warm-up video demonstrating three drills is three

@@ -452,6 +452,12 @@ public class CoachController : TeamScopedController
                 .ToPageAsync(drillPage, DrillController.PageSize)
             : DrillSearch.PagedResult<Drill>.Empty;
 
+        // Hoisted for the same reason: the picker's "In this plan" marker needs the set of drill
+        // ids as well as the rows themselves, and one query serves both.
+        var planDrills = plan.Kind == PlanKind.Drills
+            ? await PlanDrillsAsync(plan.Id)
+            : new List<DrillCard>();
+
         var model = new PlanEditViewModel
         {
             Ctx = ctx!,
@@ -462,9 +468,8 @@ public class CoachController : TeamScopedController
             MaxUploadBytes = _storage.QuotaBytes,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
             Notice = notice,
-            PlanDrills = plan.Kind == PlanKind.Drills
-                ? await PlanDrillsAsync(plan.Id)
-                : new List<DrillCard>(),
+            PlanDrills = planDrills,
+            DrillIdsInPlan = planDrills.Select(c => c.Drill.Id).ToHashSet(),
             Library = library.Items.Select(d => new DrillCard { Drill = d }).ToList(),
             AllDrillTags = plan.Kind == PlanKind.Drills
                 ? await DistinctDrillTagsAsync(ctx.Team.Id)

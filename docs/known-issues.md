@@ -278,6 +278,25 @@ edge case a permanent branch through every place a drill's length is read.
 drill.** The fix is a flag recording which meaning was typed, applied at `RunTime.Effective` so
 every read site inherits it. Worth doing only if it happens more than once.
 
+### 13. A drill used twice in a plan puts its video in the popup carousel twice
+
+A drill can legitimately appear more than once in one practice, and when it does, the plan page
+renders its "Watch the drill" button once per appearance. The in-page player collects its list
+with `document.querySelectorAll('[data-embed]')` (`Plan/Details.cshtml`), so both buttons join it:
+the "N of M" counter counts the video twice and Previous/Next walks past the same clip twice.
+
+Left alone deliberately, because the carousel is documented as walking the practice in order —
+the comment above that query says a drill plan's buttons join the plan-link cards so
+"Previous/Next walks the practice in order" — and a drill that genuinely runs as both warm-up and
+cool-down *is* two moments in the practice. Meeting its video again at the second slot is
+consistent with what the list is for. Deduping by embed URL would make the counter tidier and
+break that mapping, so the player would no longer line up with the running order beside it.
+
+**Trigger: a coach or player reporting the repeat as confusing, or the carousel gaining a progress
+indicator** that puts the inflated total on screen as a number in its own right rather than as a
+position in a walk. The fix then is to dedupe the list by embed URL at the point it is built,
+which also means deciding what the Previous/Next mapping becomes.
+
 ---
 
 ## Small items

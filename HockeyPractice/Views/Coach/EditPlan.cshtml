@@ -509,6 +509,23 @@
                                need to see what one contains, and leaving the page to find out
                                means abandoning the plan you are part way through building. *@
                             @await Html.PartialAsync("_DrillPeek", card)
+
+                            @* Drawn here rather than inside _DrillRow or _DrillPeek, both of which
+                               render from several call sites and have to stay context-free — a
+                               check like "is this a plan row" in the partial is the bug waiting to
+                               happen (see the README).
+
+                               It says "In this plan", not "Added" and not a checkmark, and the Add
+                               button beside it is deliberately unchanged. A drill legitimately runs
+                               twice in one practice — warm-up and cool-down — so the marker has to
+                               report state without reading as a door that has closed. A coach who
+                               believes a second add is forbidden never tries it, which is the
+                               misreading this exists to remove. *@
+                            @if (Model.DrillIdsInPlan.Contains(card.Drill.Id))
+                            {
+                                <span class="hp-pill">In this plan</span>
+                            }
+
                             <form method="post" asp-action="AddDrill" asp-route-slug="@slug"
                                   asp-route-id="@planId" asp-route-drillTag="@tagFilter"
                                   asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
