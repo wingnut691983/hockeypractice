@@ -79,13 +79,42 @@ public class TeamController : TeamScopedController
         if (manage && Access.RealLevelFor(User, team.Id) >= TeamAccessLevel.Manager)
             return RedirectToAction("Index", "Coach", new { slug });
 
+        var preview = await SharedPlanPreviewAsync(team, returnUrl);
+
         return View(new EnterCodeViewModel
         {
             Team = team,
             ReturnUrl = returnUrl,
             LogoUrl = LogoUrlFor(team),
-            ManageMode = manage
+            ManageMode = manage,
+            PreviewPlanTitle = preview.Title,
+            PreviewPlanUrl = preview.Url
         });
+    }
+
+    /// <summary>
+    /// The title of the plan a visitor was heading for when the gate stopped them, for the link
+    /// preview and nothing else. Null unless the returnUrl names one published plan of this team.
+    ///
+    /// Published only, and that is the point rather than a detail: a draft is a plan the coach has
+    /// not shown anyone yet, and its title is often exactly what they are still deciding. Scoped
+    /// on TeamId as well as the parsed slug, so neither half can be worked around on its own.
+    /// </summary>
+    private async Task<(string? Title, string? Url)> SharedPlanPreviewAsync(
+        Team team, string? returnUrl)
+    {
+        var planId = PlanPreview.PlanIdFromReturnUrl(returnUrl, Request.PathBase.Value, team.Slug);
+        if (planId is null) return (null, null);
+
+        var title = await Db.Plans
+            .Where(p => p.Id == planId && p.TeamId == team.Id && p.Status == PlanStatus.Published)
+            .Select(p => p.Title)
+            .FirstOrDefaultAsync();
+
+        if (title is null) return (null, null);
+
+        // Rebuilt from the id, never echoed from returnUrl. See EnterCodeViewModel.PreviewPlanUrl.
+        return (title, Url.Action("Details", "Plan", new { slug = team.Slug, id = planId }));
     }
 
     [HttpPost("code")]

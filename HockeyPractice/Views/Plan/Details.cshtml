@@ -1,8 +1,15 @@
 @using HockeyPractice.Services
+@using HockeyPractice.Infrastructure
 @model PlanDetailViewModel
 @{
     ViewBag.Title = Model.Plan.Title + " – " + Model.Ctx.Team.Name;
     ViewBag.Team = Model.Ctx.Team;
+
+    @* Same two strings as the code page, from the same helper. A crawler is never signed in so it
+       does not reach this page, but if these were left to differ, the card and the page it opens
+       would disagree and only one of them would ever be noticed. *@
+    ViewBag.OgTitle = PlanPreview.Title(Model.Plan.Title);
+    ViewBag.OgDescription = PlanPreview.Description(Model.Ctx.Team.Name);
 
     var fileUrl = Url.Action("File", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;
     var beaconUrl = Url.Action("Viewed", "Plan", new { slug = Model.Ctx.Team.Slug, id = Model.Plan.Id })!;

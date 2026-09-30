@@ -50,6 +50,25 @@ public class EnterCodeViewModel
     /// is, so entering the wrong one on the wrong screen can't escalate anything.
     /// </summary>
     public bool ManageMode { get; init; }
+
+    /// <summary>
+    /// The title of the plan this code page was reached FROM, when it was reached by following a
+    /// shared plan link. Drives the link preview only, never anything on the page: the visitor
+    /// standing at the gate is not told which plan they are being kept out of, because that is
+    /// the one thing the card already told them.
+    ///
+    /// Null whenever the returnUrl does not name a published plan of this team, which includes
+    /// the ordinary case of someone opening the code page directly.
+    /// </summary>
+    public string? PreviewPlanTitle { get; init; }
+
+    /// <summary>
+    /// The canonical path of that plan, built from its id rather than echoed back out of the
+    /// returnUrl. The returnUrl passed a path match but its query string did not, and rendering
+    /// an attacker-supplied string into a meta tag to save one route lookup is a bad trade even
+    /// when Razor escapes it. Null exactly when <see cref="PreviewPlanTitle"/> is.
+    /// </summary>
+    public string? PreviewPlanUrl { get; init; }
 }
 
 public class RosterPickViewModel

@@ -299,6 +299,36 @@ which also means deciding what the Previous/Next mapping becomes.
 
 ---
 
+### 14. Published plan titles can be walked by id through the link-preview card
+
+Shipping the plan name in a shared link's preview (30 September 2026) means a published plan's
+title is readable without the team code, by design and with the user's explicit agreement. The
+consequence that goes beyond "someone was sent a link" is that the plan id sits in the URL, so the
+titles can be enumerated:
+
+```
+/t/<slug>/code?returnUrl=/t/<slug>/plans/1
+/t/<slug>/code?returnUrl=/t/<slug>/plans/2   ...
+```
+
+Team slugs are already listed publicly on the home page, so the practical reach is every published
+plan title on the site. Titles only: no date, no location, no drills, no roster, and drafts are
+excluded.
+
+**This is inherent to the feature, not a defect in the implementation.** A chat app's crawler is an
+ordinary HTTP client with no cookies, so there is no way to show the title on a card and withhold
+it from a person walking ids. The guards that exist are the ones that can exist: whole-path match,
+the slug in the path must equal the team rendering the page, published only, `TeamId`-scoped query.
+
+The only fix that actually closes it is a per-plan share token, so a link reveals only its own
+plan: a random token column on `PracticePlan`, the Share button copying `?s=<token>`, and the
+preview keyed on the token instead of the id. That is a real feature with rotation and storage
+questions attached, which is why it was not done in passing.
+
+**Trigger: a coach putting something in a plan title they would not want read by a stranger, or
+any request to widen the card beyond the title (a date, the rink). Either one means the token work
+is now worth doing.** Also revisit if plan titles ever start carrying player names.
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.

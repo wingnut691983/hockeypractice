@@ -5,6 +5,31 @@
     var primary = team?.SafePrimary ?? Team.DefaultPrimary;
     var accent  = team?.SafeAccent  ?? Team.DefaultAccent;
     var palette = HockeyPractice.Infrastructure.Palette.CssVariables(primary, accent);
+
+    // Link preview. A page opts in by setting OgTitle / OgDescription; the defaults say nothing a
+    // signed-out visitor cannot already see, which is the right default because a chat app's
+    // crawler is always signed out. See Infrastructure/PlanPreview.cs for what a plan reveals and
+    // why that was a decision.
+    var ogTitle = ViewBag.OgTitle as string ?? title;
+    var ogDescription = ViewBag.OgDescription as string;
+
+    // Open Graph needs absolute URLs; a relative one is dropped silently by every crawler, which
+    // is exactly the kind of failure nobody notices. Scheme comes from UseForwardedHeaders, so it
+    // is https in production even though TLS terminates at the gateway.
+    var origin = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var ogPath = ViewBag.OgUrl as string ?? $"{Context.Request.PathBase}{Context.Request.Path}";
+
+    // The team's own logo when it has one, the site icon otherwise. Never the plan's overview
+    // picture: that would publish the practice layout to anyone holding the link, which is well
+    // past what the card is for. TeamController.Logo is ungated, so a crawler can actually fetch
+    // this one — checked against production, it answers 200 with no code.
+    //
+    // icon-512, not apple-touch-icon: the touch icon is 180x180 and several chat apps refuse to
+    // render a preview image under about 300px, so the card would silently lose its picture on a
+    // team with no logo of its own.
+    var ogImage = team?.LogoFileName is null
+        ? Url.Content("~/icon-512.png")
+        : Url.Action("Logo", "Team", new { slug = team.Slug });
 }
 <!DOCTYPE html>
 @* Team colours ride on the root element so one stylesheet serves every team. *@
@@ -16,6 +41,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="@primary" />
     <title>@title</title>
+
+    @* summary, not summary_large_image: the picture here is a square team logo, and the wide card
+       would letterbox it into a smudge. *@
+    <meta property="og:site_name" content="EBHockey Plans" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="@ogTitle" />
+    @if (!string.IsNullOrWhiteSpace(ogDescription))
+    {
+        <meta property="og:description" content="@ogDescription" />
+    }
+    <meta property="og:url" content="@(origin + ogPath)" />
+    <meta property="og:image" content="@(origin + ogImage)" />
+    <meta name="twitter:card" content="summary" />
     <link rel="stylesheet" href="~/css/hockeypractice.css" asp-append-version="true" />
     <link rel="manifest" href="@Url.Action("Manifest", "Home")" />
 

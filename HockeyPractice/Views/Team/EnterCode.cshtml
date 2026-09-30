@@ -1,7 +1,24 @@
+@using HockeyPractice.Infrastructure
 @model EnterCodeViewModel
 @{
     ViewBag.Title = Model.Team.Name + (Model.ManageMode ? " – Manage" : " – Practice Plans");
     ViewBag.Team = Model.Team;
+
+    @* The card a chat app builds for a shared plan link. This page is what the crawler is given
+       instead of the plan, so this is where the plan's name has to be said or it is said nowhere.
+       Falls back to the team when the link was not a plan link. *@
+    if (Model.PreviewPlanTitle is not null)
+    {
+        ViewBag.OgTitle = PlanPreview.Title(Model.PreviewPlanTitle);
+        ViewBag.OgDescription = PlanPreview.Description(Model.Team.Name);
+        @* Canonical, so the card points at the plan rather than at the gate it was built from. *@
+        ViewBag.OgUrl = Model.PreviewPlanUrl;
+    }
+    else
+    {
+        ViewBag.OgTitle = Model.Team.Name;
+        ViewBag.OgDescription = "Practice plans. The team code is needed to read them.";
+    }
     var initials = string.Join("", Model.Team.Name
         .Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Take(2).Select(w => char.ToUpperInvariant(w[0])));

@@ -789,6 +789,49 @@ answer in September.
   team logo should be expected to leave the old one on screen for up to a tenth of its age. The
   reason it is untouched is scope, not disagreement: see `docs/known-issues.md`.
 
+- **A shared plan link previews with the plan's name, and getting there meant deciding what a
+  stranger may read.** Before this, a plan shared into the team chat previewed as "Jackson Melling
+  16U – Practice Plans" every time. The `<title>` on the plan page was already correct; the
+  problem was that nobody ever sees it. A plan URL 302s to the code page for anyone not signed in,
+  and a chat app builds its card by fetching the URL with no cookies, so the crawler was reading
+  the title of the gate. Measured on production before the change: `GET /t/melling16u/plans/1` →
+  `302 /t/melling16u/code?returnUrl=...`, and the page that follows is titled with the team.
+  There were also **no Open Graph tags anywhere in the layout**, so every preview was whatever
+  `<title>` the crawler happened to land on.
+  The layout now emits `og:*` and `twitter:card`, defaulting to something a signed-out visitor can
+  already see, and `TeamController.EnterCode` resolves the `returnUrl` to a plan so the gate can
+  caption the card it is standing in for. `Infrastructure/PlanPreview.cs` is the only definition of
+  what a card says, and both the gate and the plan's own page render from it so they cannot drift.
+  **The card shows the plan's title and the team's name. Nothing else, and that was a decision, not
+  an oversight.** No date, no rink, no drills, no roster, and published plans only. The reasoning
+  is in `PlanPreview`'s own comment and the short version is this: there is no way to tell a chat
+  app the plan's name and withhold it from a person, because the crawler is an ordinary HTTP
+  client. Anything the card can show, anyone holding the link can read. Widening it is a privacy
+  change, not a copy tweak.
+  **What this newly exposes, stated plainly.** Published plan titles are now readable without the
+  team code, and because the id is in the URL they can be walked: `?returnUrl=/t/<slug>/plans/1`,
+  `/2`, `/3`. Team slugs are already listed publicly on the home page, so in practice every
+  published plan title on the site is now public. That is inherent to the feature rather than a
+  flaw in this implementation, and the only thing that would remove it is per-plan share tokens so
+  a link reveals only its own plan. Drafts are excluded deliberately and that guard is
+  load-bearing: a draft title is often the thing the coach is still deciding. See
+  `docs/known-issues.md` for the enumeration entry and its trigger.
+  **Four things not to undo.** The `returnUrl` match is anchored on the whole path and on exactly
+  five segments, so `/print`, `/overview` or any extra segment fails rather than resolving to
+  something adjacent. The slug in that path must equal the team whose code page is rendering, or
+  one team's gate would caption another team's plan from an attacker-supplied value. `og:url` is
+  rebuilt from the plan id rather than echoed out of the `returnUrl`, whose query string never
+  passed any check. And the fallback image is `icon-512.png`, not `apple-touch-icon.png`: the
+  touch icon is 180x180 and several chat apps refuse to render a preview image under about 300px,
+  so a team with no logo of its own would silently get a text-only card.
+  Verified against a running app: the published plan's card names it, a draft's does not, the bare
+  code page falls back to the team, all fourteen abuse shapes I tried fall back safely (cross-team
+  slug, another team's plan id under this slug, `//evil.com`, an absolute URL, traversal, encoded
+  separators, a trailing `/print`, id `0`, `-1`, `1x`, and a plan that does not exist), a plan
+  title of `"><script>alert(1)</script>` comes back fully entity-escaped inside the attribute, and
+  a junk query string on the `returnUrl` does not reach `og:url`. `TeamController.Logo` is
+  ungated, checked against production with no code: 200, `image/png`.
+
 ## Things worth knowing before you change anything
 
 - **The print sheet is a separate layout and deliberately records nothing.**
