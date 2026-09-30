@@ -755,6 +755,40 @@ answer in September.
   `PlanStorageService.OverviewExists`, **before** the path is built, which is what makes the guard
   fail closed instead of throwing a 500 out of a page render.
 
+- **Replacing a plan's overview picture looked like it did nothing, and ETag was not enough to
+  stop it.** The coach's report was exact: the old picture came back whether they hit Replace or
+  removed it and added a new one. Nothing was wrong on the server. `SetOverview` writes a new
+  `overview-<guid>.webp` on every save, updates the row and only then deletes the old file, and I
+  confirmed all of that was happening. The problem was the URL, which is `/plans/<id>/overview`
+  and does not carry the file name, so it never changed. `PhysicalFile` sets `Last-Modified` and
+  no `Cache-Control`, and a response with `Last-Modified` and no `Cache-Control` lets the browser
+  invent a freshness lifetime of a tenth of the file's age and not ask the server at all. Replace
+  a week-old picture and the coach sees the old one for about a day. Measured against a running
+  app on 2026-09-30: the response carries `Last-Modified` and no `Cache-Control` header of any
+  kind.
+  The fix is the same two-tier shape as the static files: every link the app writes now carries
+  `?v=<the file name's guid>` (`PracticePlan.OverviewVersion`), and `PlanController.Overview`
+  answers a request whose `v` matches the current file with `private, max-age=31536000, immutable`
+  and anything else — an old link, a hand-typed URL, a tab opened before the replacement — with
+  `private, no-cache`, which still revalidates to a 304 off `Last-Modified`.
+  **`PhysicalFile` does not set an ETag**, whatever the comments in this codebase say. It sets
+  `Last-Modified` only: `PhysicalFileResult` fills in `EntityTag` solely when the caller supplies
+  one, and none of the three call sites here do. Measured on a running app — the 304 comes back to
+  an `If-Modified-Since`, and there is no `ETag` header on the 200. Corrected in
+  `PlanController.Overview`; the same wrong claim is still in `DrillController.Diagram`, which
+  serves the same way. The behaviour is fine either way, the comment is just describing a header
+  that isn't there.
+  **Three things not to undo.** `private`, never `public`: this is gated on the team code and must
+  not sit in a shared cache. The token comes from the stored file name rather than a timestamp,
+  because that name is what actually changed. And **adding a new place that renders the picture
+  means adding `v = Model.Plan.OverviewVersion` to its URL** — the four that exist are
+  `Coach/EditPlan`, `Plan/Details` twice and `Plan/Print`; leave it off and that one view silently
+  goes back to showing a stale picture while every other view is right.
+  **`TeamController.Logo` has the identical defect and is not fixed.** Same shape: one stable URL,
+  `PhysicalFile`, no `Cache-Control`, and a file name that changes on every upload. Replacing a
+  team logo should be expected to leave the old one on screen for up to a tenth of its age. The
+  reason it is untouched is scope, not disagreement: see `docs/known-issues.md`.
+
 ## Things worth knowing before you change anything
 
 - **The print sheet is a separate layout and deliberately records nothing.**
@@ -799,6 +833,8 @@ answer in September.
   plan's directory, and `DataPaths.UsedBytes()` already counts it. **No backup, delete or quota
   code changed.** Images only, because it renders inline; a PDF is refused with a message that
   says so rather than the drill path's "needs to be a PDF or an image".
+  Every URL that renders it carries `?v=<guid>` off `OverviewVersion`; see "What I'd flag" for why
+  leaving that off makes a replacement invisible.
 
 - **Plan PDFs live under the hash of their contents, in two layouts.** A plan's file is
   `teams/<team>/pdfs/<sha256>.pdf`, named by what is in it, and `PracticePlan.PdfKey` holds that

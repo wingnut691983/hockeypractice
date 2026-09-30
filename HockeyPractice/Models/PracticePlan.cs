@@ -65,6 +65,22 @@ public class PracticePlan
     public bool HasOverview => !string.IsNullOrEmpty(OverviewFileName);
 
     /// <summary>
+    /// The GUID out of <see cref="OverviewFileName"/>, carried in the picture's URL as ?v= so the
+    /// URL changes whenever the picture does.
+    ///
+    /// The URL cannot carry the file name itself (see PlanController.Overview), and the response
+    /// has Last-Modified with no Cache-Control, which makes browsers guess a freshness lifetime of
+    /// a tenth of the file's age. A replaced picture therefore kept being served from cache — a
+    /// week-old one for about a day — so a coach saw the old picture no matter how many times they
+    /// replaced it. Measured 2026-09-30 against a running app: the response carries Last-Modified
+    /// and no Cache-Control, and no ETag either.
+    ///
+    /// Length-checked because this reads from a database column: 9 for "overview-", 32 hex, 5 for
+    /// ".webp". A row that doesn't match gets no token and revalidates instead.
+    /// </summary>
+    public string? OverviewVersion => OverviewFileName is { Length: 46 } n ? n[9..^5] : null;
+
+    /// <summary>
     /// Whether this plan is an uploaded PDF or built from drills. Chosen when the plan is created
     /// and not switched afterwards — the two render through entirely different paths.
     /// </summary>

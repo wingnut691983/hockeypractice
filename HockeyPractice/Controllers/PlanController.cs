@@ -214,8 +214,31 @@ public class PlanController : TeamScopedController
 
         if (!_storage.OverviewExists(ctx!.Team.Id, plan.Id, plan.OverviewFileName)) return NotFound();
 
-        // PhysicalFile, not File(stream): it sets ETag and Last-Modified and handles range
-        // requests, so the picture isn't re-downloaded on every view of the plan.
+        // Last-Modified alone was not enough. It produces a cheap 304 only if the browser asks,
+        // and with no Cache-Control a browser is free to guess a freshness lifetime from
+        // Last-Modified — a tenth of the file's age — and not ask at all. That is why replacing a
+        // plan's picture appeared to do nothing: the row and the file had both changed, and the
+        // browser kept painting the copy it already had.
+        //
+        // Every link the app writes carries ?v=<the file name's GUID>, which changes on every
+        // save, so a request that names the current picture can be cached hard and costs no round
+        // trip at all on a second view. Without the token — an old link, a hand-typed URL, the
+        // picture opened in its own tab before a replacement — the bytes at this URL may already
+        // be stale, so it has to revalidate. "private" in both cases, never "public": this is
+        // gated on the team code and must not land in a shared cache.
+        // The null check is first and is load-bearing: an absent ?v= reads as StringValues.Empty,
+        // which compares equal to a null string, so a malformed row would otherwise hand a
+        // tokenless request the immutable header.
+        Response.Headers.CacheControl =
+            plan.OverviewVersion is not null && Request.Query["v"] == plan.OverviewVersion
+                ? "private, max-age=31536000, immutable"
+                : "private, no-cache";
+
+        // PhysicalFile, not File(stream): it sets Last-Modified and handles range requests, so the
+        // revalidating case above answers 304 instead of resending the picture. Measured, because
+        // this comment used to claim an ETag as well and there isn't one: PhysicalFileResult sets
+        // EntityTag only when the caller supplies it, so the conditional request that comes back
+        // is If-Modified-Since. The same wrong claim is still in DrillController.Diagram.
         // Always WebP — SaveOverviewAsync writes nothing else — so the type is a literal.
         return PhysicalFile(_storage.OverviewPath(ctx.Team.Id, plan.Id, plan.OverviewFileName),
             "image/webp");

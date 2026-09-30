@@ -243,7 +243,7 @@
             @if (Model.Plan.HasOverview)
             {
                 var overviewUrl = Url.Action("Overview", "Plan",
-                    new { slug, id = Model.Plan.Id });
+                    new { slug, id = Model.Plan.Id, v = Model.Plan.OverviewVersion });
 
                 <div class="hp-diagram-item" style="margin-bottom:.8rem;">
                     <a href="@overviewUrl" target="_blank" rel="noopener noreferrer">

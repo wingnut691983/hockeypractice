@@ -335,6 +335,19 @@ Individually not worth a commit; worth sweeping the next time each file is open.
   `LogoFileName` points at a file that is not on the volume prints an empty box. Same exposure as
   `_TeamHeader`, so it is consistent rather than new; noticed because the local dev database
   references a logo that was never copied into `.localdata`.
+- **Replacing a team logo leaves the old one on screen, for the same reason replacing a plan's
+  overview picture used to.** `TeamController.Logo` serves one stable URL (`/t/<slug>/logo`) with
+  `PhysicalFile`, which sets `Last-Modified` and no `Cache-Control`, and browsers turn that into a
+  guessed freshness lifetime of a tenth of the file's age. `Team.LogoFileName` changes on every
+  upload but the URL does not, so the new logo is invisible until the guess expires — up to a day
+  for a logo that has been in place a week or two. The overview fix on 2026-09-30 is the template:
+  a `?v=` token off the stored file name, `private, max-age=31536000, immutable` when it matches
+  and `private, no-cache` when it does not. Left for now because a logo is set once and a practice
+  picture is replaced week to week, and the fix touches four views
+  (`Home/Index`, `Plan/Print`, `Shared/_TeamHeader`, `Team/EnterCode`) plus `LogoUrlFor`, which is
+  wider than the report that prompted it. **Trigger: anyone reporting a changed logo not
+  appearing, or the next change to `LogoUrlFor`.** Note the logo URL has no file-name validation
+  either, unlike `PlanOverview` — worth doing in the same pass.
 
 ---
 
