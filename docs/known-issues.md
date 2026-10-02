@@ -22,11 +22,12 @@ condition has arrived.
 Production still has no `RESEND_API_KEY`, so `IEmailSender` resolves to `LoggingEmailSender`,
 `NotificationService.IsLive` is false, and the signup box does not render at all.
 
-**Both entries below are now FIXED, 1 October 2026, by audit batch R.** They were fixed while mail
-was still off, which is what CLAUDE.md asked for: before the key is set, not after. The original
-entries are kept under each because the reasoning is why the fix looks the way it does.
+**Both entries below are now FIXED, shipped in `v37` on 2 October 2026 as audit batch R.** They
+were fixed while mail was still off, which is what CLAUDE.md asked for: before the key is set, not
+after. The original entries are kept under each because the reasoning is why the fix looks the way
+it does.
 
-### 1. Publishing a plan blocks on sending every subscriber email — FIXED 1 October 2026
+### 1. Publishing a plan blocks on sending every subscriber email — FIXED in v37, 2 October 2026
 
 `CoachController.Publish` no longer awaits the send. It queues a `PublishNotification` carrying the
 plan id, the team id and the request's scheme, host and path base, and `PublishNotificationService`
@@ -63,7 +64,7 @@ saved before the mail loop runs, which makes the ambiguity worse rather than bet
 hand the loop to a background service, or give the whole loop one shared budget the way
 `VideoTitleService.PopulateTitlesAsync` already does with `OverallBudget`.
 
-### 2. Unsubscribe is a destructive GET, and there is no `List-Unsubscribe` header — FIXED 1 October 2026
+### 2. Unsubscribe is a destructive GET, and there is no `List-Unsubscribe` header — FIXED in v37, 2 October 2026
 
 Split in two. `GET /s/unsub/{token}` is now read-only and renders a confirmation page;
 `POST /s/unsub/{token}` is the only thing that deletes. Measured locally: five GETs in a row leave

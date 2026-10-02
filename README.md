@@ -834,8 +834,8 @@ answer in September.
 
 - **Publishing a plan does not wait on the subscriber mail, and the unsubscribe GET must stay
   read-only.** Both of these were deliberately left alone until mail was about to be switched on,
-  and both were fixed on 1 October 2026 before `RESEND_API_KEY` was set rather than after. They are
-  audit batch R.
+  and both were fixed before `RESEND_API_KEY` was set rather than after. They are
+  audit batch R, shipped in `v37`.
   **The publish half.** `CoachController.Publish` used to await `NotifyPublishedAsync`, which sends
   one message per subscriber at a 15 second `HttpClient` timeout each. Thirty subscribers against a
   degraded provider is 7.5 minutes of a held request ending in a gateway error, and the plan had
@@ -960,8 +960,8 @@ answer in September.
   write. Restoring an archive old enough to need a migration is exactly when that happens.
 - **Known problems that were left alone on purpose are written down**, in
   [`docs/known-issues.md`](docs/known-issues.md), each with the condition that should bring it
-  back rather than a date. The two that were waiting on `RESEND_API_KEY` are **done**, fixed on
-  1 October 2026 while mail was still off, which was the point: a publish no longer blocks on the
+  back rather than a date. The two that were waiting on `RESEND_API_KEY` are **done**, shipped in
+  `v37` on 2 October 2026 while mail was still off, which was the point: a publish no longer blocks on the
   send, and unsubscribing is no longer a destructive GET. That file also records what has already
   been audited and found clean, so the next pass over the code does not spend its time re-deriving
   it.
