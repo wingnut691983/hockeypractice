@@ -22,10 +22,18 @@ condition has arrived.
 Production still has no `RESEND_API_KEY`, so `IEmailSender` resolves to `LoggingEmailSender`,
 `NotificationService.IsLive` is false, and the signup box does not render at all.
 
-**Both entries below are now FIXED, shipped in `v37` on 2 October 2026 as audit batch R.** They
-were fixed while mail was still off, which is what CLAUDE.md asked for: before the key is set, not
-after. The original entries are kept under each because the reasoning is why the fix looks the way
-it does.
+**Both entries below were FIXED in `v37` as audit batch R, and then the feature they describe was
+REMOVED on 2 October 2026.** Subscriber email never went live: the signup box, the confirm and
+unsubscribe pages, the publish queue and `NotifyPublishedAsync` are all gone, and the only mail
+this site sends is the team-request notice. So neither entry describes live code any more.
+
+They are kept, rather than deleted, because the fixes are the two things a future re-implementation
+would otherwise get wrong again, and both were measured rather than reasoned. The `Subscriber`
+table was deliberately left in place so bringing the feature back is a code change, not a schema
+one. See README's "What I'd flag" for the short version and `v37` for the implementation.
+
+**New trigger for both: the day subscriber email is reintroduced**, not the day `RESEND_API_KEY`
+is set. That key is already set, for team requests alone.
 
 ### 1. Publishing a plan blocks on sending every subscriber email — FIXED in v37, 2 October 2026
 

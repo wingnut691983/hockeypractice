@@ -93,12 +93,17 @@
                         <strong>@request.TeamName</strong> &middot; @request.Association &middot;
                         @request.FullName &middot;
                         <a href="mailto:@request.Email">@request.Email</a>
+                        <form method="post" asp-action="UnhandleRequest" asp-route-id="@request.Id"
+                              style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                    style="margin-left:.4rem;">Back to waiting</button>
+                        </form>
                         <form method="post" asp-action="DeleteRequest" asp-route-id="@request.Id"
                               style="display:inline;"
                               data-confirm="Delete this request for good?">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
-                                    style="margin-left:.4rem;">Delete</button>
+                            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">Delete</button>
                         </form>
                     </div>
                 }

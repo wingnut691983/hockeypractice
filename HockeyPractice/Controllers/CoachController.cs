@@ -15,8 +15,6 @@ public class CoachController : TeamScopedController
     private readonly PlanStorageService _storage;
     private readonly LinkExtractionService _links;
     private readonly DataPaths _paths;
-    private readonly NotificationService _notifications;
-    private readonly PublishNotificationQueue _publishMail;
     private readonly VideoTitleService _videoTitles;
     private readonly ILogger<CoachController> _log;
 
@@ -25,16 +23,13 @@ public class CoachController : TeamScopedController
     private const long MaxLogoBytes = 2 * 1024 * 1024;
 
     public CoachController(AppDbContext db, TeamAccessService access, PlanStorageService storage,
-        LinkExtractionService links, DataPaths paths, NotificationService notifications,
-        PublishNotificationQueue publishMail, VideoTitleService videoTitles,
+        LinkExtractionService links, DataPaths paths, VideoTitleService videoTitles,
         ILogger<CoachController> log)
         : base(db, access)
     {
         _storage = storage;
         _links = links;
         _paths = paths;
-        _notifications = notifications;
-        _publishMail = publishMail;
         _videoTitles = videoTitles;
         _log = log;
     }
@@ -84,8 +79,6 @@ public class CoachController : TeamScopedController
             }).ToList(),
             Roster = await Db.Players.Where(p => p.TeamId == ctx!.Team.Id)
                         .OrderBy(p => p.Name).ToListAsync(),
-            ConfirmedSubscribers = await Db.Subscribers
-                        .CountAsync(s => s.TeamId == ctx!.Team.Id && s.ConfirmedUtc != null),
             UsedBytes = _storage.UsedBytes(),
             QuotaBytes = _storage.QuotaBytes,
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
@@ -916,38 +909,11 @@ public class CoachController : TeamScopedController
             });
         }
 
-        // Genuinely the first publish, not a republish after an unpublish. Keying off
-        // PublishedUtc rather than Status is what stops a fix-and-republish from mailing
-        // the whole team a second time.
-        var firstPublish = plan.PublishedUtc is null;
-
         if (plan.Status != PlanStatus.Published)
         {
             plan.Status = PlanStatus.Published;
             plan.PublishedUtc ??= DateTime.UtcNow;
             await Db.SaveChangesAsync();
-        }
-
-        if (firstPublish)
-        {
-            // Queued, not awaited. One message per subscriber at a 15 second timeout each used to
-            // be held open in front of the coach: thirty subscribers against a degraded provider
-            // is 7.5 minutes ending in a gateway error, and the plan had published regardless, so
-            // the error told them nothing. The scheme, host and path base go with it because the
-            // emailed links are absolute and the background sender has no request to build them
-            // from.
-            var queued = _publishMail.TryEnqueue(new PublishNotification(
-                plan.Id, ctx!.Team.Id,
-                Request.Scheme, Request.Host.Value, Request.PathBase.Value ?? string.Empty));
-
-            // Only when the queue is full, which needs 100 unsent publishes in one pod's life.
-            // Logged rather than surfaced: the plan published, which is what the coach asked for.
-            if (!queued)
-            {
-                _log.LogWarning(
-                    "Publish notifications for plan {PlanId} were dropped: the queue is full.",
-                    plan.Id);
-            }
         }
 
         return RedirectToAction(nameof(EditPlan), new { slug, id });

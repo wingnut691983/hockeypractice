@@ -90,7 +90,6 @@ public class PlanListViewModel
     /// at all — offering it and then never sending the confirmation email is a trap, not a
     /// feature, and that was exactly the live state before this flag was consulted.
     /// </summary>
-    public bool EmailSignupAvailable { get; init; }
     public List<PlanCard> Upcoming { get; init; } = new();
     public List<PlanCard> Past { get; init; } = new();
     public bool HasAny => Next != null || Upcoming.Count > 0 || Past.Count > 0;

@@ -7,7 +7,6 @@ public class ManageViewModel
     public TeamContext Ctx { get; init; } = null!;
     public List<PlanCard> Plans { get; init; } = new();
     public List<Player> Roster { get; init; } = new();
-    public int ConfirmedSubscribers { get; init; }
 
     public long UsedBytes { get; init; }
     public long QuotaBytes { get; init; }

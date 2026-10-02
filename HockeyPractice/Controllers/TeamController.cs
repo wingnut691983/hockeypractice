@@ -14,14 +14,11 @@ namespace HockeyPractice.Controllers;
 public class TeamController : TeamScopedController
 {
     private readonly DataPaths _paths;
-    private readonly NotificationService _notifications;
 
-    public TeamController(AppDbContext db, TeamAccessService access, DataPaths paths,
-        NotificationService notifications)
+    public TeamController(AppDbContext db, TeamAccessService access, DataPaths paths)
         : base(db, access)
     {
         _paths = paths;
-        _notifications = notifications;
     }
 
     /// <summary>
@@ -267,8 +264,7 @@ public class TeamController : TeamScopedController
             Ctx = ctx,
             Next = upcoming.FirstOrDefault(),
             Upcoming = upcoming.Skip(1).ToList(),
-            Past = past,
-            EmailSignupAvailable = _notifications.IsLive
+            Past = past
         });
     }
 

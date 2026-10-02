@@ -144,7 +144,7 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 | `SITE_ADMIN_CODE` | yes | Gates `/admin`. Fails closed: unset means no one can sign in. **At least 12 characters**, enforced at startup, and **case-sensitive**. A shorter one is refused rather than accepted with a warning, and the sign-in page says so rather than claiming the variable is unset. |
 | `DATA_DIR` | no | Defaults to `/persisted-data`. Set to `../.localdata` in development. |
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
-| `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged instead of sent and the signup box is hidden. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
+| `RESEND_API_KEY` | no | Enables real email. The site sends exactly one kind: a team request from the public form. Without the key, mail is logged instead of sent. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
 | `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain, and the domain must be the one verified with Resend: a mismatch is rejected and `ResendEmailSender` logs the status code only, never the body, so it surfaces as a bare `403` with nothing explaining it. |
 | `SITE_ADMIN_EMAIL` | no | Where a team request from the public form is emailed. Unset means the request is still saved and still shows on the admin page; only the email is skipped, and a line says so in the log. Not the same thing as `SITE_ADMIN_CODE`: this is a mailbox, that is a credential. |
 | `ARCHIVE_S3_ENDPOINT` | no | Cloudflare R2 S3 endpoint, `https://<accountid>.r2.cloudflarestorage.com`. **Without the bucket on the end**; the SDK appends it, and pasting the bucket's own "S3 API" value gives `.../<bucket>/<bucket>/<key>` and a missing-bucket error. |
@@ -924,6 +924,34 @@ answer in September.
   **Nothing new under `DATA_DIR`.** Checked rather than assumed, per the rule above: this is a
   database table, so the archive's database snapshot already carries it and
   `VolumeBackupService.CreateAsync` needed no change. No backup, restore or quota code changed.
+
+- **Subscriber email was removed on 2 October 2026, before it was ever switched on, and the
+  `Subscriber` table was deliberately left behind.** The signup box, the double-opt-in confirm
+  and unsubscribe pages, the publish notification queue and `NotifyPublishedAsync` are all gone.
+  The only mail this site sends now is the team-request notice to the operator.
+  **The table, model, indexes and migrations stay.** Dropping a table is irreversible from inside
+  the app, an unused empty table costs nothing once no query touches it, and a destructive
+  migration would also mean that restoring an archive taken before the drop reintroduces a table
+  the migration history has since removed. Bringing the feature back should be a code change, not
+  a schema change. `CoachController` also used to count confirmed subscribers on every page load
+  for a number no view rendered; that query is gone too.
+  **If it ever comes back, two things have to come back with it**, and neither is obvious from
+  what is left in the tree. First, **the publish send cannot sit in the request**: one message per
+  subscriber at a 15 second timeout each meant thirty subscribers against a degraded provider was
+  7.5 minutes of a held request ending in a gateway error, with the plan published anyway so the
+  error told the coach nothing. The fix was a bounded in-memory queue drained by a background
+  service, wrapped at both levels because `BackgroundServiceExceptionBehavior` defaults to
+  `StopHost`. Second, **the unsubscribe GET must not delete**: link scanners and mail prefetchers
+  follow links in message bodies, so a parent could be unsubscribed by their employer's security
+  appliance and never find out. The GET has to be a confirmation page with the delete on a POST,
+  and that POST needs `List-Unsubscribe-Post` and `[IgnoreAntiforgeryToken]` so a mail client's
+  one-click button still works. Both were built and shipped in `v37` as audit batch R; read that
+  commit rather than rediscovering it.
+  **There is a hard limit worth knowing before switching anything mail-shaped back on.** Resend's
+  free tier is **100 emails a day and 3,000 a month, account-wide**, and this account is shared
+  with StatsLogic. One team with twenty subscribers publishing a couple of plans a week is fine;
+  several teams posting the night before practice is not, and a partial send is close to invisible
+  because `ResendEmailSender` logs a status code and nothing reaches the coach.
 
 ## Things worth knowing before you change anything
 

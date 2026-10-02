@@ -824,6 +824,27 @@ public class SiteAdminController : Controller
         return RedirectToAction(nameof(Index), new { notice = "Request marked handled." });
     }
 
+    /// <summary>
+    /// Puts a handled request back in the waiting list. Exists because "Mark handled" is one tap
+    /// with no confirmation, and without this the only way back from a misclick on the wrong card
+    /// was editing the database.
+    /// </summary>
+    [HttpPost("requests/{id:int}/waiting")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UnhandleRequest(int id)
+    {
+        if (!_access.IsSiteAdmin(User)) return RedirectToAction(nameof(Index));
+
+        var request = await _db.TeamRequests.FirstOrDefaultAsync(r => r.Id == id);
+        if (request is null) return RedirectToAction(nameof(Index));
+
+        request.Status = TeamRequestStatus.New;
+        request.HandledUtc = null;
+        await _db.SaveChangesAsync();
+
+        return RedirectToAction(nameof(Index), new { notice = "Request moved back to waiting." });
+    }
+
     /// <summary>Removes a request outright. For spam, which is the one thing marking it handled
     /// would leave cluttering the page.</summary>
     [HttpPost("requests/{id:int}/delete")]
@@ -872,19 +893,27 @@ public class SiteAdminController : Controller
             }
         }
 
-        // Two short lists rather than one filtered in the view: the waiting ones drive the
-        // banner at the top of the page and the handled ones are only there so a request that was
-        // acted on can still be looked up. Capped, because neither is worth paging.
-        var requests = await _db.TeamRequests
+        // Two queries, not one filtered afterwards. Taking the newest 200 of everything and
+        // splitting them in memory meant a genuinely new request older than those 200 fell out of
+        // the list entirely, with no way to reach it, which spam makes reachable. It also left
+        // the (Status, CreatedUtc) index unused, because the query never filtered on Status.
+        // Waiting ones are never capped: they are the work, and hiding any of them is the bug.
+        var waiting = await _db.TeamRequests
+            .Where(r => r.Status == TeamRequestStatus.New)
             .OrderByDescending(r => r.CreatedUtc)
-            .Take(200)
+            .ToListAsync();
+
+        var handled = await _db.TeamRequests
+            .Where(r => r.Status != TeamRequestStatus.New)
+            .OrderByDescending(r => r.CreatedUtc)
+            .Take(25)
             .ToListAsync();
 
         return new AdminViewModel
         {
             Teams = teams,
-            NewRequests = requests.Where(r => r.Status == TeamRequestStatus.New).ToList(),
-            HandledRequests = requests.Where(r => r.Status != TeamRequestStatus.New).Take(25).ToList(),
+            NewRequests = waiting,
+            HandledRequests = handled,
             Notice = notice,
             Error = error,
             Configured = _adminCodeHash is not null,

@@ -18,8 +18,8 @@ public interface IEmailSender
 
 /// <summary>
 /// Development / unconfigured fallback: writes the mail to the log instead of sending it.
-/// Keeps the whole subscribe → confirm → notify flow exercisable before a sending domain
-/// exists, and guarantees local development never mails a real family.
+/// Keeps the mail path exercisable before a sending domain exists, and guarantees local
+/// development never mails a real person.
 /// </summary>
 public class LoggingEmailSender : IEmailSender
 {

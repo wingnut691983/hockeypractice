@@ -6,6 +6,7 @@ using HockeyPractice.Services;
 using HockeyPractice.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 
 namespace HockeyPractice.Controllers;
 
@@ -24,6 +25,22 @@ public class TeamRequestController : Controller
     private readonly AppDbContext _db;
     private readonly NotificationService _notifications;
     private readonly ILogger<TeamRequestController> _log;
+
+    /// <summary>
+    /// How many of these to email in a day before falling back to the admin page alone.
+    ///
+    /// The form's rate limiter caps submissions at 10 per 10 minutes, which is 1,440 a day, and
+    /// every one of those used to be an email. Resend's free tier is 100 a day **across the whole
+    /// account**, which this app shares with StatsLogic, so an afternoon of bot traffic through a
+    /// form on a public home page could stop a different production site sending mail until
+    /// midnight. Confirmed against the Resend usage page: 100/day, 3,000/month.
+    ///
+    /// Capping the email rather than tightening the limiter keeps the two concerns apart. Every
+    /// request is still saved and still shows on the admin page, which is the real delivery
+    /// mechanism; the email is a nudge. Ten a day is far beyond what this form will ever see
+    /// legitimately and leaves 90 for everything else.
+    /// </summary>
+    private const int MaxNotificationsPerDay = 10;
 
     public TeamRequestController(AppDbContext db, NotificationService notifications,
         ILogger<TeamRequestController> log)
@@ -86,8 +103,24 @@ public class TeamRequestController : Controller
 
         try
         {
-            var adminUrl = Url.Action("Index", "SiteAdmin", null, Request.Scheme)!;
-            await _notifications.NotifyTeamRequestedAsync(request, adminUrl);
+            // One email per saved row, so the row count for today IS the number of emails sent
+            // today. That is why this needs no extra column to track: a honeypot hit and a
+            // refused submission both save nothing and so cost nothing.
+            var today = DateTime.UtcNow.Date;
+            var sentToday = await _db.TeamRequests.CountAsync(r => r.CreatedUtc >= today);
+
+            if (sentToday > MaxNotificationsPerDay)
+            {
+                _log.LogWarning(
+                    "Team request {RequestId} saved but not emailed: {Count} already today, " +
+                    "which is over the daily cap of {Cap}. It is on the admin page.",
+                    request.Id, sentToday, MaxNotificationsPerDay);
+            }
+            else
+            {
+                var adminUrl = Url.Action("Index", "SiteAdmin", null, Request.Scheme)!;
+                await _notifications.NotifyTeamRequestedAsync(request, adminUrl);
+            }
         }
         catch (Exception ex)
         {
