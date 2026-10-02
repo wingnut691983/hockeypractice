@@ -804,6 +804,43 @@ public class SiteAdminController : Controller
         catch (IOException) { /* best effort; the staged copy is disposable */ }
     }
 
+    /// <summary>
+    /// Marks a request dealt with. It stays on the page under "handled" rather than being
+    /// deleted, because the common next question is "who was it that asked for this team".
+    /// </summary>
+    [HttpPost("requests/{id:int}/handled")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> HandleRequest(int id)
+    {
+        if (!_access.IsSiteAdmin(User)) return RedirectToAction(nameof(Index));
+
+        var request = await _db.TeamRequests.FirstOrDefaultAsync(r => r.Id == id);
+        if (request is null) return RedirectToAction(nameof(Index));
+
+        request.Status = TeamRequestStatus.Handled;
+        request.HandledUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return RedirectToAction(nameof(Index), new { notice = "Request marked handled." });
+    }
+
+    /// <summary>Removes a request outright. For spam, which is the one thing marking it handled
+    /// would leave cluttering the page.</summary>
+    [HttpPost("requests/{id:int}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteRequest(int id)
+    {
+        if (!_access.IsSiteAdmin(User)) return RedirectToAction(nameof(Index));
+
+        var request = await _db.TeamRequests.FirstOrDefaultAsync(r => r.Id == id);
+        if (request is null) return RedirectToAction(nameof(Index));
+
+        _db.TeamRequests.Remove(request);
+        await _db.SaveChangesAsync();
+
+        return RedirectToAction(nameof(Index), new { notice = "Request deleted." });
+    }
+
     private async Task<AdminViewModel> BuildAsync(string? notice, string? error = null)
     {
         var teams = await _db.Teams
@@ -835,9 +872,19 @@ public class SiteAdminController : Controller
             }
         }
 
+        // Two short lists rather than one filtered in the view: the waiting ones drive the
+        // banner at the top of the page and the handled ones are only there so a request that was
+        // acted on can still be looked up. Capped, because neither is worth paging.
+        var requests = await _db.TeamRequests
+            .OrderByDescending(r => r.CreatedUtc)
+            .Take(200)
+            .ToListAsync();
+
         return new AdminViewModel
         {
             Teams = teams,
+            NewRequests = requests.Where(r => r.Status == TeamRequestStatus.New).ToList(),
+            HandledRequests = requests.Where(r => r.Status != TeamRequestStatus.New).Take(25).ToList(),
             Notice = notice,
             Error = error,
             Configured = _adminCodeHash is not null,

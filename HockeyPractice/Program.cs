@@ -178,6 +178,28 @@ builder.Services.AddRateLimiter(options =>
         return ValueTask.CompletedTask;
     };
 
+    // The public team-request form. One shared bucket for the whole internet, which is a
+    // deliberate choice between two bad options rather than a good one.
+    //
+    // Per-caller is not available here. The gateway does not reliably pass X-Forwarded-For, so
+    // the address is not an identity (same finding as the team-code limiter), and the cookie
+    // trick the admin sign-in uses works there only because locking out the operator is the
+    // worse failure. Here the opposite is true: this form writes rows and sends mail to the
+    // operator's inbox, so an unlimited lane for anyone who clears a cookie is the worse failure.
+    //
+    // What a shared bucket costs: someone can spend it on purpose and a genuine request then
+    // meets a 429 for the rest of the window. That is survivable, because the ask is rare, the
+    // page says to try again shortly, and the site's contact address is in the footer of every
+    // page as a way round it. Ten in ten minutes is far more than this form will ever see
+    // legitimately and little enough to make flooding it pointless.
+    options.AddPolicy("team-request", _ =>
+        RateLimitPartition.GetFixedWindowLimiter("team-request", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0
+        }));
+
     options.AddPolicy("code-entry", http =>
     {
         // Populated because UseRateLimiter runs after UseRouting.

@@ -1,0 +1,60 @@
+@model TeamRequestFormViewModel
+@{ ViewBag.Title = "Request a team – EBHockey Plans"; }
+<div class="hp-rail"></div>
+<div class="hp-shell" style="max-width:32rem;">
+    <h1 class="hp-title">Request a team</h1>
+    <p class="hp-muted" style="margin-top:-.25rem;">
+        Tell us a bit about your team and we'll set it up and send you the codes. Nothing is
+        created automatically, so expect a reply rather than an instant login.
+    </p>
+
+    @if (Model.Error is not null)
+    {
+        <div class="hp-error">@Model.Error</div>
+    }
+
+    <form method="post" class="hp-form">
+        @Html.AntiForgeryToken()
+
+        <div class="hp-row" style="gap:.6rem;">
+            <div style="flex:1 1 10rem;">
+                <label class="hp-label" for="FirstName">First name</label>
+                <input class="hp-input" id="FirstName" name="FirstName" value="@Model.FirstName"
+                       autocomplete="given-name" required maxlength="80" />
+            </div>
+            <div style="flex:1 1 10rem;">
+                <label class="hp-label" for="LastName">Last name</label>
+                <input class="hp-input" id="LastName" name="LastName" value="@Model.LastName"
+                       autocomplete="family-name" required maxlength="80" />
+            </div>
+        </div>
+
+        <label class="hp-label" for="Email">Email</label>
+        <input class="hp-input" id="Email" name="Email" type="email" value="@Model.Email"
+               autocomplete="email" inputmode="email" required maxlength="200" />
+        <p class="hp-muted" style="font-size:.78rem;margin:.2rem 0 .8rem;">
+            This is how we'll send you the codes, so check it twice.
+        </p>
+
+        <label class="hp-label" for="Association">Association or club</label>
+        <input class="hp-input" id="Association" name="Association" value="@Model.Association"
+               autocomplete="organization" required maxlength="140" />
+
+        <label class="hp-label" for="TeamName">Team name</label>
+        <input class="hp-input" id="TeamName" name="TeamName" value="@Model.TeamName"
+               required maxlength="140" />
+        <p class="hp-muted" style="font-size:.78rem;margin:.2rem 0 1rem;">
+            Whatever the team goes by, for example "2012 AA" or "Bantam A".
+        </p>
+
+        @* Honeypot. Hidden from people and from screen readers, and left empty by both; anything
+           that arrives with it filled came from something filling every input on the page. Not
+           type="hidden", which a bot skips: it has to look like a real field to be worth a try. *@
+        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">
+            <label for="Website">Website</label>
+            <input id="Website" name="Website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <button type="submit" class="hp-btn" data-busy="Sending…">Send the request</button>
+    </form>
+</div>

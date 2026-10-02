@@ -18,10 +18,15 @@ public class AppDbContext : DbContext
     public DbSet<PlanDrill> PlanDrills => Set<PlanDrill>();
     public DbSet<PlanView> PlanViews => Set<PlanView>();
     public DbSet<Subscriber> Subscribers => Set<Subscriber>();
+    public DbSet<TeamRequest> TeamRequests => Set<TeamRequest>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.Entity<Team>().HasIndex(t => t.Slug).IsUnique();
+
+        // The admin page asks the same question on every load: is anything waiting, and what is
+        // the newest. Both halves of that are this index.
+        b.Entity<TeamRequest>().HasIndex(r => new { r.Status, r.CreatedUtc });
 
         b.Entity<Player>()
             .HasOne(p => p.Team).WithMany(t => t.Players)

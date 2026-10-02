@@ -105,4 +105,17 @@
             </div>
         </a>
     </div>
+
+    @* Full width under the pair above, not a third column: this is the one thing on the page
+       aimed at somebody who has no team here yet, and squeezing it into a third of a phone
+       screen would read as the least important of three rather than the only call to action. *@
+    <a class="hp-card" asp-controller="TeamRequest" asp-action="Index"
+       style="margin-top:.7rem;margin-bottom:0;">
+        <div class="hp-card-title" style="font-size:1.02rem;margin:0 0 .25rem;">
+            Like what you see? Request a team&nbsp;&rarr;
+        </div>
+        <div class="hp-muted" style="font-size:.82rem;">
+            Tell us about your team and we'll set it up and send you the codes.
+        </div>
+    </a>
 </div>

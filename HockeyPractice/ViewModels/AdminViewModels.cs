@@ -25,6 +25,12 @@ public class AdminViewModel
 
     public long DatabaseBytes { get; init; }
 
+    /// <summary>Team requests still waiting, newest first. The admin page's action item.</summary>
+    public List<TeamRequest> NewRequests { get; init; } = new();
+
+    /// <summary>Ones already dealt with, kept so a handled request can still be looked up.</summary>
+    public List<TeamRequest> HandledRequests { get; init; } = new();
+
     /// <summary>The database a restore moved aside, if one ever has. Shown because it is the
     /// only way back from restoring the wrong file.</summary>
     public long ReplacedBytes { get; init; }
@@ -67,4 +73,23 @@ public class TeamSummary
     public Team Team { get; init; } = null!;
     public int PlanCount { get; init; }
     public int PlayerCount { get; init; }
+}
+
+/// <summary>What the public team-request form posts back, and what it re-renders on an error.</summary>
+public class TeamRequestFormViewModel
+{
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public string? Email { get; set; }
+    public string? Association { get; set; }
+    public string? TeamName { get; set; }
+
+    /// <summary>
+    /// Honeypot. Hidden from people, left empty by them, and filled by anything that fills every
+    /// input it finds. Named "website" rather than something obvious, because a field called
+    /// "honeypot" is one a bot can learn to skip.
+    /// </summary>
+    public string? Website { get; set; }
+
+    public string? Error { get; set; }
 }

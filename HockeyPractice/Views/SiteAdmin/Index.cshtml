@@ -36,6 +36,76 @@
         <div class="hp-error">@Model.Error</div>
     }
 
+    @* The action item. Above Teams on purpose: it is the one thing on this page that arrived
+       on its own and is waiting on the admin, and everything below it is work they came here
+       intending to do. Renders nothing at all when there is nothing waiting. *@
+    @if (Model.NewRequests.Count > 0)
+    {
+        <div class="hp-notice">
+            <strong>
+                @Model.NewRequests.Count
+                @(Model.NewRequests.Count == 1 ? "team request is" : "team requests are") waiting.
+            </strong>
+            Create the team below, then mark the request handled.
+        </div>
+    }
+
+    @if (Model.NewRequests.Count > 0 || Model.HandledRequests.Count > 0)
+    {
+        <div class="hp-section">Team requests</div>
+    }
+
+    @foreach (var request in Model.NewRequests)
+    {
+        <div class="hp-panel" style="margin-bottom:.6rem;">
+            <div class="hp-card-title" style="margin:0 0 .2rem;">@request.TeamName</div>
+            <div class="hp-muted" style="font-size:.85rem;">
+                @request.Association<br />
+                @request.FullName &middot;
+                <a href="mailto:@request.Email">@request.Email</a><br />
+                Asked @request.CreatedUtc.ToString("d MMM yyyy")
+            </div>
+            <div class="hp-row" style="gap:.4rem;margin-top:.6rem;">
+                <form method="post" asp-action="HandleRequest" asp-route-id="@request.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn hp-btn-sm">Mark handled</button>
+                </form>
+                <form method="post" asp-action="DeleteRequest" asp-route-id="@request.Id"
+                      data-confirm="Delete this request? Use this for spam; handled requests stay listed.">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm">Delete</button>
+                </form>
+            </div>
+        </div>
+    }
+
+    @if (Model.HandledRequests.Count > 0)
+    {
+        <details style="margin-bottom:1rem;">
+            <summary class="hp-muted" style="cursor:pointer;font-size:.85rem;">
+                @Model.HandledRequests.Count handled
+                @(Model.HandledRequests.Count == 1 ? "request" : "requests")
+            </summary>
+            <div style="margin-top:.5rem;">
+                @foreach (var request in Model.HandledRequests)
+                {
+                    <div class="hp-muted" style="font-size:.82rem;padding:.3rem 0;">
+                        <strong>@request.TeamName</strong> &middot; @request.Association &middot;
+                        @request.FullName &middot;
+                        <a href="mailto:@request.Email">@request.Email</a>
+                        <form method="post" asp-action="DeleteRequest" asp-route-id="@request.Id"
+                              style="display:inline;"
+                              data-confirm="Delete this request for good?">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                    style="margin-left:.4rem;">Delete</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </details>
+    }
+
     <div class="hp-section">Teams</div>
     @if (Model.Teams.Count == 0)
     {

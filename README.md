@@ -146,6 +146,7 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
 | `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged instead of sent and the signup box is hidden. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
 | `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain, and the domain must be the one verified with Resend: a mismatch is rejected and `ResendEmailSender` logs the status code only, never the body, so it surfaces as a bare `403` with nothing explaining it. |
+| `SITE_ADMIN_EMAIL` | no | Where a team request from the public form is emailed. Unset means the request is still saved and still shows on the admin page; only the email is skipped, and a line says so in the log. Not the same thing as `SITE_ADMIN_CODE`: this is a mailbox, that is a credential. |
 | `ARCHIVE_S3_ENDPOINT` | no | Cloudflare R2 S3 endpoint, `https://<accountid>.r2.cloudflarestorage.com`. **Without the bucket on the end**; the SDK appends it, and pasting the bucket's own "S3 API" value gives `.../<bucket>/<bucket>/<key>` and a missing-bucket error. |
 | `ARCHIVE_S3_BUCKET` | no | Bucket name. |
 | `ARCHIVE_S3_PREFIX` | no | `hockeypractice/` in production, `local-test/` for testing. A safety fence, not tidiness: everything the app lists, offers and prunes is confined to this prefix. |
@@ -884,6 +885,45 @@ answer in September.
   into the delivered message. Everything above was verified against a stubbed provider capturing
   the real request body, which proves they leave this app and nothing about what Resend does with
   them. That check is in the audit's batch R list and wants doing the day the key is set.
+
+- **The public team-request form is the only write on this site a complete stranger can reach, and
+  everything about its shape follows from that.** "Like what you see? Request a team" on the home
+  page goes to `/request-a-team`, which takes a name, an email, an association and a team name,
+  writes one `TeamRequest` row, and emails the operator. It deliberately **does not create a
+  team**: a team needs a slug chosen and codes issued, which stays a site-admin job, so what the
+  form produces is a message to act on. The admin page shows waiting requests above Teams with
+  "Mark handled" and "Delete", and handled ones stay in a collapsed list because the next question
+  is usually "who was it that asked for this team".
+  **Four defences, and none of them is the one you would reach for first.** There is no per-caller
+  rate limit because there cannot be: the gateway does not reliably pass `X-Forwarded-For`, which
+  is the same finding that makes the team-code limiter partition on the slug. So this one shares a
+  single bucket for the whole internet, 10 per 10 minutes. That is a real tradeoff and not a free
+  win: someone can spend the budget on purpose and a genuine request then meets a 429 until the
+  window rolls. It is the right way round here, because the alternative is an unlimited lane for
+  anyone who clears a cookie, writing rows and mailing the operator. The ask is rare, the page says
+  to try again shortly, and the contact address in the footer is the way round it.
+  The second is a **honeypot** field, hidden off-screen and `aria-hidden`, which real people and
+  screen readers never fill. A submission that fills it gets the same thank-you page and is saved
+  nowhere, because an error would teach the bot what to avoid.
+  The third is that **lengths are enforced in the controller**, not left to the model's
+  `MaxLength` attributes. SQLite does not enforce those, which `docs/known-issues.md` already
+  records, and these five values come from an anonymous stranger. Over-long input is refused with
+  a message rather than truncated, because a name cut in half is worse than being asked again.
+  The fourth is `Clean`, which **collapses every run of whitespace and control characters to one
+  space**. A browser cannot put a newline in a text input but a crafted POST can, and these values
+  go into an email subject and a `Reply-To` header. Resend takes them as JSON rather than raw SMTP
+  so a newline is not an injection there, but relying on a third party to sanitise what we hand it
+  is the wrong place to draw the line. Verified with a crafted POST carrying
+  `Peewee A\r\nBcc: victim@example.test`: the subject came out as one line.
+  **Two orderings not to swap.** The row is saved **before** the email and the email failure is
+  swallowed, so a request that reached the database but not the inbox still shows on the admin
+  page; losing it because mail was down would leave nothing to show the person who typed it. And
+  the requester's address goes in **`Reply-To`, never `From`**: `From` has to stay on the verified
+  sending domain or Resend rejects the message, and the one thing the operator wants to do with
+  that mail is answer the person who sent it.
+  **Nothing new under `DATA_DIR`.** Checked rather than assumed, per the rule above: this is a
+  database table, so the archive's database snapshot already carries it and
+  `VolumeBackupService.CreateAsync` needed no change. No backup, restore or quota code changed.
 
 ## Things worth knowing before you change anything
 
