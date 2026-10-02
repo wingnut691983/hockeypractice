@@ -145,7 +145,7 @@ Local data (SQLite, uploads, keys) goes to `../.localdata` (one level above the 
 | `DATA_DIR` | no | Defaults to `/persisted-data`. Set to `../.localdata` in development. |
 | `PATH_PREFIX` | no | Injected by UpTurtle. Empty locally. |
 | `RESEND_API_KEY` | no | Enables real email. Without it, mail is logged instead of sent and the signup box is hidden. The full message body is logged **only in Development**; everywhere else the log line is the subject alone. See "What I'd flag". |
-| `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain. |
+| `EMAIL_FROM` | no | e.g. `Bantam A <plans@yourdomain.com>`. Needs a verified domain, and the domain must be the one verified with Resend: a mismatch is rejected and `ResendEmailSender` logs the status code only, never the body, so it surfaces as a bare `403` with nothing explaining it. |
 | `ARCHIVE_S3_ENDPOINT` | no | Cloudflare R2 S3 endpoint, `https://<accountid>.r2.cloudflarestorage.com`. **Without the bucket on the end**; the SDK appends it, and pasting the bucket's own "S3 API" value gives `.../<bucket>/<bucket>/<key>` and a missing-bucket error. |
 | `ARCHIVE_S3_BUCKET` | no | Bucket name. |
 | `ARCHIVE_S3_PREFIX` | no | `hockeypractice/` in production, `local-test/` for testing. A safety fence, not tidiness: everything the app lists, offers and prunes is confined to this prefix. |
@@ -832,6 +832,59 @@ answer in September.
   a junk query string on the `returnUrl` does not reach `og:url`. `TeamController.Logo` is
   ungated, checked against production with no code: 200, `image/png`.
 
+- **Publishing a plan does not wait on the subscriber mail, and the unsubscribe GET must stay
+  read-only.** Both of these were deliberately left alone until mail was about to be switched on,
+  and both were fixed on 1 October 2026 before `RESEND_API_KEY` was set rather than after. They are
+  audit batch R.
+  **The publish half.** `CoachController.Publish` used to await `NotifyPublishedAsync`, which sends
+  one message per subscriber at a 15 second `HttpClient` timeout each. Thirty subscribers against a
+  degraded provider is 7.5 minutes of a held request ending in a gateway error, and the plan had
+  published regardless, so the error told the coach nothing. It now enqueues to
+  `PublishNotificationQueue` and returns: measured locally with two confirmed subscribers, the
+  publish POST came back in 3.8 ms and the mail followed.
+  Three things in that shape are deliberate. The queue is **bounded at 100 with `DropWrite`**,
+  because unbounded means a wedged provider turns into memory growth; a drop is logged and never
+  shown, since the plan published. It is **per process and does not survive a restart**, like
+  `MaintenanceState`, because a publish notification is worth sending in the next few seconds and
+  not worth a durable outbox. And the loop is **wrapped at both levels**, because
+  `BackgroundServiceExceptionBehavior` defaults to `StopHost` and an unhandled send failure would
+  otherwise take the whole site down, which is the trap `ScheduledBackupService` already documents.
+  The sender also re-reads the plan and re-checks `Status`, so publishing and immediately
+  unpublishing does not mail the team about a withdrawn plan.
+  **Why the background sender uses `LinkGenerator` and carries the host.** The emailed links are
+  absolute, and there is no `HttpContext` on the far side of a queue, so `Url.Action` cannot work
+  there. The scheme, host and path base are captured in the request and travel with the job. That
+  keeps the previous behaviour exactly, including its one quirk: **publish from the custom domain,
+  because publishing from the bare upturtle.app URL puts that host in the email.** Do not "simplify"
+  this into a hardcoded base URL without noticing it is also what makes local development produce
+  working localhost links.
+  **The unsubscribe half.** `GET /s/unsub/{token}` deleted the row outright. That reads as
+  kindness, since an unsubscribe that asks follow-up questions is why people hit "spam" instead,
+  but corporate link scanners and mail client prefetchers follow links in message bodies without
+  anyone clicking. A parent could be unsubscribed by their employer's security appliance and never
+  find out: the mail stops, the site looks broken, and nothing records it because a deleted row is
+  indistinguishable from the parent having meant it. The GET is now a confirmation page and
+  **writes nothing**; `POST /s/unsub/{token}` is the only thing that deletes. Verified: five GETs
+  in a row leave the row in place.
+  The one-click experience is not lost, and that is what the headers are for.
+  `List-Unsubscribe` plus `List-Unsubscribe-Post: List-Unsubscribe=One-Click` means a mail client's
+  own unsubscribe button POSTs straight through and never renders the page. **That POST carries
+  `[IgnoreAntiforgeryToken]` and it has to**: RFC 8058 one-click arrives from Gmail's or Yahoo's
+  infrastructure with no cookie and no form, so there is nothing to validate against. The 24-byte
+  CSPRNG token in the URL is the authorisation, exactly as it is for the confirm link. Do not
+  "secure" that endpoint with an antiforgery token; it would break one-click silently and the only
+  symptom would be deliverability drifting down.
+  Two small ones that are easy to undo. The header URL is **angle-bracketed**, because the header
+  is a list. And `headers` is **left out of the JSON entirely** when empty rather than sent as
+  `null`, which needed `DefaultIgnoreCondition = WhenWritingNull`: the confirmation mail is
+  transactional and should carry no `List-Unsubscribe` at all, and an API that type-checks its
+  optional fields is entitled to reject a null. Measured, without that option the payload carried
+  `"headers": null`.
+  **What is still unproven, and only the real provider can prove it:** that the two headers survive
+  into the delivered message. Everything above was verified against a stubbed provider capturing
+  the real request body, which proves they leave this app and nothing about what Resend does with
+  them. That check is in the audit's batch R list and wants doing the day the key is set.
+
 ## Things worth knowing before you change anything
 
 - **The print sheet is a separate layout and deliberately records nothing.**
@@ -907,11 +960,11 @@ answer in September.
   write. Restoring an archive old enough to need a migration is exactly when that happens.
 - **Known problems that were left alone on purpose are written down**, in
   [`docs/known-issues.md`](docs/known-issues.md), each with the condition that should bring it
-  back rather than a date. Two of them are waiting on `RESEND_API_KEY` being set and want fixing
-  *before* mail is switched on: publishing a plan currently blocks on sending every subscriber
-  email one at a time, and unsubscribing is a destructive GET that a mail scanner can trip. That
-  file also records what has already been audited and found clean, so the next pass over the code
-  does not spend its time re-deriving it.
+  back rather than a date. The two that were waiting on `RESEND_API_KEY` are **done**, fixed on
+  1 October 2026 while mail was still off, which was the point: a publish no longer blocks on the
+  send, and unsubscribing is no longer a destructive GET. That file also records what has already
+  been audited and found clean, so the next pass over the code does not spend its time re-deriving
+  it.
 
 ## Deploying
 

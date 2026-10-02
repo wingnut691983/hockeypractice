@@ -5,7 +5,14 @@ public interface IEmailSender
     /// <summary>True when a real provider is wired up; false when mail is only being logged.</summary>
     bool IsLive { get; }
 
+    /// <param name="headers">
+    /// Extra message headers. Exists for List-Unsubscribe and List-Unsubscribe-Post, which have
+    /// to be real headers rather than body content: Gmail and Yahoo read them to decide whether a
+    /// bulk sender is behaving, and their absence degrades deliverability in a way nothing inside
+    /// the app can see.
+    /// </param>
     Task<bool> SendAsync(string toEmail, string subject, string htmlBody, string textBody,
+        IReadOnlyDictionary<string, string>? headers = null,
         CancellationToken ct = default);
 }
 
@@ -35,6 +42,7 @@ public class LoggingEmailSender : IEmailSender
     public bool IsLive => false;
 
     public Task<bool> SendAsync(string toEmail, string subject, string htmlBody, string textBody,
+        IReadOnlyDictionary<string, string>? headers = null,
         CancellationToken ct = default)
     {
         if (_logBodies)

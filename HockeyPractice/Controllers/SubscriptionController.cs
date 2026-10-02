@@ -81,11 +81,51 @@ public class SubscriptionController : TeamScopedController
     }
 
     /// <summary>
-    /// One click, no confirmation step — an unsubscribe that asks follow-up questions is the
-    /// reason people mark mail as spam instead.
+    /// Asks before unsubscribing. **This GET must stay read-only.**
+    ///
+    /// It used to delete the row outright, which read as kindness: an unsubscribe that asks
+    /// follow-up questions is the reason people mark mail as spam instead. The problem is who
+    /// follows links in a message body. Corporate link scanners and mail client prefetchers do,
+    /// without anyone clicking, so a parent could be unsubscribed by their own employer's security
+    /// appliance and never find out: the mail simply stops and the site looks broken. Nothing in
+    /// the app would record it either, because deleting the row is indistinguishable from the
+    /// parent having meant it.
+    ///
+    /// The one-click experience is not lost. The mail carries List-Unsubscribe-Post, so a mail
+    /// client's own unsubscribe button POSTs straight to <see cref="UnsubscribeConfirmed"/> and
+    /// never renders this page. A human who taps the link in the body gets one button.
     /// </summary>
     [HttpGet("s/unsub/{token}")]
     public async Task<IActionResult> Unsubscribe(string token)
+    {
+        var subscriber = await Db.Subscribers
+            .Include(s => s.Team)
+            .FirstOrDefaultAsync(s => s.UnsubToken == token);
+
+        // A spent or unknown token is not an error worth a scary page: the common cause is
+        // unsubscribing twice, and the outcome they wanted is already true.
+        if (subscriber is null)
+            return View("SubscriptionResult", ("You're already unsubscribed.",
+                "There are no practice plan emails going to that address. You can sign up again " +
+                "any time from your team's page."));
+
+        return View("Unsubscribe", (token, subscriber.Email, subscriber.Team?.Name ?? "this team"));
+    }
+
+    /// <summary>
+    /// Actually unsubscribes. Reached two ways: the button on the page above, and a mail client's
+    /// own one-click unsubscribe, which RFC 8058 defines as a POST to the List-Unsubscribe URL.
+    ///
+    /// No antiforgery token, and that is required rather than convenient. The one-click POST
+    /// arrives from Gmail's or Yahoo's infrastructure with no cookie and no form, so there is
+    /// nothing to validate against. The unguessable token in the URL is the authorisation, the
+    /// same way the confirm link is: 24 bytes of CSPRNG from <c>Security.NewToken</c>. The attack
+    /// this gives up is a cross-site POST that unsubscribes someone, which needs their token,
+    /// which is the whole secret anyway.
+    /// </summary>
+    [HttpPost("s/unsub/{token}")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> UnsubscribeConfirmed(string token)
     {
         var subscriber = await Db.Subscribers.FirstOrDefaultAsync(s => s.UnsubToken == token);
 

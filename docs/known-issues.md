@@ -19,9 +19,37 @@ condition has arrived.
 
 ## Blocked on configuration that is not set
 
-Production currently has no `RESEND_API_KEY`, so `IEmailSender` resolves to `LoggingEmailSender`,
-`NotificationService.IsLive` is false, and the signup box does not render at all. Both of these
-are inert until that changes.
+Production still has no `RESEND_API_KEY`, so `IEmailSender` resolves to `LoggingEmailSender`,
+`NotificationService.IsLive` is false, and the signup box does not render at all.
+
+**Both entries below are now FIXED, 1 October 2026, by audit batch R.** They were fixed while mail
+was still off, which is what CLAUDE.md asked for: before the key is set, not after. The original
+entries are kept under each because the reasoning is why the fix looks the way it does.
+
+### 1. Publishing a plan blocks on sending every subscriber email — FIXED 1 October 2026
+
+`CoachController.Publish` no longer awaits the send. It queues a `PublishNotification` carrying the
+plan id, the team id and the request's scheme, host and path base, and `PublishNotificationService`
+drains that queue outside the request and builds the absolute links with `LinkGenerator`. Measured
+locally against a stubbed provider with two confirmed subscribers: the publish POST returned 302 in
+**3.8 ms**, and both messages went out afterwards.
+
+Three things about the shape of it. The queue is **bounded at 100 with `DropWrite`**, because an
+unbounded queue turns a wedged provider into memory growth; a drop is logged, never surfaced,
+since the plan published either way. It is **in memory and per process**, like `MaintenanceState`,
+so a queued notification does not survive a restart: that is a deliberate limit, not an oversight,
+as the notification is worth sending in the seconds after a publish and not worth a durable
+outbox. And the background loop is **wrapped at both levels**, because
+`BackgroundServiceExceptionBehavior` defaults to `StopHost`, which is the same trap
+`ScheduledBackupService` documents: an unhandled send failure would take the site down.
+
+The sender also **re-reads the plan and re-checks `Status`** before sending, so a coach who
+publishes and immediately unpublishes does not mail the team about a plan they just withdrew.
+
+**Not changed:** `SubscriptionController.Subscribe` still sends its confirmation inside the
+request. That is one message rather than a loop, the parent is waiting on the "check your email"
+answer, and the worst case is a 15 second wait on the `ResendEmailSender` timeout. Worth revisiting
+only if that timeout is ever actually hit.
 
 ### 1. Publishing a plan blocks on sending every subscriber email
 
@@ -34,6 +62,40 @@ saved before the mail loop runs, which makes the ambiguity worse rather than bet
 **Trigger: the day `RESEND_API_KEY` is set.** Fix before switching mail on, not after. Either
 hand the loop to a background service, or give the whole loop one shared budget the way
 `VideoTitleService.PopulateTitlesAsync` already does with `OverallBudget`.
+
+### 2. Unsubscribe is a destructive GET, and there is no `List-Unsubscribe` header — FIXED 1 October 2026
+
+Split in two. `GET /s/unsub/{token}` is now read-only and renders a confirmation page;
+`POST /s/unsub/{token}` is the only thing that deletes. Measured locally: five GETs in a row leave
+the row in place, the POST removes it, a spent token GETs a plain "you're already unsubscribed"
+page rather than an error, and a second POST is idempotent.
+
+The POST carries `[IgnoreAntiforgeryToken]`, and that is required rather than lazy: RFC 8058
+one-click arrives from Gmail's or Yahoo's infrastructure with no cookie and no form, so there is
+nothing to validate against. The 24-byte CSPRNG token in the URL is the authorisation, exactly as
+it is for the confirm link.
+
+`List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` now ride on the
+notification mail, through a new optional `headers` argument on `IEmailSender.SendAsync`. Captured
+from the real request body against a stubbed provider:
+
+```json
+"headers": {
+  "List-Unsubscribe": "<http://localhost:8080/s/unsub/unsubtok0>",
+  "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
+}
+```
+
+Two details that are easy to undo. The URL is **angle-bracketed**, because the header is a list.
+And the `headers` property is **left out of the JSON entirely** when there is nothing to send,
+rather than sent as `null`: the confirmation mail is transactional and has nothing to unsubscribe
+from, and an API that type-checks its optional fields is entitled to reject a null. That needed
+`DefaultIgnoreCondition = WhenWritingNull`; measured, without it the payload carried
+`"headers": null`.
+
+**Still unverified, and only the real provider can close it:** that the two headers survive into
+the delivered message. That is the audit's own post-ship check for this batch and it needs
+`RESEND_API_KEY` set. What is proven is that they leave this app in the request body.
 
 ### 2. Unsubscribe is a destructive GET, and there is no `List-Unsubscribe` header
 

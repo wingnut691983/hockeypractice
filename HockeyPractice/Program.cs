@@ -81,6 +81,13 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<VideoTitleService>();
 builder.Services.AddHttpClient();
 
+// Publish-time subscriber mail runs here, not in the coach's request. See
+// PublishNotificationQueue for why. Singleton queue, one reader; the service is registered
+// unconditionally because an unconfigured sender still drains the queue (into the log), which is
+// what keeps the whole flow exercisable before a sending domain exists.
+builder.Services.AddSingleton<PublishNotificationQueue>();
+builder.Services.AddHostedService<PublishNotificationService>();
+
 // A real provider only when a key is present; otherwise mail is logged, so the whole
 // subscribe → confirm → notify flow still works before a sending domain exists.
 if (!string.IsNullOrWhiteSpace(builder.Configuration["RESEND_API_KEY"]))

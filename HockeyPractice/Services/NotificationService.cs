@@ -81,7 +81,18 @@ public class NotificationService
                 $"<p style=\"color:#8b95a7;font-size:12px\">" +
                 $"<a href=\"{Esc(unsub)}\" style=\"color:#8b95a7\">Stop these emails</a></p>");
 
-            if (await _email.SendAsync(subscriber.Email, subject, html, text)) sent++;
+            // RFC 8058 one-click. The URL is angle-bracketed because the header is a list, and
+            // the Post header is what lets the client POST to it instead of following a GET: the
+            // GET is now a confirmation page on purpose (see SubscriptionController.Unsubscribe),
+            // so without this pair a mail client's unsubscribe button would land a human on a
+            // page asking them to press another button.
+            var headers = new Dictionary<string, string>
+            {
+                ["List-Unsubscribe"] = $"<{unsub}>",
+                ["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+            };
+
+            if (await _email.SendAsync(subscriber.Email, subject, html, text, headers)) sent++;
         }
 
         _log.LogInformation("Notified {Sent} of {Total} subscribers about plan {PlanId}",

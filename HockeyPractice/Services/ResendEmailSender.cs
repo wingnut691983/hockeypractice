@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace HockeyPractice.Services;
 
@@ -23,9 +25,13 @@ public class ResendEmailSender : IEmailSender
         _from = config["EMAIL_FROM"] ?? "Practice Plans <onboarding@resend.dev>";
     }
 
+    private static readonly JsonSerializerOptions OmitNulls =
+        new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
     public bool IsLive => !string.IsNullOrWhiteSpace(_apiKey);
 
     public async Task<bool> SendAsync(string toEmail, string subject, string htmlBody, string textBody,
+        IReadOnlyDictionary<string, string>? headers = null,
         CancellationToken ct = default)
     {
         try
@@ -34,14 +40,20 @@ public class ResendEmailSender : IEmailSender
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
+            // The headers property is left OUT of the JSON when there is nothing to send, not sent
+            // as null and not as {}. The confirmation mail is transactional and has nothing to
+            // unsubscribe from, so it should carry no List-Unsubscribe at all, and an API that
+            // type-checks its optional fields is entitled to reject a null. Measured: without
+            // WhenWritingNull the payload carried "headers": null.
             var response = await client.PostAsJsonAsync("https://api.resend.com/emails", new
             {
                 from = _from,
                 to = new[] { toEmail },
                 subject,
                 html = htmlBody,
-                text = textBody
-            }, ct);
+                text = textBody,
+                headers = headers is { Count: > 0 } ? headers : null
+            }, OmitNulls, ct);
 
             if (response.IsSuccessStatusCode) return true;
 
