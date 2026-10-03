@@ -226,7 +226,7 @@
                         {
                             var pictureUrl = Url.Action("Diagram", "Drill", new
                             {
-                                slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id
+                                slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id, v = picture.Version
                             });
 
                             if (picture.IsPdf)

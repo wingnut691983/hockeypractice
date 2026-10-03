@@ -234,7 +234,7 @@
                                    name it and print a URL that can actually be typed. Shown
                                    on screen too, so the coach finds out before printing. *@
                                 var pdfUrl = Url.Action("Diagram", "Drill",
-                                    new { slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id },
+                                    new { slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id, v = picture.Version },
                                     Context.Request.Scheme);
 
                                 <p class="hp-print-note">
@@ -246,7 +246,7 @@
                             {
                                 var pictureUrl = Url.Action("Diagram", "Drill", new
                                 {
-                                    slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id
+                                    slug = Model.Ctx.Team.Slug, id = drill.Id, diagramId = picture.Id, v = picture.Version
                                 });
 
                                 @* No loading="lazy" here, unlike Details: an image below the

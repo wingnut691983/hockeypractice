@@ -177,7 +177,7 @@
             <div class="hp-diagram-grid">
                 @foreach (var picture in d.Diagrams.OrderBy(x => x.Id))
                 {
-                    var url = Url.Action("Diagram", new { slug, id = d.Id, diagramId = picture.Id });
+                    var url = Url.Action("Diagram", new { slug, id = d.Id, diagramId = picture.Id, v = picture.Version });
                     <div class="hp-diagram-item">
                         @if (picture.IsPdf)
                         {

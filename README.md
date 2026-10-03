@@ -953,6 +953,47 @@ answer in September.
   several teams posting the night before practice is not, and a partial send is close to invisible
   because `ResendEmailSender` logs a status code and nothing reaches the coach.
 
+- **`display: none` does not stop an image downloading, and that is how a phone-first site ended
+  up shipping 155 KB it never showed.** The top bar carries two brand logos, an emblem for narrow
+  screens and the full wordmark for wide ones, and until 2 Oct 2026 it rendered both as `<img>` and
+  hid one with a media query. The hide happens long after the fetch has started, so every phone
+  pulled both: 165,870 bytes of brand per cold page view to display about 10 KB of one of them, on
+  rink wifi, on the screen size this whole site is designed around. The CSS looked completely
+  correct and the page looked completely correct; nothing about it reads as a bug. It is now a
+  `<picture>` with a `<source media>`, which the browser resolves *before* it fetches. Measured
+  after, at 390px: one logo request, 3,448 bytes. **If you ever go back to two elements swapped by
+  CSS, you reintroduce the whole cost in a change that looks like a simplification.** The same trap
+  applies to any "just hide it on mobile" instinct for a heavy element.
+
+- **The team logo is deliberately ungated and deliberately `public`, and it is the odd one out.**
+  Three controller actions serve pictures off the volume. `DrillController.Diagram` and
+  `PlanController.Overview` sit behind the team code and so must be `private` — a shared cache
+  holding one is a cross-team leak. `TeamController.Logo` takes no access check at all, because it
+  is the `og:image`: a chat app unfurling a team link fetches it with no cookie, and a private
+  logo means no preview. The obvious tidy-up here is to make the three consistent, and it breaks
+  something in whichever direction you do it. There is a check for this in batch F's list: fetch a
+  logo URL with no cookie and confirm 200.
+
+- **An `immutable` cache header on a URL keyed by a database id is a loaded gun, and a restore is
+  what fires it.** All three picture actions take a `?v=` token carrying the file name's GUID and
+  only hand out a year-long `immutable` when it matches. That is not belt-and-braces: diagram URLs
+  are `/drills/{id}/diagram/{diagramId}` and logo URLs are `/{slug}/logo`, so neither address
+  contains anything that changes when the bytes do. A restore rolls ids back and reissues them to
+  different pictures (the same hazard the plan-directory note below describes), so a bare URL cached
+  for a year would paint the wrong diagram with no way to correct it from the server. The logo is
+  worse: a coach can replace it any afternoon. `CoachController` already wrote a fresh
+  `logo-<guid>.<ext>` per upload with a comment saying that stopped stale serving — it did not,
+  because the file name was never in the URL. `Team.LogoVersion` and `DrillDiagram.Version` are
+  what make that true. **Do not "simplify" by dropping the token and keeping the header.**
+
+- **`new WebpEncoder { Quality = 85 }` does not give you quality 85. It gives you lossless.**
+  `FileFormat` defaults to null, which ImageSharp treats as lossless, and `Quality` is then ignored
+  outright. Measured from one call on one image: 96,260 bytes with `Quality = 85` alone, 20,128
+  with `Quality = 85, FileFormat = WebpFileFormatType.Lossy`. Nothing warns you; the output is a
+  valid WebP and looks right. `PlanStorageService.ShrinkToWebpAsync` has this bug as of 2 Oct 2026
+  and is left for audit batch G, which already edits that method — see `docs/audit-2026-09.md`. The
+  two brand logos in `wwwroot` were re-encoded by hand with the format set explicitly.
+
 ## Things worth knowing before you change anything
 
 - **The print sheet is a separate layout and deliberately records nothing.**
@@ -1049,6 +1090,13 @@ response and middleware is order-sensitive:
   `asp-append-version` writes) gets a year and `immutable`, anything else gets an hour. Before
   this there was no `max-age` at all, so every asset was revalidated on every navigation.
 - **`frame-ancestors 'self'`**, plus `X-Frame-Options: SAMEORIGIN` for anything older.
+
+Pictures that live on the volume are served by controller actions and so never reach that static
+middleware. They set their own `Cache-Control`, and all three now follow one pattern: a `?v=` token
+carrying the file name's GUID, `max-age=31536000, immutable` when the token matches the file on
+disk, and `no-cache` when it is absent or stale. `DrillController.Diagram` and
+`PlanController.Overview` are `private`; `TeamController.Logo` is `public`, and the next section
+says why that difference is deliberate.
 
 ### Three things about that which are easy to undo
 

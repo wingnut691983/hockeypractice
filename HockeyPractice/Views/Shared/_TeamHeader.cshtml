@@ -1,4 +1,5 @@
 @model TeamContext
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersion
 @{
     var initials = string.Join("", Model.Team.Name
         .Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -22,10 +23,29 @@
         @* Site brand, and the way back to the team list, which is where a logo in the top-left
            corner is expected to go anyway. Two logos share this bar, so on a narrow phone the
            wordmark collapses to just the emblem: the full lockup plus the team's own logo and
-           name does not fit beside the menu at 390px without truncating the team to nothing. *@
+           name does not fit beside the menu at 390px without truncating the team to nothing.
+
+           <picture>, not two <img> swapped by CSS, which is what this was until 2 Oct 2026.
+           display:none is applied after the browser has already begun fetching, so every phone
+           downloaded the wide wordmark and then hid it: 155 KB per page view, on the narrow
+           screens this site is built for, for an image nobody saw. A <source media> is resolved
+           before the fetch, so exactly one file is downloaded.
+
+           asp-append-version is an <img>/<link>/<script> tag helper and does not reach <source>,
+           so the wordmark's cache token is added by hand through the same provider that helper
+           uses. Both need one: unversioned static files get an hour (Program.cs), versioned ones
+           get a year. *@
         <a class="hp-topbar-brand" asp-controller="Home" asp-action="Index" aria-label="EBHockey Plans, all teams">
-            <img class="hp-brand-mark" src="~/logo-mark.png" alt="" width="96" height="96" />
-            <img class="hp-brand-wordmark" src="~/logo-wordmark.png" alt="" width="880" height="275" />
+            <picture>
+                <source media="(min-width: 30rem)"
+                        srcset="@FileVersion.AddFileVersionToPath(Context.Request.PathBase, Url.Content("~/logo-wordmark.webp"))" />
+                @* width/height describe the fallback (the emblem). When the source above wins
+                   they are the wrong shape, so the box comes from CSS aspect-ratio at both
+                   widths rather than from these; they stay because they are still right for the
+                   narrow case, which is the one that renders without a media match. *@
+                <img class="hp-brand-lockup" src="~/logo-mark.webp" asp-append-version="true"
+                     alt="" width="96" height="96" />
+            </picture>
         </a>
 
         <a class="hp-topbar-id" asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">

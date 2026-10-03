@@ -1407,23 +1407,26 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   align-items: center;
   flex-shrink: 0;              /* the team name truncates before the logo does */
 }
-/* Deliberately sets no display here. `.hp-topbar-brand img` is (0,1,1) and would outrank the
-   (0,1,0) class rules below, so a display declared here pins BOTH variants visible at every
-   width and the media query silently does nothing. Every display rule for these two stays at
-   the same specificity so the media query is what decides. */
 .hp-topbar-brand img { width: auto; }
 
-/* Both stay under the bar's 44px content area, so neither can grow the header. Measured on the
+/* One <img> inside a <picture> now, not two swapped with display:none — see _TeamHeader for why
+   that swap was costing every phone a 155 KB download of an image it then hid. So the breakpoint
+   changes the element's SIZE rather than which of two elements is visible.
+
+   Both stay under the bar's 44px content area, so neither can grow the header. Measured on the
    real page: the two text lines beside them come to 34.3px and the team badge to 40px.
    The wordmark is set to 38 rather than 34 because the badge carries its own padding, so a
    38px box shows about 30px of actual artwork; that reads level with the two lines of text
-   while the badge itself lines up with the team's. */
-.hp-brand-mark     { display: block; height: 30px; }
-.hp-brand-wordmark { display: none;  height: 38px; }
+   while the badge itself lines up with the team's.
+
+   aspect-ratio is what keeps the header from jumping. With two <img> the width/height attributes
+   gave the browser each box before the bytes arrived; one <img> can only carry one pair, and
+   they describe the emblem, so the wide case needs its ratio stating here. Fixed height plus a
+   ratio is enough to reserve the exact box with no file loaded. */
+.hp-brand-lockup { display: block; height: 30px; aspect-ratio: 1; }
 
 @media (min-width: 30rem) {
-  .hp-brand-mark     { display: none; }
-  .hp-brand-wordmark { display: block; }
+  .hp-brand-lockup { height: 38px; aspect-ratio: 880 / 275; }
 }
 
 /* ── Changelog ─────────────────────────────────────────────

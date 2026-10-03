@@ -29,7 +29,7 @@
     // team with no logo of its own.
     var ogImage = team?.LogoFileName is null
         ? Url.Content("~/icon-512.png")
-        : Url.Action("Logo", "Team", new { slug = team.Slug });
+        : Url.Action("Logo", "Team", new { slug = team.Slug, v = team.LogoVersion });
 }
 <!DOCTYPE html>
 @* Team colours ride on the root element so one stylesheet serves every team. *@

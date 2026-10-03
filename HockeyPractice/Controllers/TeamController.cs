@@ -286,6 +286,22 @@ public class TeamController : TeamScopedController
             _ => "image/jpeg"
         };
 
+        // Every link the app writes carries ?v=<the file name's GUID>, which changes on every
+        // upload, so a request that names the current logo can be cached for a year. Without the
+        // token the bytes here may already have been replaced, so it revalidates instead; that is
+        // cheap, because PhysicalFile sets Last-Modified and answers 304.
+        //
+        // "public", unlike the diagram and overview pictures, which are "private". This action
+        // takes no access check on purpose: it is the og:image in _Layout, and a chat app
+        // unfurling a team link fetches it with no team cookie. Marking it private would stop
+        // those previews being cached at all. See Team.LogoVersion.
+        // The null check is first for the same reason as the other two: an absent ?v= reads as
+        // StringValues.Empty, which compares equal to a null string.
+        Response.Headers.CacheControl =
+            team.LogoVersion is not null && Request.Query["v"] == team.LogoVersion
+                ? "public, max-age=31536000, immutable"
+                : "public, no-cache";
+
         return PhysicalFile(path, contentType);
     }
 

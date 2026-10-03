@@ -393,8 +393,8 @@ contentTypes.Mappings[".bcmap"] = "application/octet-stream";
 // a versioned URL names exactly one immutable file and can be cached for a year: a change to the
 // file changes the hash, which changes the URL. Anything without one may be replaced in place, so
 // it gets an hour: long enough to drop the repeat round trips inside a session, short enough that
-// swapping a logo is not invisible for a day. The two logos are the assets that most want
-// versioning; see audit finding 1.6.
+// swapping a logo is not invisible for a day. Both logos carry asp-append-version as of 2 Oct 2026
+// and so sit in the top tier; the icons and the pdf.js assets are what is left in the hour tier.
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = contentTypes,

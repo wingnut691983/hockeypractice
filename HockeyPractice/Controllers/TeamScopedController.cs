@@ -94,7 +94,9 @@ public abstract class TeamScopedController : Controller
     }
 
     protected string? LogoUrlFor(Team team) =>
-        team.LogoFileName is null ? null : Url.Action("Logo", "Team", new { slug = team.Slug });
+        team.LogoFileName is null
+            ? null
+            : Url.Action("Logo", "Team", new { slug = team.Slug, v = team.LogoVersion });
 
     /// <summary>
     /// The current URL, including the reverse proxy's path prefix, for round-tripping through

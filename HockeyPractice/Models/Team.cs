@@ -19,6 +19,29 @@ public class Team
     [MaxLength(120)]
     public string? LogoFileName { get; set; }
 
+    /// <summary>
+    /// The logo file name's GUID, for the <c>?v=</c> token on the Logo URL. Null when the name
+    /// doesn't match the shape this app writes, which makes the response revalidate instead of
+    /// being cached hard.
+    ///
+    /// The upload writes a fresh <c>logo-&lt;guid&gt;.&lt;ext&gt;</c> every time, with a comment
+    /// saying that stops a stale logo being served. It does not on its own: the URL is
+    /// <c>/{slug}/logo</c> and has never carried the file name, so a replaced logo kept the same
+    /// address and browsers were free to keep painting the copy they had. This token is what
+    /// makes that comment true. Unlike the other two picture URLs the response is "public", not
+    /// "private": Logo is deliberately ungated because it is the og:image a chat app fetches to
+    /// unfurl a team link, and it arrives with no team cookie.
+    ///
+    /// Length-checked because this reads from a database column: 5 for "logo-" plus 32 hex, with
+    /// the extension off first because the logo keeps whichever one it was uploaded as.
+    /// </summary>
+    [NotMapped]
+    public string? LogoVersion =>
+        Path.GetFileNameWithoutExtension(LogoFileName) is { Length: 37 } n
+        && n.StartsWith("logo-", StringComparison.Ordinal)
+            ? n[5..]
+            : null;
+
     [MaxLength(9)] public string PrimaryColor { get; set; } = "#0B4EA2";
     [MaxLength(9)] public string AccentColor  { get; set; } = "#F0562D";
 

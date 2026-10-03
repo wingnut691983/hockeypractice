@@ -467,8 +467,32 @@ public class DrillController : TeamScopedController
         var path = _storage.DiagramPath(ctx.Team.Id, id, diagram.FileName);
         var contentType = diagram.IsPdf ? "application/pdf" : "image/webp";
 
-        // PhysicalFile, not File(stream): it sets ETag and Last-Modified and handles range
-        // requests, so a diagram isn't re-downloaded on every page view.
+        // Without a Cache-Control the browser revalidated on every page view, and each of those
+        // round trips ran this whole action again: ResolveAsync above (a Teams query, often a
+        // Players query, and OtherTeamsAsync), then the DrillDiagrams query, then a File.Exists.
+        // A 12-drill plan with a diagram each was about 48 database queries on a repeat view that
+        // should have cost nothing at all.
+        //
+        // Every link the app writes carries ?v=<the file name's GUID>, so a request that names
+        // the current picture can be cached for a year and costs no round trip on a second view.
+        // Without the token — an old link, a hand-typed URL, a diagram opened in its own tab
+        // before the plan was restored — the bytes here may not be the ones that URL used to
+        // mean, so it has to revalidate. See DrillDiagram.Version for why the id in the path is
+        // not enough on its own. "private" in both cases, never "public": a diagram is behind
+        // the team code and must not land in a shared cache.
+        // The null check is first and is load-bearing: an absent ?v= reads as StringValues.Empty,
+        // which compares equal to a null string, so a malformed row would otherwise hand a
+        // tokenless request the immutable header.
+        Response.Headers.CacheControl =
+            diagram.Version is not null && Request.Query["v"] == diagram.Version
+                ? "private, max-age=31536000, immutable"
+                : "private, no-cache";
+
+        // PhysicalFile, not File(stream): it sets Last-Modified and handles range requests, so
+        // the revalidating case above answers 304 instead of resending the picture. It does not
+        // set an ETag — PhysicalFileResult sets EntityTag only when the caller supplies one — so
+        // the conditional request that comes back is If-Modified-Since. This comment claimed an
+        // ETag until 2 Oct 2026 and PlanController.Overview was right to flag it.
         return PhysicalFile(path, contentType);
     }
 

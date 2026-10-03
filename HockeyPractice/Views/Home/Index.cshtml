@@ -4,8 +4,12 @@
 <div class="hp-shell">
     @* Still an h1 so the page keeps its heading; the alt text carries the name for screen
        readers and search. *@
+    @* The largest thing on this page and the LCP element, so it carries the version token that
+       moves it onto the year-long cache tier. fetchpriority high because it is the one image
+       above the fold and the page is otherwise text. *@
     <h1 class="hp-title hp-home-brand">
-        <img src="~/logo-wordmark.png" alt="EBHockey Plans" width="880" height="275" />
+        <img src="~/logo-wordmark.webp" asp-append-version="true" fetchpriority="high"
+             alt="EBHockey Plans" width="880" height="275" />
     </h1>
 
     @if (Model.Teams.Count == 0)
@@ -24,7 +28,7 @@
             var level = Model.LevelFor(team.Id);
             var logoUrl = team.LogoFileName is null
                 ? null
-                : Url.Action("Logo", "Team", new { slug = team.Slug });
+                : Url.Action("Logo", "Team", new { slug = team.Slug, v = team.LogoVersion });
             var initials = string.Join("", team.Name
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Take(2).Select(w => char.ToUpperInvariant(w[0])));

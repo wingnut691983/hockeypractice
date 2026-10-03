@@ -40,7 +40,7 @@
         @foreach (var picture in Model.Diagrams)
         {
             var pictureUrl = Url.Action("Diagram", "Drill",
-                new { slug, id = Model.Drill.Id, diagramId = picture.Id });
+                new { slug, id = Model.Drill.Id, diagramId = picture.Id, v = picture.Version });
 
             if (picture.IsPdf)
             {
@@ -68,7 +68,7 @@
                 @foreach (var picture in Model.Diagrams.Where(p => !p.IsPdf))
                 {
                     <img class="hp-peek-diagram"
-                         src="@Url.Action("Diagram", "Drill", new { slug, id = Model.Drill.Id, diagramId = picture.Id })"
+                         src="@Url.Action("Diagram", "Drill", new { slug, id = Model.Drill.Id, diagramId = picture.Id, v = picture.Version })"
                          alt="Diagram for @Model.Drill.Title" />
                 }
             </noscript>
