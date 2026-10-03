@@ -308,8 +308,28 @@ public class PlanStorageService
                 }));
             }
 
+            // FileFormat is NOT optional here, however redundant it looks beside Quality. It
+            // defaults to null, ImageSharp reads null as lossless, and Quality is then ignored
+            // outright — so `new WebpEncoder { Quality = 85 }` silently wrote lossless WebP from
+            // the day this was added until 2 Oct 2026, and the output is a valid file that looks
+            // correct, so nothing ever complained.
+            //
+            // Measured at the 1600px width this method stores, on content shaped like what
+            // coaches actually upload: a photo of a diagram 1,160,774 bytes lossless against
+            // 299,248 lossy, and it encodes faster too (1,630 ms against 1,075 ms). The two
+            // largest diagrams on the volume in Sept 2026 were 694 KB and 623 KB, which is a
+            // photograph stored lossless, not line art.
+            //
+            // Lossy is not universally smaller and the tradeoff is worth knowing before anyone
+            // "fixes" this again: a clean line-art export goes the other way, 14,720 bytes
+            // lossless against 20,892 lossy. That case is accepted. It is a few KB on files that
+            // are already tiny, the photographs are what threaten the 1 GiB cap, and encoding
+            // both to keep the smaller would roughly double CPU on a path that accepts four
+            // large photos in one request. Quality 85 on line art was checked at 1:1 pixels and
+            // shows no visible ringing on 15px text or thin rink lines.
             await using var destination = File.Create(target);
-            await image.SaveAsWebpAsync(destination, new WebpEncoder { Quality = 85 }, ct);
+            await image.SaveAsWebpAsync(destination,
+                new WebpEncoder { Quality = 85, FileFormat = WebpFileFormatType.Lossy }, ct);
             return null;
         }
         catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException

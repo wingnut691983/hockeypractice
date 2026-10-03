@@ -987,12 +987,28 @@ answer in September.
   what make that true. **Do not "simplify" by dropping the token and keeping the header.**
 
 - **`new WebpEncoder { Quality = 85 }` does not give you quality 85. It gives you lossless.**
-  `FileFormat` defaults to null, which ImageSharp treats as lossless, and `Quality` is then ignored
-  outright. Measured from one call on one image: 96,260 bytes with `Quality = 85` alone, 20,128
-  with `Quality = 85, FileFormat = WebpFileFormatType.Lossy`. Nothing warns you; the output is a
-  valid WebP and looks right. `PlanStorageService.ShrinkToWebpAsync` has this bug as of 2 Oct 2026
-  and is left for audit batch G, which already edits that method — see `docs/audit-2026-09.md`. The
-  two brand logos in `wwwroot` were re-encoded by hand with the format set explicitly.
+  `FileFormat` defaults to null, ImageSharp reads null as lossless, and `Quality` is then ignored
+  outright. Nothing warns you: the output is a valid WebP that looks correct, so
+  `ShrinkToWebpAsync` wrote lossless from the day it was added until 2 Oct 2026 and nobody noticed.
+  Fixed by setting `FileFormat` explicitly, and the explicit-looking redundancy beside `Quality` is
+  the point — do not tidy it away.
+
+  **The reason to set it to lossy is narrower than it first looks, and I got this wrong once
+  before correcting it.** My first measurement was on the wordmark and I generalised it to "every
+  stored picture is 4-5x too big". It is not. Lossy is not universally smaller. At the 1600px
+  width that method stores: a photo of a diagram is 1,160,774 bytes lossless against 299,248
+  lossy, a text-heavy screenshot 51,756 against 34,224, but a **clean line-art export goes the
+  other way**, 14,720 lossless against 20,892 lossy. Lossy is right here because photographs are
+  what actually get uploaded and what threatens the 1 GiB cap — the two largest diagrams the old
+  encoder stored were 694 KB and 623 KB, which is a photograph, not line art — and because the
+  regression case costs a few KB on files that are already tiny. Encoding both and keeping the
+  smaller would never regress and was still rejected: it roughly doubles CPU on a path that takes
+  four large photos in one request. Quality 85 was checked on line art at 1:1 pixels, with no
+  visible ringing on 15px text or thin rink lines. **If you ever reopen this, measure on a photo
+  and on a clean export, not on one image.**
+
+  Existing files were not re-encoded; the fix only changes new uploads. The two brand logos in
+  `wwwroot` were re-encoded by hand with the format set explicitly.
 
 ## Things worth knowing before you change anything
 
