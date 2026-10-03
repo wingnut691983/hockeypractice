@@ -52,6 +52,27 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection("Site"));
+
+// Two limits that have to agree and live in different files, which is exactly how they drifted
+// apart before: a 20 MB request cap against an allowance of 6 diagrams at 10 MB each, so four
+// large photos were refused by Kestrel before the action ran and the coach got a bare 400 instead
+// of the "here is what fitted" message. MaxUploadRequestBytes must be a compile-time constant and
+// MaxDiagramBytes is configurable, so nothing but a check can hold them together. Fails closed at
+// startup rather than waiting for a coach to find it: a misconfigured cap is invisible until
+// someone tries a big upload, and then it looks like a broken site.
+{
+    var site = builder.Configuration.GetSection("Site").Get<SiteOptions>() ?? new SiteOptions();
+    var needed = (long)DrillController.MaxDiagrams * site.MaxDiagramBytes;
+    if (DrillController.MaxUploadRequestBytes < needed)
+    {
+        throw new InvalidOperationException(
+            $"Site:MaxDiagramBytes is {site.MaxDiagramBytes} and a drill holds " +
+            $"{DrillController.MaxDiagrams} pictures, which needs a request limit of at least " +
+            $"{needed} bytes, but DrillController.MaxUploadRequestBytes is " +
+            $"{DrillController.MaxUploadRequestBytes}. Raise the constant or lower the option.");
+    }
+}
+
 builder.Services.AddScoped<TeamAccessService>();
 builder.Services.AddScoped<PlanStorageService>();
 builder.Services.AddSingleton<DatabaseBackupService>();

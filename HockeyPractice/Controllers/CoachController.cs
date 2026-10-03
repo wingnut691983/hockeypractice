@@ -14,22 +14,16 @@ public class CoachController : TeamScopedController
 {
     private readonly PlanStorageService _storage;
     private readonly LinkExtractionService _links;
-    private readonly DataPaths _paths;
     private readonly VideoTitleService _videoTitles;
     private readonly ILogger<CoachController> _log;
 
-    private static readonly string[] AllowedLogoTypes =
-        ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    private const long MaxLogoBytes = 2 * 1024 * 1024;
-
     public CoachController(AppDbContext db, TeamAccessService access, PlanStorageService storage,
-        LinkExtractionService links, DataPaths paths, VideoTitleService videoTitles,
+        LinkExtractionService links, VideoTitleService videoTitles,
         ILogger<CoachController> log)
         : base(db, access)
     {
         _storage = storage;
         _links = links;
-        _paths = paths;
         _videoTitles = videoTitles;
         _log = log;
     }
@@ -1110,12 +1104,20 @@ public class CoachController : TeamScopedController
         if (!string.IsNullOrWhiteSpace(timeZoneId)) team.TimeZoneId = timeZoneId.Trim();
 
         string? notice = null;
+        var previousLogo = team.LogoFileName;
         if (logo is { Length: > 0 })
         {
             notice = await SaveLogoAsync(team, logo);
         }
 
         await Db.SaveChangesAsync();
+
+        // Row first, then the old file, matching SetOverview. This used to delete the old logo
+        // before the row was written, so a failure in between left the team pointing at a file
+        // that was already gone — a broken image on every page that team has.
+        if (previousLogo is not null && previousLogo != team.LogoFileName)
+            _storage.DeleteLogo(team.Id, previousLogo);
+
         return RedirectToAction(nameof(Index), new { slug, notice = notice ?? "Saved." });
     }
 
@@ -1185,38 +1187,22 @@ public class CoachController : TeamScopedController
 
     // ── helpers ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Points the team at a newly stored logo, returning an error message to show the manager or
+    /// null on success. The old file is NOT removed here — see the caller, which drops it only
+    /// after the row is saved.
+    ///
+    /// The validation and the re-encode moved to PlanStorageService.SaveLogoAsync on 3 Oct 2026.
+    /// This used to trust the browser's Content-Type, derive the extension from it and copy the
+    /// bytes through untouched, which made it the one upload path on the site that stored
+    /// something it had never looked at.
+    /// </summary>
     private async Task<string?> SaveLogoAsync(Team team, IFormFile logo)
     {
-        if (logo.Length > MaxLogoBytes) return "Logo must be under 2 MB.";
+        var saved = await _storage.SaveLogoAsync(team.Id, logo);
+        if (!saved.Ok) return saved.Error;
 
-        var contentType = logo.ContentType?.ToLowerInvariant() ?? string.Empty;
-        if (!AllowedLogoTypes.Contains(contentType))
-            return "Logo must be a JPEG, PNG, GIF or WebP image.";
-
-        var ext = contentType switch
-        {
-            "image/png" => ".png",
-            "image/gif" => ".gif",
-            "image/webp" => ".webp",
-            _ => ".jpg"
-        };
-
-        var dir = _paths.TeamDirectory(team.Id);
-        Directory.CreateDirectory(dir);
-
-        // New filename each time so browsers and the CDN don't serve the old logo.
-        var fileName = $"logo-{Guid.NewGuid():N}{ext}";
-        await using (var destination = System.IO.File.Create(Path.Combine(dir, fileName)))
-        await using (var source = logo.OpenReadStream())
-            await source.CopyToAsync(destination);
-
-        if (team.LogoFileName is not null)
-        {
-            try { System.IO.File.Delete(Path.Combine(dir, team.LogoFileName)); }
-            catch (IOException) { /* non-fatal: the new logo is already in place */ }
-        }
-
-        team.LogoFileName = fileName;
+        team.LogoFileName = saved.FileName;
         return null;
     }
 

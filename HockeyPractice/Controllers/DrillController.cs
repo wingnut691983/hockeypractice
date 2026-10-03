@@ -87,7 +87,8 @@ public class DrillController : TeamScopedController
 
     [HttpPost("new")]
     [ValidateAntiForgeryToken]
-    [RequestSizeLimit(20 * 1024 * 1024)]
+    [RequestSizeLimit(MaxUploadRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadRequestBytes)]
     public async Task<IActionResult> Create(string slug, string title, string? description,
         string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams,
         string? returnUrl)
@@ -160,7 +161,8 @@ public class DrillController : TeamScopedController
 
     [HttpPost("{id:int}")]
     [ValidateAntiForgeryToken]
-    [RequestSizeLimit(20 * 1024 * 1024)]
+    [RequestSizeLimit(MaxUploadRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadRequestBytes)]
     public async Task<IActionResult> Update(string slug, int id, string title, string? description,
         string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams)
     {
@@ -917,6 +919,20 @@ public class DrillController : TeamScopedController
     /// that a library can't quietly eat the volume. Public so the form can state the limit
     /// rather than hard-coding a number that could drift away from the check.</summary>
     public const int MaxDiagrams = 6;
+
+    /// <summary>
+    /// Largest body these two upload actions accept. It has to clear MaxDiagrams times
+    /// SiteOptions.MaxDiagramBytes, or the app's own allowance is unreachable: it was 20 MB
+    /// against an allowance of 6 x 10 MB, so attaching four large photos was refused by Kestrel
+    /// before the action ran at all. That gives a bare 400 and loses the whole form, where
+    /// AddDiagramsAsync was written to accept what fits and say what didn't.
+    ///
+    /// MaxDiagramBytes is configurable and this must be a compile-time constant, so the two
+    /// cannot be tied together here. Program.cs asserts the relationship at startup instead, and
+    /// will refuse to boot rather than let them drift apart silently again. Raise this if you
+    /// raise that. The slack covers the form fields riding alongside the files.
+    /// </summary>
+    public const long MaxUploadRequestBytes = MaxDiagrams * 10L * 1024 * 1024 + 1024 * 1024;
 
     public const int MaxTags = 15;
 

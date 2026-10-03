@@ -271,9 +271,15 @@ public class PlanStorageService
     /// Decodes, scales down if oversized, and re-encodes as WebP. Returns an error message when the
     /// upload isn't a usable image.
     /// </summary>
+    /// <param name="maxWidth">
+    /// Widest the stored image gets. Defaults to the diagram width, which is what the two picture
+    /// paths want. A team logo passes something far smaller: it renders about 40px tall in the
+    /// header and its largest real use is as the og:image, where chat apps want roughly 300px.
+    /// </param>
     private async Task<string?> ShrinkToWebpAsync(IFormFile file, string target, CancellationToken ct,
-        string? notAnImageMessage = null)
+        string? notAnImageMessage = null, int? maxWidth = null)
     {
+        var widest = maxWidth ?? _options.DiagramMaxWidth;
         // The default names PDF as acceptable because the drill path accepts one. The overview
         // path does not, so it passes its own wording rather than telling a coach to try the one
         // thing that is certain to be refused.
@@ -299,12 +305,12 @@ public class PlanStorageService
             await using var source = file.OpenReadStream();
             using var image = await Image.LoadAsync(source, ct);
 
-            if (image.Width > _options.DiagramMaxWidth)
+            if (image.Width > widest)
             {
                 image.Mutate(x => x.Resize(new ResizeOptions
                 {
                     Mode = ResizeMode.Max,
-                    Size = new Size(_options.DiagramMaxWidth, 0)
+                    Size = new Size(widest, 0)
                 }));
             }
 
@@ -332,9 +338,31 @@ public class PlanStorageService
                 new WebpEncoder { Quality = 85, FileFormat = WebpFileFormatType.Lossy }, ct);
             return null;
         }
-        catch (Exception ex) when (ex is UnknownImageFormatException or InvalidImageContentException
-                                      or NotSupportedException)
+        // Deliberately broad. The filter here used to name three exception types, and the decode
+        // path can throw plenty more: ImageProcessingException, InvalidOperationException and
+        // OutOfMemoryException among them. Any of those was an unhandled 500, and the real cost
+        // was not the error page — it was that the coach lost everything typed into the drill
+        // form, and the partial-success message in AddDiagramsAsync never got to run. A picture
+        // the decoder cannot handle is a bad upload, not a server fault, so it answers like one.
+        //
+        // The two exclusions are not tidiness. OperationCanceledException means the client went
+        // away, and reporting that as a bad image would be a lie about a request nobody is
+        // waiting for. IOException means the volume is full or unwritable, and the caller already
+        // turns that into "Could not save that file. The storage volume may be full." Swallowing
+        // it here would replace a true, actionable message with a wrong one.
+        catch (Exception ex) when (ex is not OperationCanceledException and not IOException)
         {
+            // The three below are ordinary "that isn't an image" and not worth a log line.
+            // Anything else reaching here is a decoder fault, a resource limit, or a case nobody
+            // predicted. It still answers with the friendly message rather than 500ing, but it
+            // gets recorded — a widened filter that logs nothing hides real faults forever.
+            if (ex is not (UnknownImageFormatException or InvalidImageContentException
+                           or NotSupportedException))
+            {
+                _log.LogWarning("Image upload failed with {Type}: {Error}",
+                    ex.GetType().Name, ex.Message);
+            }
+
             return notAnImage;
         }
     }
@@ -458,6 +486,70 @@ public class PlanStorageService
         _paths.PlanOverview(teamId, planId, fileName);
 
     /// <summary>
+    /// Stores a team's logo, replacing whatever the caller had before.
+    ///
+    /// This path used to live in CoachController and was the one upload on the site that took the
+    /// browser at its word: it read the Content-Type header, picked an extension from it, and
+    /// copied the bytes to the volume unexamined. The PDF path sniffs for %PDF- and the two
+    /// picture paths decode and re-encode, so the logo was the sole exception, and the comment on
+    /// SaveDiagramAsync named it as such. Routing it here closes that: the header is irrelevant,
+    /// the decoder decides, and what lands is WebP this app wrote.
+    ///
+    /// Shrinking matters more here than anywhere else on the site, because a team's logo is on
+    /// every page that team has. An unexamined 2 MB PNG was shipped on all of them.
+    ///
+    /// The caller owns the old file, the same contract as <see cref="SaveOverviewAsync"/>: this
+    /// writes the new one and reports its name, and deleting the previous one only after the row
+    /// is saved is what stops a failure here leaving a team pointing at nothing.
+    /// </summary>
+    public async Task<DiagramResult> SaveLogoAsync(int teamId, IFormFile file,
+        CancellationToken ct = default)
+    {
+        if (file.Length == 0) return new DiagramResult(false, "That file is empty.");
+
+        if (file.Length > _options.MaxLogoBytes)
+            return new DiagramResult(false,
+                $"That file is {Human(file.Length)}. The limit is {Human(_options.MaxLogoBytes)}.");
+
+        if (IsFull())
+            return new DiagramResult(false,
+                "Storage is nearly full. Delete some old plans or drills before uploading more.");
+
+        var dir = _paths.TeamDirectory(teamId);
+        Directory.CreateDirectory(dir);
+
+        // Shape matters: Team.LogoVersion reads the GUID back out of this name to build the ?v=
+        // token the Logo action caches on, and it length-checks "logo-" plus 32 hex.
+        var fileName = $"logo-{Guid.NewGuid():N}.webp";
+        var target = Path.Combine(dir, fileName);
+
+        try
+        {
+            var error = await ShrinkToWebpAsync(file, target, ct,
+                "A logo needs to be an image (JPEG, PNG, GIF or WebP).",
+                _options.LogoMaxWidth);
+
+            if (error is not null)
+            {
+                TryDelete(target);
+                return new DiagramResult(false, error);
+            }
+
+            return new DiagramResult(true, Bytes: new FileInfo(target).Length, FileName: fileName);
+        }
+        catch (IOException ex)
+        {
+            _log.LogError("Failed to write logo for team {TeamId}: {Error}", teamId, ex.Message);
+            TryDelete(target);
+            return new DiagramResult(false, "Could not save that file. The storage volume may be full.");
+        }
+    }
+
+    /// <summary>Removes one team logo — the old one, after a replacement is safely written.</summary>
+    public void DeleteLogo(int teamId, string fileName) =>
+        TryDelete(Path.Combine(_paths.TeamDirectory(teamId), Path.GetFileName(fileName)));
+
+    /// <summary>
     /// Duplicates a diagram for a copied drill. Copies rather than references so each team can
     /// edit or delete its own drill without touching anyone else's.
     /// </summary>
@@ -528,6 +620,20 @@ public class SiteOptions
     /// <summary>Largest drill diagram accepted, before shrinking. PDFs can't be shrunk, so this
     /// is what actually caps them.</summary>
     public long MaxDiagramBytes { get; set; } = 10 * 1024 * 1024;
+
+    /// <summary>
+    /// Largest team logo accepted, before shrinking. Smaller than a diagram on purpose: a logo is
+    /// a small mark, and this one is checked before anything is decoded.
+    /// </summary>
+    public long MaxLogoBytes { get; set; } = 2 * 1024 * 1024;
+
+    /// <summary>
+    /// Widest a stored team logo gets. Far below the diagram width because the logo is drawn about
+    /// 40px tall in the header and about 30px on a team card. The floor is the og:image: several
+    /// chat apps refuse a preview picture under roughly 300px, so this must stay comfortably above
+    /// that or link unfurls lose their image.
+    /// </summary>
+    public int LogoMaxWidth { get; set; } = 512;
 
     /// <summary>
     /// Widest a stored diagram image gets. Anything larger is scaled down — a phone photo of a

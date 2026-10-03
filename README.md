@@ -158,6 +158,14 @@ admin page says so. Everything else keeps working. The tunables live in `appsett
 `Archive` (`HourUtc` 8, which is 03:00 Central in summer; `Keep` 3; `MaxBytes` 512 MB) because they
 are code decisions rather than deployment config. Override with `Archive__Keep` style names.
 
+The `Site` section holds the upload limits (`MaxUploadBytes` for a plan PDF, `MaxDiagramBytes` and
+`MaxLogoBytes` for pictures, `DiagramMaxWidth` and `LogoMaxWidth` for how far each is scaled down).
+**One of them can stop the app booting, on purpose.** A drill holds `DrillController.MaxDiagrams`
+pictures, so `MaxDiagramBytes` times that has to fit inside the request cap on the two drill upload
+actions, and that cap must be a compile-time constant. `Program.cs` checks the pair at startup and
+throws if raising `MaxDiagramBytes` has outgrown it, naming both numbers. That is the fix for them
+having silently disagreed before; see "What I'd flag".
+
 ## Backups
 
 There are two, and they cover different things.
@@ -985,6 +993,45 @@ answer in September.
   `logo-<guid>.<ext>` per upload with a comment saying that stopped stale serving — it did not,
   because the file name was never in the URL. `Team.LogoVersion` and `DrillDiagram.Version` are
   what make that true. **Do not "simplify" by dropping the token and keeping the header.**
+
+- **The team logo was the one upload on this site that stored bytes nobody had looked at, and the
+  giveaway was how little code it had.** It read the browser's `Content-Type` header, picked the
+  file extension from that header, and copied the stream to the volume. No sniff, no decode, no
+  size reduction. Every sibling path does more: the PDF path checks for `%PDF-`, and both picture
+  paths decode and re-encode. The security half is milder than it sounds (the extension comes from
+  a fixed allowlist so there is no route to `.html` or `.svg`, and `nosniff` is set), so the real
+  damage was weight: an unexamined 2 MB PNG served on every page that team has. It now goes through
+  `PlanStorageService.SaveLogoAsync` like everything else. Measured on a real upload: 1,694,075
+  bytes in, **6,720 bytes stored**, re-encoded to WebP and scaled to 512px wide regardless of what
+  the browser claimed it was. **512 is a floor, not a preference** — the logo is the `og:image`, and
+  several chat apps drop a preview picture under about 300px, so do not shrink it further.
+
+- **Fixing that also fixed an ordering bug worth not reintroducing.** The old code deleted the
+  previous logo file *before* the row was written, so a failure in between left a team pointing at
+  a file that was already gone, which is a broken image on every page. `SetOverview` had the right
+  shape and a comment saying why ("Row first, then the old file"); `Branding` now matches it.
+
+- **A crafted image used to be an unhandled 500, and the cost was the coach's typing, not the error
+  page.** The decode path caught three exception types by name. Everything else — and there is a
+  lot of it — went up as a 500, which meant the title, description, run time and tags the coach had
+  just entered were gone, and the careful "only 2 fitted" message never ran. The filter is now
+  broad, with two deliberate exclusions: `OperationCanceledException` (the client left, and calling
+  that a bad image is a lie) and `IOException` (the volume is full, and the caller already has a
+  true message for it). **Reproduced, not theorised:** a PNG whose header declares a width of zero
+  throws `ArgumentOutOfRangeException`, which was in none of the three named types. It is now a
+  friendly refusal and a logged warning. The three ordinary "not an image" types stay unlogged so
+  bad uploads do not fill the log, but anything else gets a line — a widened filter that logs
+  nothing hides real faults forever.
+
+- **Two upload limits in different files have to agree, and a comment was never going to hold
+  them.** A drill accepts 6 pictures at 10 MB each, but the request cap was 20 MB, so four large
+  photos were refused by Kestrel before the action ran: a bare 400, with the whole form lost, from
+  an upload the app's own rules allow. The cap is now derived from `MaxDiagrams` in
+  `DrillController`, and because `MaxDiagramBytes` is configurable while a `[RequestSizeLimit]`
+  needs a compile-time constant, **`Program.cs` asserts the relationship at startup and refuses to
+  boot if they drift**. Verified both ways: raising `Site__MaxDiagramBytes` to 20 MB stops the app
+  with a message naming both numbers, and the default config boots clean. A misconfigured cap is
+  otherwise invisible until a coach tries a big upload, and then it looks like a broken site.
 
 - **`new WebpEncoder { Quality = 85 }` does not give you quality 85. It gives you lossless.**
   `FileFormat` defaults to null, ImageSharp reads null as lossless, and `Quality` is then ignored
