@@ -990,8 +990,8 @@ answer in September.
   `FileFormat` defaults to null, ImageSharp reads null as lossless, and `Quality` is then ignored
   outright. Nothing warns you: the output is a valid WebP that looks correct, so
   `ShrinkToWebpAsync` wrote lossless from the day it was added until 2 Oct 2026 and nobody noticed.
-  Fixed by setting `FileFormat` explicitly, and the explicit-looking redundancy beside `Quality` is
-  the point — do not tidy it away.
+  Fixed by setting `FileFormat` explicitly (shipped in `v39`), and the explicit-looking redundancy
+  beside `Quality` is the point — do not tidy it away.
 
   **The reason to set it to lossy is narrower than it first looks, and I got this wrong once
   before correcting it.** My first measurement was on the wordmark and I generalised it to "every
