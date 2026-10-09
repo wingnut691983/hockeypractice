@@ -15,11 +15,28 @@
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <!-- Shrinks drill diagrams on upload. Pinned to 3.x deliberately: 4.x moved to a paid licence
          and fails the build with "No Six Labors license found" until you buy one. 3.1.x is the
-         Six Labors Split License — free for individuals and orgs under $1M revenue — and still
-         gets security fixes, which matters for a decoder that parses uploaded files.
+         Six Labors Split License — free for individuals and orgs under $1M revenue.
          Must also stay fully managed: Dockerfile.fast publishes on the host and assembles onto a
          linux/amd64 base, so a package with native per-RID assets would build fine and fail at
-         runtime. Do not "upgrade to latest" without reading this. -->
+         runtime. Do not "upgrade to latest" without reading this.
+
+         THE "still gets security fixes" PART OF THIS NOTE WAS WRONG, corrected 3 Oct 2026.
+         3.1.12 is the last release of the 3.1 line and carries five open advisories, three of
+         them High. Every one is patched only in 4.1.2, so no 3.x fix is coming.
+         A vulnerability scan of this project will keep reporting them.
+
+         Four of the five cannot be reached from this app: two are TIFF CCITT encoders and this
+         app only ever encodes WebP, one needs Image<HalfVector4> plus HistogramEqualization which
+         it never calls, and the ICC one is reached on 3.x through the IccProfile.Entries accessor,
+         which it never touches. The fifth, GHSA-wmxv-xphr-5c9g, is a BigTIFF decoder that can be
+         made to spin on a 24-byte file — and that one WAS reachable, because ImageSharp's default
+         configuration registers nine decoders while this app accepts four.
+         PlanStorageService.DecodeFormats now registers only those four, which removes it without
+         a licence. See README "What I'd flag" and known-issues #14.
+
+         So: upgrading is a licence decision, not a version bump, and the thing to re-check before
+         taking it is whether a NEW advisory lands on JPEG, PNG, GIF or WebP. Those are the four
+         still being decoded. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <!-- Uploads the nightly volume archive to Cloudflare R2 over the S3-compatible API.
          Pinned to an EXACT version, not 3.7.*: the request shape changes inside that range.

@@ -400,6 +400,40 @@ questions attached, which is why it was not done in passing.
 any request to widen the card beyond the title (a date, the rink). Either one means the token work
 is now worth doing.** Also revisit if plan titles ever start carrying player names.
 
+### 15. ImageSharp 3.1.12 carries five open advisories and the fix needs a paid licence
+
+`dotnet list package --vulnerable` reports five against `SixLabors.ImageSharp` 3.1.12, three of
+them High. **3.1.12 is the last release of the 3.1 line and every one is patched only in 4.1.2**,
+so no 3.x fix is coming and the report will not go away while the pin stands. The csproj note
+claiming 3.1.x "still gets security fixes" was wrong and has been corrected.
+
+Four of the five cannot be reached from this app:
+
+| Advisory | Why it cannot be reached |
+|---|---|
+| GHSA-jjfr-hcj7-qf5w (High) | TIFF CCITT Group 4 **encoder**. This app only ever encodes WebP |
+| GHSA-j9gm-c75j-xc9q (High) | TIFF CCITT Group 3 **encoder**. Same |
+| GHSA-j3p4-wp97-rph4 (High) | Needs `Image<HalfVector4>` and `HistogramEqualization()`. Neither is used |
+| GHSA-gwg2-r3hj-4w44 (Moderate) | ICC over-allocation, reached on 3.x through the `IccProfile.Entries` accessor, which is never called. **The one I would least confidently rule out** |
+
+The fifth, **GHSA-wmxv-xphr-5c9g** (Moderate), is a BigTIFF decoder that can be made to spin on a
+24-byte file, and it *was* reachable: ImageSharp's default configuration registers nine decoders
+while this app accepts four. **Fixed on 3 October 2026** by registering only JPEG, PNG, GIF and
+WebP (`PlanStorageService.DecodeFormats`), which also dropped BMP, PBM, QOI, TGA and TIFF as
+attack surface this app had never wanted. Measured after: a malformed BigTIFF is refused in 4 ms
+with the ordinary "that needs to be an image" message, and all four accepted formats still upload.
+
+So what is left is a **reporting** problem, not an exposure one, and clearing it means buying into
+4.x: compiling against 4.0.0 or later fails until a Six Labors licence file is present. That is an
+admin and possibly cost decision rather than a version bump.
+
+**Trigger: a new advisory landing on JPEG, PNG, GIF or WebP** — those are the four formats still
+being decoded, and the format gate would not help. Also revisit if a Six Labors licence is
+obtained for any other reason, or if a compliance process requires a clean vulnerability scan
+rather than a reasoned exposure argument.
+
+---
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.

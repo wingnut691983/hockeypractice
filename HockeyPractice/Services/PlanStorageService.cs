@@ -1,6 +1,10 @@
 using HockeyPractice.Infrastructure;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 using SixLabors.ImageSharp.Processing;
 
@@ -26,6 +30,35 @@ public class PlanStorageService
     // Every PDF starts with these five bytes. Checked instead of trusting the file extension
     // or the browser-supplied content type, both of which are trivially wrong or spoofed.
     private static readonly byte[] PdfMagic = "%PDF-"u8.ToArray();
+
+    /// <summary>
+    /// The only image formats this app will decode: the four it accepts and names in its own
+    /// error messages.
+    ///
+    /// ImageSharp's default configuration registers nine — BMP, GIF, JPEG, PBM, PNG, QOI, TGA,
+    /// TIFF and WebP — so until 3 Oct 2026 an upload reached five parsers this app has never
+    /// accepted a file for. That is attack surface taken for nothing: each one is a decoder
+    /// being handed a stranger's bytes, and the library's own advisories land on exactly those
+    /// paths. CVE-2026-106116 (GHSA-wmxv-xphr-5c9g) is a BigTIFF decoder that can be made to
+    /// spin on a 24-byte file, and it is reachable here only because the TIFF decoder is
+    /// registered at all. Nothing in 3.1.x fixes it; 3.1.12 is the end of that line and the fix
+    /// is 4.1.2, which needs a Six Labors licence. Dropping the decoder removes the exposure
+    /// without either.
+    ///
+    /// WebP has to stay: it is what this service writes, and the encoder is resolved through
+    /// this configuration too.
+    ///
+    /// A file in one of the dropped formats now fails as UnknownImageFormatException, which
+    /// ShrinkToWebpAsync already answers with "that needs to be an image", naming these four.
+    /// So the refusal is both accurate and the message a coach could already get.
+    /// </summary>
+    private static readonly Configuration DecodeFormats = new(
+        new JpegConfigurationModule(),
+        new PngConfigurationModule(),
+        new GifConfigurationModule(),
+        new WebpConfigurationModule());
+
+    private static DecoderOptions Decoding => new() { Configuration = DecodeFormats };
 
     private readonly DataPaths _paths;
     private readonly SiteOptions _options;
@@ -338,7 +371,7 @@ public class PlanStorageService
             // dimensions have to be rejected BEFORE anything is decoded.
             await using (var probe = file.OpenReadStream())
             {
-                var info = await Image.IdentifyAsync(probe, ct);
+                var info = await Image.IdentifyAsync(Decoding, probe, ct);
                 if ((long)info.Width * info.Height > _options.MaxDiagramPixels)
                 {
                     return $"That image is {info.Width}x{info.Height}, which is too large to " +
@@ -347,7 +380,7 @@ public class PlanStorageService
             }
 
             await using var source = file.OpenReadStream();
-            using var image = await Image.LoadAsync(source, ct);
+            using var image = await Image.LoadAsync(Decoding, source, ct);
 
             if (image.Width > widest)
             {

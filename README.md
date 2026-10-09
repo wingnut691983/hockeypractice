@@ -1069,6 +1069,19 @@ answer in September.
   with a message naming both numbers, and the default config boots clean. A misconfigured cap is
   otherwise invisible until a coach tries a big upload, and then it looks like a broken site.
 
+- **The app decoded nine image formats while accepting four, and that is where its only reachable
+  CVE lived.** `Image.LoadAsync` uses ImageSharp's default configuration, which registers BMP, GIF,
+  JPEG, PBM, PNG, QOI, TGA, TIFF and WebP. This app has only ever accepted JPEG, PNG, GIF and WebP
+  and says so in its own error messages, so five decoders were being handed strangers' bytes for
+  nothing. One of them mattered: GHSA-wmxv-xphr-5c9g is a BigTIFF decoder that can be made to spin
+  on a 24-byte file, and it was reachable purely because the TIFF decoder was registered.
+  `PlanStorageService.DecodeFormats` now registers the four, and a malformed BigTIFF is refused in
+  4 ms as "that needs to be an image", which is both true and a message the coach could already
+  get. **Keep WebP in that list** — it is what this service writes, and the encoder resolves
+  through the same configuration. The wider lesson is the one worth keeping: a parser you do not
+  accept files for is still a parser you are exposed to, and the default configuration is not the
+  same thing as your accepted-formats list.
+
 - **`new WebpEncoder { Quality = 85 }` does not give you quality 85. It gives you lossless.**
   `FileFormat` defaults to null, ImageSharp reads null as lossless, and `Quality` is then ignored
   outright. Nothing warns you: the output is a valid WebP that looks correct, so
