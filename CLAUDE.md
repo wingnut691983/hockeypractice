@@ -136,8 +136,8 @@ found clean, so a later pass doesn't re-derive it.
 piece at a time. It holds the sequencing, the file collisions that stop two batches being worked on
 at once, and per-batch checks to run before and after shipping.
 
-**Seven of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
-F `v39`; G `v40`). **Ten remain, and they are four deploys**, not ten: H+J together, I alone for its
+**Nine of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
+F `v39`; G `v40`; H and J `v41`). **Eight remain, and they are three deploys**: I alone for its
 schema migration, K on its own, then L+M+N+O in one session. P and Q fold in item by item.
 
 Read its "Where to resume" section first. If you are asked to work on the site generally, or to

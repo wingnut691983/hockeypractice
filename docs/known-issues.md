@@ -148,7 +148,7 @@ is the worst place to be debugging arithmetic.
 **Trigger: the volume passing roughly half full.** Fix by measuring headroom before `ValidateAsync`
 stages, or by subtracting the staged file's size from the `UsedBytes()` reading.
 
-### 4. `UsedBytes()` walks the entire volume, and it is called in loops
+### 4. `UsedBytes()` walks the entire volume, and it is called in loops — FIXED in `v41`, 9 October 2026
 
 `DataPaths.UsedBytes()` is a recursive `EnumerateFiles` over the whole persistent root.
 `PlanStorageService.IsFull()` calls it, and `IsFull()` is called once per drill inside both bulk
@@ -160,6 +160,12 @@ every PDF on the site.
 **Trigger: a team library large enough that a rollover feels slow, or the volume holding enough
 files that a page load stalls.** Fix by caching the total for a few seconds, or tracking it
 incrementally on write.
+
+✅ **Fixed in `v41` by tracking, not caching.** `PlanStorageService` is scoped, so the figure now
+lives for one request; writes add their own byte count and deletes invalidate. A TTL cache was
+rejected because the copy loop writes on every iteration, so invalidating would have put the walk
+straight back. `UsedBytesExact()` was added for the recovery paths, where headroom arithmetic
+decides whether a restore may proceed. Shipped with audit batch J; see that section.
 
 ---
 
