@@ -224,7 +224,9 @@ public class TeamController : TeamScopedController
         var team = ctx!.Team;
         var viewerKey = Access.ViewerKeyFor(User);
 
-        var query = Db.Plans.Where(p => p.TeamId == team.Id);
+        // Read-only list page. The projection below still materialises Plan entities, so the
+        // snapshots are real cost and nothing here writes.
+        var query = Db.Plans.AsNoTracking().Where(p => p.TeamId == team.Id);
         // Drafts are the coach's alone — a player must not see a plan that isn't finished.
         if (!ctx.IsManager) query = query.Where(p => p.Status == PlanStatus.Published);
 

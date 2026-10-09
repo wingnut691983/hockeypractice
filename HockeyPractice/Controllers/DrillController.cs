@@ -294,7 +294,8 @@ public class DrillController : TeamScopedController
         if (_storage.IsFull())
             return RedirectToAction(nameof(Edit), new { slug, id, notice = "Storage is nearly full, so nothing was copied." });
 
-        var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
+        var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target,
+            await LoadTargetLibraryAsync(target.Id));
 
         return RedirectToAction(nameof(Edit), new { slug, id, notice = outcome.Message });
     }
@@ -363,11 +364,14 @@ public class DrillController : TeamScopedController
         int copied = 0, already = 0, clashed = 0;
         var ranOutOfSpace = false;
 
+        // Read once, then kept in step by CopyOneAsync as each copy lands.
+        var existing = await LoadTargetLibraryAsync(target.Id);
+
         foreach (var drill in drills)
         {
             if (_storage.IsFull()) { ranOutOfSpace = true; break; }
 
-            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
+            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target, existing);
             switch (outcome.Result)
             {
                 case CopyStatus.Ready:         copied++;  break;
@@ -424,11 +428,15 @@ public class DrillController : TeamScopedController
         // Through the same helper the single and selected copies use, so all three agree on what
         // counts as already copied. This one used to compare titles only, which meant a copy the
         // other team had renamed looked new and got duplicated on the next rollover.
+        // Read once, then kept in step by CopyOneAsync as each copy lands. This is the loop the
+        // finding was about: a sixty-drill rollover read the target's whole library sixty times.
+        var existing = await LoadTargetLibraryAsync(target.Id);
+
         foreach (var drill in source)
         {
             if (_storage.IsFull()) { ranOutOfSpace = true; break; }
 
-            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target);
+            var outcome = await CopyOneAsync(drill, ctx!.Team.Id, target, existing);
             switch (outcome.Result)
             {
                 case CopyStatus.Ready:         copied++;  break;
@@ -526,6 +534,64 @@ public class DrillController : TeamScopedController
     private record CopyOutcome(CopyStatus Result, string Message);
 
     /// <summary>
+    /// What the target team already holds, as the only two questions a copy ever asks of it:
+    /// has this drill already been copied here, and is that title taken?
+    ///
+    /// Read once per request and then kept in step as copies land. It used to be read inside
+    /// CopyOneAsync, which is called once per drill from both bulk paths, so an end-of-season
+    /// rollover of a sixty-drill library was sixty full reads of the target's drill table.
+    /// BuildCandidatesAsync already built exactly these two lookups, once, for the same data;
+    /// this is that shape, shared, so the preview a coach sees and the copy they then run cannot
+    /// disagree about what is already there.
+    ///
+    /// Record() is what makes hoisting safe rather than merely faster. A snapshot taken before
+    /// the loop goes stale the moment the first copy lands, and a run that copied two drills with
+    /// the same title would then let the second through against a set that had never heard of the
+    /// first. The unique index still backstops a *concurrent* copy by someone else; this handles
+    /// the run arguing with itself.
+    /// </summary>
+    private sealed class TargetLibrary
+    {
+        private readonly Dictionary<int, string> _copiedHere;
+        private readonly HashSet<string> _titles;
+
+        public TargetLibrary(IEnumerable<(string Title, int? CopiedFromDrillId)> rows)
+        {
+            var all = rows.ToList();
+            _copiedHere = all.Where(r => r.CopiedFromDrillId is not null)
+                // A team can hold at most one copy of a given source drill — the partial unique
+                // index on (TeamId, CopiedFromDrillId) guarantees it — but ToDictionary would
+                // throw rather than tolerate a duplicate if that index were ever dropped.
+                .GroupBy(r => r.CopiedFromDrillId!.Value)
+                .ToDictionary(g => g.Key, g => g.First().Title);
+            _titles = new HashSet<string>(all.Select(r => r.Title), StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>The title this drill goes by over there, or null if it has not been copied.</summary>
+        public string? CopyOf(int sourceDrillId) =>
+            _copiedHere.TryGetValue(sourceDrillId, out var title) ? title : null;
+
+        public bool HasTitle(string title) => _titles.Contains(title);
+
+        /// <summary>Folds a copy that has just landed back in, so the rest of the run sees it.</summary>
+        public void Record(int sourceDrillId, string title)
+        {
+            _copiedHere[sourceDrillId] = title;
+            _titles.Add(title);
+        }
+    }
+
+    /// <summary>Reads the target team's drills once. The one query the copy paths share.</summary>
+    private async Task<TargetLibrary> LoadTargetLibraryAsync(int toTeamId)
+    {
+        var rows = await Db.Drills.Where(d => d.TeamId == toTeamId)
+            .Select(d => new { d.Title, d.CopiedFromDrillId })
+            .ToListAsync();
+
+        return new TargetLibrary(rows.Select(r => (r.Title, r.CopiedFromDrillId)));
+    }
+
+    /// <summary>
     /// Copies one drill, refusing rather than overwriting. The single copy and the bulk copy
     /// both go through here so the two can never disagree about what "already copied" means.
     ///
@@ -539,26 +605,24 @@ public class DrillController : TeamScopedController
     /// Nothing here ever updates an existing drill. Once a copy lands it belongs to the other
     /// team, and copying again must not reach across and undo whatever they have done to it since.
     /// </summary>
-    private async Task<CopyOutcome> CopyOneAsync(Drill drill, int fromTeamId, Team target)
+    private async Task<CopyOutcome> CopyOneAsync(Drill drill, int fromTeamId, Team target,
+        TargetLibrary existing)
     {
-        var existing = await Db.Drills.Where(d => d.TeamId == target.Id)
-            .Select(d => new { d.Id, d.Title, d.CopiedFromDrillId })
-            .ToListAsync();
-
-        if (existing.FirstOrDefault(e => e.CopiedFromDrillId == drill.Id) is { } copy)
+        if (existing.CopyOf(drill.Id) is { } titleThere)
         {
             // Naming what it is called over there matters: told only "already copied", a coach
             // goes looking for the original title, doesn't find it, and assumes this is wrong.
-            var renamed = !string.Equals(copy.Title, drill.Title, StringComparison.OrdinalIgnoreCase)
-                ? $" It's called \"{copy.Title}\" there."
+            var renamed = !string.Equals(titleThere, drill.Title, StringComparison.OrdinalIgnoreCase)
+                ? $" It's called \"{titleThere}\" there."
                 : "";
             return new CopyOutcome(CopyStatus.AlreadyCopied,
                 $"{target.Name} already has \"{drill.Title}\".{renamed} Nothing was changed, so any " +
                 "edits they've made are safe.");
         }
 
-        // Compared in memory: OrdinalIgnoreCase has no SQL translation and would throw at runtime.
-        if (existing.Any(e => string.Equals(e.Title, drill.Title, StringComparison.OrdinalIgnoreCase)))
+        // Compared case-insensitively in memory: OrdinalIgnoreCase has no SQL translation and
+        // would throw at runtime, which is why the target's titles are held as a set here.
+        if (existing.HasTitle(drill.Title))
         {
             return new CopyOutcome(CopyStatus.NameClash,
                 $"{target.Name} already has a different drill called \"{drill.Title}\", so this one " +
@@ -569,6 +633,7 @@ public class DrillController : TeamScopedController
         {
             await CopyDrillAsync(drill, fromTeamId, target.Id);
             await Db.SaveChangesAsync();
+            existing.Record(drill.Id, drill.Title);
         }
         catch (DbUpdateException)
         {
@@ -601,19 +666,15 @@ public class DrillController : TeamScopedController
         // out. Copying one deliberately is still possible from its own page.
         var cards = await QueryLibraryAsync(fromTeamId, tag, name, archived: false);
 
-        var existing = await Db.Drills.Where(d => d.TeamId == toTeamId)
-            .Select(d => new { d.Title, d.CopiedFromDrillId })
-            .ToListAsync();
-
-        var fromHere = existing.Where(e => e.CopiedFromDrillId is not null)
-            .ToDictionary(e => e.CopiedFromDrillId!.Value, e => e.Title);
-        var titles = new HashSet<string>(existing.Select(e => e.Title), StringComparer.OrdinalIgnoreCase);
+        // The same lookups the copy itself uses, from the same loader, so the preview a coach
+        // reads and the copy they then run cannot disagree about what is already over there.
+        var existing = await LoadTargetLibraryAsync(toTeamId);
 
         return cards.Select(card =>
         {
             // Provenance wins over the name check: a copy renamed at the far end is still the same
             // drill, and calling that a name clash would be both wrong and unfixable.
-            if (fromHere.TryGetValue(card.Drill.Id, out var titleThere))
+            if (existing.CopyOf(card.Drill.Id) is { } titleThere)
                 return new CopyCandidate
                 {
                     Card = card,
@@ -626,7 +687,7 @@ public class DrillController : TeamScopedController
             return new CopyCandidate
             {
                 Card = card,
-                Status = titles.Contains(card.Drill.Title) ? CopyStatus.NameClash : CopyStatus.Ready
+                Status = existing.HasTitle(card.Drill.Title) ? CopyStatus.NameClash : CopyStatus.Ready
             };
         }).ToList();
     }
@@ -728,8 +789,13 @@ public class DrillController : TeamScopedController
     /// ThenBy(Id) is not cosmetic. Title alone is not a total order, and Skip/Take over an
     /// ambiguous sort can serve one drill on two pages while never serving another.
     /// </summary>
+    /// <summary>
+    /// The library listing. AsNoTracking because both callers — the library page and the copy
+    /// preview — only render what they load. The copy paths load their own drills separately and
+    /// tracked, because CopyDrillAsync reads a drill's tags and diagrams to build the new rows.
+    /// </summary>
     private IQueryable<Drill> LibraryQuery(int teamId, string? tag, string? name, bool archived) =>
-        Db.Drills.Include(d => d.Tags).Include(d => d.Diagrams)
+        Db.Drills.AsNoTracking().Include(d => d.Tags).Include(d => d.Diagrams)
             .Where(d => d.TeamId == teamId && d.IsArchived == archived)
             // Each filter applies only when it has something in it, so an empty box is ignored
             // rather than matching nothing, and the two combine to narrow when both are set.

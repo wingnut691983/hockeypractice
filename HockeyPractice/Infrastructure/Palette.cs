@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -16,6 +17,21 @@ public static class Palette
 {
     // WCAG AA for normal-size text. Large text would allow 3.0, but these labels are small.
     private const double MinContrast = 4.5;
+
+    /// <summary>
+    /// Memo for <see cref="CssVariables"/>, which was the whole cost of this class at runtime.
+    /// It ran on every page render, and again per team card on the landing page, to recompute an
+    /// answer that is a pure function of two colours: behind it <see cref="AsTextOn"/> is a loop
+    /// of up to 101 steps doing an HSL round trip and two Math.Pow calls each, called four times
+    /// per set.
+    ///
+    /// Unbounded growth is not a real risk — every caller passes Team.SafePrimary/SafeAccent, which
+    /// are validated hex or the default, so the live key count is the number of distinct team
+    /// colour pairs on the site. The cap is there anyway because this is a static reachable from
+    /// views: past it, results are still correct, just recomputed.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, string> VariableCache = new();
+    private const int MaxCachedPalettes = 256;
 
     private const string Ink   = "#10141a";   // near-black, matches --hp-text
     private const string Paper = "#ffffff";
@@ -85,6 +101,20 @@ public static class Palette
     /// </summary>
     public static string CssVariables(string primary, string accent)
     {
+        var key = $"{primary}|{accent}";
+        if (VariableCache.TryGetValue(key, out var cached)) return cached;
+
+        var computed = Build(primary, accent);
+
+        // TryAdd rather than the indexer so a racing write cannot push past the cap, and the cap
+        // is checked before the add rather than after: two threads can both pass it, which adds
+        // one extra entry and matters not at all.
+        if (VariableCache.Count < MaxCachedPalettes) VariableCache.TryAdd(key, computed);
+        return computed;
+    }
+
+    private static string Build(string primary, string accent)
+    {
         // Matches the "next practice" card's gradient end in the stylesheet.
         var gradientEnd = Mix(primary, 0.62, accent);
 
@@ -119,9 +149,15 @@ public static class Palette
 
     // ── conversions ──────────────────────────────────────────────────────
 
+    // Static and compiled. This was a fresh non-compiled Regex.IsMatch per call, and Parse is
+    // called dozens of times per palette — the memo above removes most of those calls, but the
+    // ones that remain should not be re-parsing the pattern each time.
+    private static readonly Regex HexColour =
+        new("^#[0-9a-fA-F]{6}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static (double R, double G, double B) Parse(string hex)
     {
-        if (!Regex.IsMatch(hex ?? "", "^#[0-9a-fA-F]{6}$"))
+        if (!HexColour.IsMatch(hex ?? ""))
             return (0, 0, 0);
 
         return (

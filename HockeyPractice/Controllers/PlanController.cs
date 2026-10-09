@@ -22,7 +22,10 @@ public class PlanController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
-        var plan = await Db.Plans
+        // The busiest page in the app, and a pure read: AsNoTracking skips a change-tracking
+        // snapshot per entity that nothing here consults. Everything this action loads goes
+        // straight into a view model.
+        var plan = await Db.Plans.AsNoTracking()
             .Include(p => p.Links)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
 
@@ -35,7 +38,7 @@ public class PlanController : TeamScopedController
         var drills = new List<DrillCard>();
         if (plan.Kind == PlanKind.Drills)
         {
-            var entries = await Db.PlanDrills
+            var entries = await Db.PlanDrills.AsNoTracking()
                 .Include(pd => pd.Drill).ThenInclude(d => d!.Diagrams)
                 .Where(pd => pd.PracticePlanId == plan.Id)
                 .OrderBy(pd => pd.SortOrder).ThenBy(pd => pd.Id)
@@ -61,7 +64,7 @@ public class PlanController : TeamScopedController
 
         if (ctx!.IsManager)
         {
-            var roster = await Db.Players
+            var roster = await Db.Players.AsNoTracking()
                 .Where(p => p.TeamId == ctx.Team.Id && p.IsActive)
                 .OrderBy(p => p.Name)
                 .ToListAsync();
@@ -103,7 +106,8 @@ public class PlanController : TeamScopedController
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
 
-        var plan = await Db.Plans
+        // Read-only, same as Details.
+        var plan = await Db.Plans.AsNoTracking()
             .Include(p => p.Links)
             .FirstOrDefaultAsync(p => p.Id == id && p.TeamId == ctx!.Team.Id);
 

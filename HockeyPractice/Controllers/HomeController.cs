@@ -34,7 +34,9 @@ public class HomeController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var teams = await _db.Teams.OrderBy(t => t.SortOrder).ThenBy(t => t.Name).ToListAsync();
+        // Read-only page, so no change-tracking snapshots. Nothing below mutates a Team.
+        var teams = await _db.Teams.AsNoTracking()
+            .OrderBy(t => t.SortOrder).ThenBy(t => t.Name).ToListAsync();
 
         // Always show the list, even for a single team. Auto-forwarding saved players one tap
         // but removed the only page where the two ways in — read the plans, or manage the team

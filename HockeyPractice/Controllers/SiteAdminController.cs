@@ -507,7 +507,10 @@ public class SiteAdminController : Controller
             return View("Index", await BuildAsync(null, "Choose a backup file to upload."));
 
         // The uploaded file has to fit beside the one it replaces, because the old one is kept.
-        var headroom = Math.Max(0, _storage.QuotaBytes - _storage.UsedBytes());
+        // UsedBytesExact, not UsedBytes: this is headroom arithmetic in the recovery path, and
+        // the ordinary reading is a per-request figure kept in step by addition. Close enough for
+        // a "nearly full" guard, not for deciding whether a restore may proceed.
+        var headroom = Math.Max(0, _storage.QuotaBytes - _storage.UsedBytesExact());
         if (backup.Length > headroom)
             return View("Index", await BuildAsync(null,
                 $"That file is {PlanStorageService.Human(backup.Length)} and there is only " +

@@ -994,6 +994,42 @@ answer in September.
   because the file name was never in the URL. `Team.LogoVersion` and `DrillDiagram.Version` are
   what make that true. **Do not "simplify" by dropping the token and keeping the header.**
 
+- **`AsNoTracking` fails as a broken WRITE, not a broken read, and it fails silently.** Read-only
+  pages now use it (the landing page, a plan's Details and Print, the plan list, the drill library
+  query). The rule is narrow and must stay narrow: **only where nothing downstream mutates what it
+  loads.** Put it on a query whose entity is later edited and saved, and EF has no snapshot to
+  compare against, so `SaveChanges` writes nothing, reports no error, and the coach finds their
+  edit did not stick. There is no test that catches this; the check is to edit and save a plan, a
+  drill and a roster entry, then reload each and confirm it took. **`SiteAdminController` was left
+  out deliberately** even though the audit named it: `BuildAsync` is called from 25 places across
+  restore, delete and create paths, the page is admin-only and rarely loaded, and the benefit did
+  not justify proving all 25 safe.
+
+- **Volume usage is a per-request figure kept in step by arithmetic, and the arithmetic is the
+  point.** `UsedBytes()` walks every file under the volume, and `IsFull()` calls it once per drill
+  inside both bulk copy loops, once per uploaded picture, and on every manage and admin render. The
+  service is scoped, so the figure now lives for one request. Writes **add their own byte count**
+  rather than invalidating: invalidating would have put the walk straight back, since the copy loop
+  writes on every iteration. Deletes invalidate instead, because they are never in a hot loop and a
+  stale-high reading refuses an upload slightly early, which is the safe direction. Every delete
+  goes through `TryDelete`, which is where the invalidation lives so a new delete path cannot
+  forget it. **`UsedBytesExact()` exists for the recovery paths** and the restore headroom check
+  uses it: that arithmetic decides whether a restore may proceed and must not run on an
+  approximation. Verified by tightening the quota and uploading four pictures in one request: two
+  were stored and the rest refused, which only happens if the guard sees the total growing
+  mid-request.
+
+- **Hoisting the bulk copy's library read is only safe because each copy is folded back in.**
+  `CopyOneAsync` used to re-read the whole target library per drill, so a sixty-drill rollover was
+  sixty full reads; it is now read once per request. The trap is that a snapshot taken before the
+  loop goes stale the instant the first copy lands: a run containing two drills with the same title
+  would let the second through against a set that had never heard of the first, and duplicate it.
+  `TargetLibrary.Record()` is what prevents that, and it is not optional. Measured on seven drills:
+  7 library reads and 24 database commands before, 1 and 18 after. Verified with two same-titled
+  drills in one run (8 copied, 1 refused as a name clash) and by running the whole rollover twice
+  (second run copies nothing). The unique index on `(TeamId, CopiedFromDrillId)` still backstops a
+  *concurrent* copy by someone else; this handles the run arguing with itself.
+
 - **The team logo was the one upload on this site that stored bytes nobody had looked at, and the
   giveaway was how little code it had.** It read the browser's `Content-Type` header, picked the
   file extension from that header, and copied the stream to the volume. No sniff, no decode, no

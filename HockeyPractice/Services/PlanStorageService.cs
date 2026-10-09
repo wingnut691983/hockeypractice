@@ -39,7 +39,47 @@ public class PlanStorageService
     }
 
     public long QuotaBytes => _options.StorageQuotaBytes;
-    public long UsedBytes() => _paths.UsedBytes();
+
+    /// <summary>
+    /// Volume usage, measured once per request and then kept in step by arithmetic.
+    ///
+    /// The measurement walks every file under the persistent root, and <see cref="IsFull"/> calls
+    /// it: once per drill inside both bulk copy loops, once per uploaded diagram, on every upload
+    /// validate, and on every render of the manage and admin pages. An end-of-season rollover of a
+    /// fifty-drill library was fifty full walks of a volume holding every PDF on the site.
+    ///
+    /// This service is scoped, so the field lives exactly as long as one request and there is no
+    /// cross-request staleness to reason about. Within the request, writes add their own byte
+    /// count rather than invalidating, which is the part that matters: the copy loop writes on
+    /// every iteration, so invalidating would have put the walk straight back.
+    ///
+    /// Deletes invalidate instead of subtracting. They are never in a hot loop, and a stale-high
+    /// reading refuses an upload slightly early, which is the safe direction.
+    /// </summary>
+    private long? _usedBytes;
+
+    public long UsedBytes() => _usedBytes ??= _paths.UsedBytes();
+
+    /// <summary>
+    /// Usage measured now, ignoring and refreshing the per-request figure. For the recovery paths,
+    /// where headroom arithmetic decides whether a restore is allowed to proceed and being a few
+    /// bytes out is not acceptable.
+    /// </summary>
+    public long UsedBytesExact()
+    {
+        _usedBytes = _paths.UsedBytes();
+        return _usedBytes.Value;
+    }
+
+    /// <summary>Keeps the figure in step after a write, without re-walking the volume.</summary>
+    private void AddUsage(long bytes)
+    {
+        if (_usedBytes is not null) _usedBytes += bytes;
+    }
+
+    /// <summary>Drops the figure so the next read measures again.</summary>
+    private void InvalidateUsage() => _usedBytes = null;
+
     public double UsedFraction() => QuotaBytes <= 0 ? 0 : (double)UsedBytes() / QuotaBytes;
 
     /// <summary>
@@ -155,6 +195,7 @@ public class PlanStorageService
                 TryDelete(staged);
             }
 
+            AddUsage(bytes);
             return new StorageResult(true, Bytes: bytes, Key: key);
         }
         catch (IOException ex)
@@ -190,6 +231,7 @@ public class PlanStorageService
         try
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            InvalidateUsage();
         }
         catch (IOException ex)
         {
@@ -257,7 +299,9 @@ public class PlanStorageService
                 }
             }
 
-            return new DiagramResult(true, Bytes: new FileInfo(target).Length, FileName: fileName);
+            var written = new FileInfo(target).Length;
+            AddUsage(written);
+            return new DiagramResult(true, Bytes: written, FileName: fileName);
         }
         catch (IOException ex)
         {
@@ -387,6 +431,7 @@ public class PlanStorageService
         try
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            InvalidateUsage();
         }
         catch (IOException ex)
         {
@@ -442,7 +487,9 @@ public class PlanStorageService
                 return new DiagramResult(false, error);
             }
 
-            return new DiagramResult(true, Bytes: new FileInfo(target).Length, FileName: fileName);
+            var written = new FileInfo(target).Length;
+            AddUsage(written);
+            return new DiagramResult(true, Bytes: written, FileName: fileName);
         }
         catch (IOException ex)
         {
@@ -465,7 +512,9 @@ public class PlanStorageService
         try
         {
             Directory.CreateDirectory(_paths.PlanDirectory(toTeamId, toPlanId));
-            File.Copy(source, _paths.PlanOverview(toTeamId, toPlanId, fileName), overwrite: true);
+            var destination = _paths.PlanOverview(toTeamId, toPlanId, fileName);
+            File.Copy(source, destination, overwrite: true);
+            AddUsage(new FileInfo(destination).Length);
             return fileName;
         }
         catch (IOException ex)
@@ -535,7 +584,9 @@ public class PlanStorageService
                 return new DiagramResult(false, error);
             }
 
-            return new DiagramResult(true, Bytes: new FileInfo(target).Length, FileName: fileName);
+            var written = new FileInfo(target).Length;
+            AddUsage(written);
+            return new DiagramResult(true, Bytes: written, FileName: fileName);
         }
         catch (IOException ex)
         {
@@ -562,7 +613,9 @@ public class PlanStorageService
         try
         {
             Directory.CreateDirectory(_paths.DrillDirectory(toTeamId, toDrillId));
-            File.Copy(source, _paths.DrillDiagram(toTeamId, toDrillId, fileName), overwrite: true);
+            var destination = _paths.DrillDiagram(toTeamId, toDrillId, fileName);
+            File.Copy(source, destination, overwrite: true);
+            AddUsage(new FileInfo(destination).Length);
             return fileName;
         }
         catch (IOException ex)
@@ -589,6 +642,7 @@ public class PlanStorageService
         try
         {
             if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+            InvalidateUsage();
         }
         catch (IOException ex)
         {
@@ -596,9 +650,15 @@ public class PlanStorageService
         }
     }
 
-    private static void TryDelete(string path)
+    /// <summary>
+    /// Every file delete in this class goes through here, which is why the usage figure is
+    /// invalidated here rather than at each call site: one place to be right, and a new delete
+    /// path cannot forget to do it.
+    /// </summary>
+    private void TryDelete(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { /* best effort */ }
+        InvalidateUsage();
     }
 
     public static string Human(long bytes) => bytes switch
