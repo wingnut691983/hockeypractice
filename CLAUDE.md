@@ -133,14 +133,18 @@ found clean, so a later pass doesn't re-derive it.
 ## Audit work in progress
 
 `docs/audit-2026-09.md` is an open work plan from a full audit on 2026-09-17, to be picked up a
-piece at a time. It holds 33 findings grouped into 18 batches across 13 deploy units, with the
-sequencing, the file collisions that stop two batches being done at once, and per-batch checks to
-run before and after shipping. **Wave 0 shipped on 2026-09-18 as `v24`; everything else is open.**
+piece at a time. It holds the sequencing, the file collisions that stop two batches being worked on
+at once, and per-batch checks to run before and after shipping.
+
+**Seven of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
+F `v39`; G `v40`). **Ten remain, and they are four deploys**, not ten: H+J together, I alone for its
+schema migration, K on its own, then L+M+N+O in one session. P and Q fold in item by item.
 
 Read its "Where to resume" section first. If you are asked to work on the site generally, or to
-pick up improvements, that file is the backlog. Its highest-severity item, batch D, is that
-manager and site-admin codes are hashed with unsalted single-round SHA-256, and it needs a
-decision from the user before it can start.
+pick up improvements, that file is the backlog. **Finding 1.1, the unsalted code hashing that was
+its highest-severity item, is closed** (batch D, `v30`, codes rotated 23 Sep 2026). **Batch K is the
+only one still needing a decision from the user before it can start:** the page size, and whether
+the player-facing plan list should page at all.
 
 The division of labour: this file is for work still expected to happen; `docs/known-issues.md` is
 for decisions not to act, organised by trigger. When a batch is dropped rather than shipped, it
