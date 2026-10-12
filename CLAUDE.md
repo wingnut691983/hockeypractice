@@ -136,9 +136,10 @@ found clean, so a later pass doesn't re-derive it.
 piece at a time. It holds the sequencing, the file collisions that stop two batches being worked on
 at once, and per-batch checks to run before and after shipping.
 
-**Ten of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
-F `v39`; G `v40`; H and J `v41`; I `v42`). **Seven remain, and they are two deploys**: K on its
-own, then L+M+N+O in one session. P and Q fold in item by item. **No schema migrations are left.**
+**Eleven of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
+F `v39`; G `v40`; H and J `v41`; I `v42`; K `v43`). **Six remain and they are ONE deploy**: the
+accessibility and polish wave, L+M+N+O in one session, with P and Q folding in item by item. No
+schema migrations are left and nothing is blocked. **When that ships, delete the audit file.**
 
 Read its "Where to resume" section first. If you are asked to work on the site generally, or to
 pick up improvements, that file is the backlog. **Finding 1.1, the unsalted code hashing that was
