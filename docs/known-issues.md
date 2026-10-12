@@ -564,7 +564,8 @@ Recorded so the next pass does not spend time here again:
 
 ### Added by the full audit of 2026-09-17
 
-Findings from that pass are in `docs/audit-2026-09.md`. These are the things it checked and found
+That pass's findings all shipped or moved here; its work plan was deleted when it emptied, on
+12 October 2026. These are the things it checked and found
 nothing wrong with, recorded here so the next audit does not re-derive them. Where an entry
 overlaps one above, it is because the audit reached it independently and agreed.
 

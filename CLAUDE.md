@@ -130,27 +130,37 @@ that should bring it back. Two of them are waiting on `RESEND_API_KEY` being set
 fixed *before* mail is switched on, not after. It also records what has already been audited and
 found clean, so a later pass doesn't re-derive it.
 
-## Audit work in progress
+## The September 2026 audit is complete
 
-`docs/audit-2026-09.md` is an open work plan from a full audit on 2026-09-17, to be picked up a
-piece at a time. It holds the sequencing, the file collisions that stop two batches being worked on
-at once, and per-batch checks to run before and after shipping.
+A full audit on 17 September 2026 raised 33 findings in 18 batches. **All of it shipped between
+18 September and 12 October 2026, as `v24` through `v44`**, or was consciously dropped into
+`docs/known-issues.md` with the condition that should bring it back. The work plan that tracked it
+(`docs/audit-2026-09.md`) was deleted when it emptied, which was always its stated finish line.
 
-**Eleven of its eighteen batches have shipped** (A, B in `v24`; C `v29`; D `v30`; E `v32`; R `v37`;
-F `v39`; G `v40`; H and J `v41`; I `v42`; K `v43`). **Six remain and they are ONE deploy**: the
-accessibility and polish wave, L+M+N+O in one session, with P and Q folding in item by item. No
-schema migrations are left and nothing is blocked. **When that ships, delete the audit file.**
+What survives it, and where:
 
-Read its "Where to resume" section first. If you are asked to work on the site generally, or to
-pick up improvements, that file is the backlog. **Finding 1.1, the unsalted code hashing that was
-its highest-severity item, is closed** (batch D, `v30`, codes rotated 23 Sep 2026). **Nothing is
-blocked on a decision any more** — batch K's two product calls were made on 12 October 2026 and are
-recorded in its section.
+- **`README.md` "What I'd flag"** holds every lesson worth not relearning. Most of the entries
+  there now came from this audit, and several record something the audit itself got wrong.
+- **`docs/known-issues.md`** holds what was deliberately not done, each with a trigger. Entries
+  #15 and #16 are the audit's leftovers: the ImageSharp version decision, and five security items
+  from the final sweep.
+- **`docs/post-audit-checks.md`** is a short list of checks that need a team code or the site-admin
+  code, so no terminal session could run them. Delete it once you have been through it.
 
-The division of labour: this file is for work still expected to happen; `docs/known-issues.md` is
-for decisions not to act, organised by trigger. When a batch is dropped rather than shipped, it
-moves there with its trigger and leaves the audit file. When everything is shipped or moved, the
-audit file gets deleted.
+If you are asked to pick up improvements, there is no backlog file any more. Start from
+`known-issues.md` and its triggers.
+
+## Checking a change before it ships
+
+**Look at the affected pages at 360px and in dark mode.** Nearly everything this site does is on a
+phone, and dark mode is the half that gets missed: `--hp-success` and then `--hp-danger` were both
+shipped wrong for dark surfaces, and a plan printed from a phone in dark mode once came out with
+near-black drill cards. Both would have been obvious in the browser and neither was obvious in the
+diff. A `dotnet build` that is clean and a page that renders at desktop width prove very little
+about either.
+
+After deploying, fetch the public URL and read the body for something only this build would
+contain. A 200 proves a pod is up, not that it is serving your change.
 
 ## Keep the README current, without being asked
 
