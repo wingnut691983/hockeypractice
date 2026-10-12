@@ -130,6 +130,18 @@ that should bring it back. Two of them are waiting on `RESEND_API_KEY` being set
 fixed *before* mail is switched on, not after. It also records what has already been audited and
 found clean, so a later pass doesn't re-derive it.
 
+## Planned work
+
+`docs/plans/` holds work that has been planned and agreed but not started. Do it in this order:
+
+1. **`docs/plans/dotnet-10-upgrade.md`**: move from .NET 8 to .NET 10. **Hard deadline: .NET 8
+   support ends 10 November 2026.** StatsLogic has the same deadline and needs its own pass in its
+   own repo.
+2. **`docs/plans/drill-diagram-tool.md`**: a "Draw a diagram" editor on the drill edit page, with
+   a blank rink and the standard hockey annotations, re-editable after saving.
+
+Delete each file when its work ships, the same finish line the audit plan used.
+
 ## The September 2026 audit is complete
 
 A full audit on 17 September 2026 raised 33 findings in 18 batches. **All of it shipped between
@@ -147,7 +159,7 @@ What survives it, and where:
 - **`docs/post-audit-checks.md`** is a short list of checks that need a team code or the site-admin
   code, so no terminal session could run them. Delete it once you have been through it.
 
-If you are asked to pick up improvements, there is no backlog file any more. Start from
+If you are asked to pick up improvements, start from `docs/plans/` (above), then
 `known-issues.md` and its triggers.
 
 ## Checking a change before it ships
