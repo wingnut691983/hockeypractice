@@ -1,5 +1,7 @@
 using HockeyPractice.Models;
 
+using Microsoft.AspNetCore.Routing;
+
 namespace HockeyPractice.ViewModels;
 
 /// <summary>
@@ -234,14 +236,21 @@ public class PagerModel
     public int LastItem => Math.Min(Page * PageSize, TotalItems);
 
     /// <summary>
-    /// Route values for one page number. Non-nullable values, because asp-all-route-data takes an
-    /// IDictionary&lt;string, string&gt;; empties are dropped rather than passed as blanks.
+    /// Route values for one page number, ready for Url.Action. Empty filters are dropped rather
+    /// than passed as blanks, so an unset filter does not litter the URL.
+    ///
+    /// Returns a RouteValueDictionary rather than a Dictionary&lt;string, string&gt;. The old
+    /// signature dated from an asp-all-route-data call site that no longer exists, and building a
+    /// RouteValueDictionary from it at the one remaining caller produced warning CS8620 on every
+    /// build: the constructor wants nullable values and was being handed non-nullable ones. Making
+    /// the right type here is the fix, rather than suppressing a warning that was telling the
+    /// truth about a mismatch.
     /// </summary>
-    public Dictionary<string, string> LinkFor(int page)
+    public RouteValueDictionary LinkFor(int page)
     {
-        var values = RouteValues
-            .Where(kv => !string.IsNullOrEmpty(kv.Value))
-            .ToDictionary(kv => kv.Key, kv => kv.Value!);
+        var values = new RouteValueDictionary();
+        foreach (var kv in RouteValues.Where(kv => !string.IsNullOrEmpty(kv.Value)))
+            values[kv.Key] = kv.Value;
 
         values[PageKey] = page.ToString();
         return values;

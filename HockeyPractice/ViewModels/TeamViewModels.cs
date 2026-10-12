@@ -91,6 +91,16 @@ public class PlanListViewModel
     /// feature, and that was exactly the live state before this flag was consulted.
     /// </summary>
     public List<PlanCard> Upcoming { get; init; } = new();
+
+    /// <summary>How many past practices exist in total, which is not Past.Count when capped.</summary>
+    public int PastTotal { get; init; }
+
+    /// <summary>
+    /// False while the "Earlier" list is showing only the most recent few. The view uses it to
+    /// offer the rest; without it a reader has no way to know anything is being held back, which
+    /// is the failure mode that makes a cap worse than a pager.
+    /// </summary>
+    public bool ShowingAllPast { get; init; } = true;
     public List<PlanCard> Past { get; init; } = new();
     public bool HasAny => Next != null || Upcoming.Count > 0 || Past.Count > 0;
 }

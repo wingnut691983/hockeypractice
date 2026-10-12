@@ -1366,6 +1366,19 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   background: transparent;
 }
 
+/* Prev and Next. Applied four times in _Pager.cshtml and, until 12 Oct 2026, styled nowhere — so
+   the two controls a thumb actually reaches sat in the same narrow box as a single digit. They
+   carry a word as well as a chevron once there is room (see hp-page-word below), so they get the
+   extra width to hold it rather than squeezing it into a number's footprint. min-width, not width,
+   so the chevron-only state on a phone still collapses to the same size as the numbers beside it. */
+.hp-page-step {
+  min-width: 3rem;
+  /* The markup writes "<chevron><span> Prev</span>", and that leading space has never rendered:
+     .hp-page is inline-flex, so the span is a flex item and whitespace at the start of an item is
+     trimmed. gap is the flex-aware way to say what the space was for. */
+  gap: .15rem;
+}
+
 /* The words drop away on a phone and leave the chevrons. */
 .hp-page-word { display: none; }
 @media (min-width: 26rem) {

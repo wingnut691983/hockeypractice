@@ -1069,6 +1069,29 @@ answer in September.
   with a message naming both numbers, and the default config boots clean. A misconfigured cap is
   otherwise invisible until a coach tries a big upload, and then it looks like a broken site.
 
+- **Paginating a list ordered by a non-unique column loses rows, and it looks like data loss.** The
+  manage page orders plans by practice date, and a team can hold two practices on one day. SQLite
+  is free to return equal keys in any order it likes, so without a tiebreaker a plan can appear on
+  two pages or on none, and it will not reproduce on demand. `.ThenByDescending(p => p.Id)` is what
+  makes the order total. The drill library's `OrderBy(Title).ThenBy(Id)` is the same guard for the
+  same reason. Tested with 47 plans across 20 shared dates: all 47 reachable, none duplicated.
+  **If you add paging anywhere else, check the sort is unique first.**
+
+- **The player-facing plan list is deliberately NOT paginated, and that was a product decision.**
+  It caps the "Earlier" section and offers "Show N older practices". Two reasons, both load-bearing.
+  First, only "Earlier" grows: "Next practice" and "Coming up" are bounded by how far ahead a coach
+  schedules, so a pager would hang off one section of a three-section page. Second, a parent hunting
+  for last week's plan must not have to find page 2. **The cap is a preview, never a limit** — the
+  link renders every past practice on one page, so nothing is ever unreachable. A cap with no way
+  past it would quietly hide history, which is worse than either paging or leaving the list alone.
+  If you touch this, keep that property: it is the whole reason the cap was allowed.
+
+- **Measured before building, so nobody over-builds it later.** A plan card is about 330 bytes of
+  markup: five plans is 2 KB, a season about 19 KB, three seasons about 58 KB, and compression puts
+  the whole page around 10 KB on the wire. **This was a scrolling and findability change, not a
+  performance rescue**, whatever the original finding's "three seasons of plans onto a phone"
+  phrasing suggests. Re-measure before treating it as urgent.
+
 - **A partial index is invisible when it is broken, and the query has to say the filter out loud.**
   `PlanViews` has a unique index on `(PracticePlanId, ViewerKey)` filtered to
   `PlayerId IS NULL`. SQLite will only use a partial index when the query's own WHERE implies that

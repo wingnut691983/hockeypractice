@@ -470,8 +470,11 @@ Individually not worth a commit; worth sweeping the next time each file is open.
   controllers take raw `string` parameters so there is no `ModelState` to check, and nothing
   truncates. A manager can store a megabyte plan title. A `Truncate` helper alongside the existing
   `SafeFileName` would close it.
-- `_Pager.cshtml:13` nullability warning CS8620: the dictionary should be
-  `Dictionary<string, string?>`.
+- ~~`_Pager.cshtml:13` nullability warning CS8620: the dictionary should be
+  `Dictionary<string, string?>`.~~ ✅ **Fixed 12 Oct 2026 in audit batch K.** Not by widening the
+  dictionary, which would only have moved the mismatch: `PagerModel.LinkFor` now returns the
+  `RouteValueDictionary` its one caller actually wanted, and the call site stopped rebuilding it.
+  The non-nullable signature dated from an `asp-all-route-data` call site that no longer exists.
 - Diagram `<img>` elements on the print sheet carry no `width`/`height`, because `DrillDiagram`
   stores only `FileName` and `Bytes` and no pixel dimensions. The page therefore reflows as the
   pictures land. It does not affect the printed output — the Print button waits for every image

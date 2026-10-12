@@ -16,6 +16,9 @@ public class ManageViewModel
     public string? ViewCode { get; init; }
     public string? Notice { get; init; }
 
+    /// <summary>Paging state for the plan list. Same pager the drill library uses.</summary>
+    public PagerModel Pager { get; init; } = new();
+
     /// <summary>Distinct tag names used anywhere on the team, for the browse row and search box.</summary>
     public List<string> AllTags { get; init; } = new();
     /// <summary>The tag currently filtering the list, if any (from the search box or a clicked chip).</summary>

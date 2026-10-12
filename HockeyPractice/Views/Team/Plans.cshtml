@@ -57,6 +57,18 @@
             {
                 @await Html.PartialAsync("_PlanCard", card)
             }
+
+            @* A plain link, not a script: it costs nothing on rink wifi, it works before the page
+               has finished loading, and it leaves a URL a parent can bookmark or share. The count
+               is in the label on purpose — "Show older" alone does not tell you whether one more
+               practice is hiding behind it or eighty. *@
+            @if (!Model.ShowingAllPast)
+            {
+                <a class="hp-btn hp-btn-quiet" style="margin-top:.8rem;"
+                   asp-action="Plans" asp-route-slug="@Model.Ctx.Team.Slug" asp-route-all="true">
+                    Show @(Model.PastTotal - Model.Past.Count) older practice@(Model.PastTotal - Model.Past.Count == 1 ? "" : "s")
+                </a>
+            }
         }
     }
 

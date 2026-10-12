@@ -9,8 +9,7 @@
     // page link on the library would have scrolled the coach back up on the way through.
     string Href(int page)
     {
-        var url = Url.Action(Model.Action, Model.Controller,
-            new RouteValueDictionary(Model.LinkFor(page))) ?? "";
+        var url = Url.Action(Model.Action, Model.Controller, Model.LinkFor(page)) ?? "";
         return Model.Anchor is { Length: > 0 } anchor ? $"{url}#{anchor}" : url;
     }
 }

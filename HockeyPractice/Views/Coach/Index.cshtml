@@ -88,6 +88,8 @@
                 }
             </ul>
         </div>
+
+        @await Html.PartialAsync("_Pager", Model.Pager)
     }
 
     <div class="hp-section">Roster</div>

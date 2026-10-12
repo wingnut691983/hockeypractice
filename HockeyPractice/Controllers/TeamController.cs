@@ -216,7 +216,7 @@ public class TeamController : TeamScopedController
     }
 
     [HttpGet("plans")]
-    public async Task<IActionResult> Plans(string slug)
+    public async Task<IActionResult> Plans(string slug, bool all = false)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Player);
         if (failure is not null) return failure;
@@ -260,15 +260,32 @@ public class TeamController : TeamScopedController
                             .OrderBy(c => c.Plan.PracticeDateLocal).ToList();
         var past = cards.Where(c => c.Plan.PracticeDateLocal < cutoff).ToList();
 
+        // The player list is NOT paged, deliberately, and this is the alternative that was
+        // chosen instead on 12 Oct 2026. Only "Earlier" grows without bound; "Next practice" and
+        // "Coming up" are limited by how far ahead a coach schedules, so a pager would hang off
+        // one section of a three-section page. It would also put last week's plan behind a
+        // page-turn, and a parent hunting for it is exactly who must not have to find page 2.
+        //
+        // The cap is a preview, never a limit: "all" renders every past practice on one page, so
+        // nothing is ever unreachable. A cap with no way past it would quietly hide history,
+        // which is worse than either paging or leaving the list alone.
         ViewBag.NavSection = "plans";
         return View(new PlanListViewModel
         {
             Ctx = ctx,
             Next = upcoming.FirstOrDefault(),
             Upcoming = upcoming.Skip(1).ToList(),
-            Past = past
+            Past = all ? past : past.Take(PastPreviewCount).ToList(),
+            PastTotal = past.Count,
+            ShowingAllPast = all || past.Count <= PastPreviewCount
         });
     }
+
+    /// <summary>
+    /// Past practices shown before the "show older" control appears. Ten is about five weeks at
+    /// two practices a week, which is as far back as a player realistically scrolls on a phone.
+    /// </summary>
+    public const int PastPreviewCount = 10;
 
     /// <summary>Team logo. Served through the app because it lives on the volume, not in wwwroot.</summary>
     [HttpGet("logo")]

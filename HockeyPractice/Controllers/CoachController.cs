@@ -36,7 +36,8 @@ public class CoachController : TeamScopedController
     private const string SecretNoticeKey = "hp:notice";
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(string slug, string? notice, string? tag, string? name)
+    public async Task<IActionResult> Index(string slug, string? notice, string? tag, string? name,
+        int page = 1)
     {
         notice ??= TempData[SecretNoticeKey] as string;
 
@@ -50,7 +51,12 @@ public class CoachController : TeamScopedController
         if (!string.IsNullOrEmpty(needle))
             plansQuery = plansQuery.Where(p => p.Tags.Any(t => t.NormalizedName.Contains(needle)));
 
-        var plans = await plansQuery
+        // ThenByDescending on Id is not decoration. PracticeDateLocal is not unique — a team can
+        // hold two practices on one day — and SQLite is free to return equal keys in any order it
+        // likes. Under paging that means a plan can appear on two pages or on none, which looks
+        // like data loss and is impossible to reproduce on demand. The drill library's
+        // OrderBy(Title).ThenBy(Id) is the same guard for the same reason.
+        var paged = await plansQuery
             .Select(p => new
             {
                 Plan = p,
@@ -58,13 +64,14 @@ public class CoachController : TeamScopedController
                 Drills = p.Drills.Count
             })
             .OrderByDescending(x => x.Plan.PracticeDateLocal)
-            .ToListAsync();
+            .ThenByDescending(x => x.Plan.Id)
+            .ToPageAsync(page, PlanPageSize);
 
         ViewBag.NavSection = "manage";
         return View(new ManageViewModel
         {
             Ctx = ctx!,
-            Plans = plans.Select(x => new PlanCard
+            Plans = paged.Items.Select(x => new PlanCard
             {
                 Plan = x.Plan,
                 VideoCount = x.Videos,
@@ -78,9 +85,34 @@ public class CoachController : TeamScopedController
             AllTags = await DistinctTagsAsync(ctx!.Team.Id),
             ActiveTag = tag,
             ActiveName = name,
-            Notice = notice
+            Notice = notice,
+            Pager = new PagerModel
+            {
+                Page = paged.Page,
+                TotalPages = paged.TotalPages,
+                TotalItems = paged.TotalItems,
+                PageSize = PlanPageSize,
+                Noun = "plan",
+                Action = nameof(Index),
+                Controller = "Coach",
+                // The two filters have to ride along or turning a page silently drops them and
+                // the coach lands in the unfiltered list wondering what happened.
+                RouteValues = new Dictionary<string, string?>
+                {
+                    ["slug"] = slug,
+                    ["tag"] = tag,
+                    ["name"] = name
+                }
+            }
         });
     }
+
+    /// <summary>
+    /// Plans per page on the manage screen. Larger than the drill library's 12 on purpose: a coach
+    /// reviewing a season of roughly sixty practices wants fewer page-turns than someone browsing
+    /// a drill library, and twenty cards is still a reasonable phone scroll.
+    /// </summary>
+    public const int PlanPageSize = 20;
 
     // ── Plans ────────────────────────────────────────────────────────────
 
