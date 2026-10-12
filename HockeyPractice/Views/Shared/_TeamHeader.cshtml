@@ -210,18 +210,24 @@
 @if (showTabs)
 {
     @* Thumb-reachable on a phone; moves up beside the header on wide screens. *@
+    @* aria-current, not just the active class: the current tab was conveyed by colour alone,
+       so a screen reader announced three identical links. _Pager.cshtml already does this and is
+       the model. A null value omits the attribute entirely rather than writing "false". *@
     <nav class="hp-tabs" aria-label="Team sections">
         <a class="hp-tab @(section == "plans" ? "active" : "")"
+           aria-current="@(section == "plans" ? "page" : null)"
            asp-controller="Team" asp-action="Plans" asp-route-slug="@slug">
             <span class="hp-tab-icon" aria-hidden="true">▤</span>
             <span>Plans</span>
         </a>
         <a class="hp-tab @(section == "drills" ? "active" : "")"
+           aria-current="@(section == "drills" ? "page" : null)"
            asp-controller="Drill" asp-action="Index" asp-route-slug="@slug">
             <span class="hp-tab-icon" aria-hidden="true">◎</span>
             <span>Drills</span>
         </a>
         <a class="hp-tab @(section == "manage" ? "active" : "")"
+           aria-current="@(section == "manage" ? "page" : null)"
            asp-controller="Coach" asp-action="Index" asp-route-slug="@slug">
             <span class="hp-tab-icon" aria-hidden="true">⚙</span>
             <span>Manage</span>

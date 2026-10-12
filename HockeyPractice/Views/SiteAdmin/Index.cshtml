@@ -1,6 +1,6 @@
 @using HockeyPractice.Services
 @model AdminViewModel
-@{ ViewBag.Title = "Site admin"; }
+@{ ViewBag.Title = "Site admin – EBHockey Plans"; }
 <div class="hp-rail"></div>
 <div class="hp-shell">
     <div class="hp-row" style="margin-top:1rem;justify-content:space-between;">
@@ -52,7 +52,7 @@
 
     @if (Model.NewRequests.Count > 0 || Model.HandledRequests.Count > 0)
     {
-        <div class="hp-section">Team requests</div>
+        <h2 class="hp-section">Team requests</h2>
     }
 
     @foreach (var request in Model.NewRequests)
@@ -111,7 +111,7 @@
         </details>
     }
 
-    <div class="hp-section">Teams</div>
+    <h2 class="hp-section">Teams</h2>
     @if (Model.Teams.Count == 0)
     {
         <div class="hp-empty">No teams yet. Create the first one below.</div>
@@ -128,13 +128,15 @@
                             <form method="post" asp-action="MoveTeam" asp-route-teamId="@summary.Team.Id">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="direction" value="up" />
-                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
+                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                        aria-label="Move @summary.Team.Name up"
                                         @(i == 0 ? "disabled" : "")>&uarr;</button>
                             </form>
                             <form method="post" asp-action="MoveTeam" asp-route-teamId="@summary.Team.Id">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="direction" value="down" />
-                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
+                                <button type="submit" class="hp-btn hp-btn-quiet hp-btn-sm"
+                                        aria-label="Move @summary.Team.Name down"
                                         @(i == Model.Teams.Count - 1 ? "disabled" : "")>&darr;</button>
                             </form>
                         </div>
@@ -186,7 +188,10 @@
                             <form method="post" asp-action="DeleteTeam" asp-route-teamId="@summary.Team.Id"
                                   class="hp-row" style="margin-top:.5rem;">
                                 @Html.AntiForgeryToken()
+                                @* This sits on a destructive delete, which is the worst place to announce "edit text".
+                                   The name says what typing here will do, not just what to type. *@
                                 <input class="hp-input" name="confirmName" required
+                                       aria-label="Type the team name to confirm deleting @summary.Team.Name"
                                        placeholder="Type &quot;@summary.Team.Name&quot; to confirm"
                                        style="flex:1;min-width:12rem;" />
                                 <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">
@@ -204,7 +209,7 @@
         </div>
     }
 
-    <div class="hp-section">New team</div>
+    <h2 class="hp-section">New team</h2>
     <div class="hp-panel">
         <form method="post" asp-action="CreateTeam" class="hp-form">
             @Html.AntiForgeryToken()
@@ -227,7 +232,7 @@
         </form>
     </div>
 
-    <div class="hp-section">Backup</div>
+    <h2 class="hp-section">Backup</h2>
     <div class="hp-panel">
         <p class="hp-muted" style="margin-top:0;">
             The download is the database in one file: every team, plan, drill, roster and view
@@ -356,7 +361,7 @@
         </details>
     </div>
 
-    <div class="hp-section">Off-site backups</div>
+    <h2 class="hp-section">Off-site backups</h2>
     <div class="hp-panel">
         <p class="hp-muted" style="margin-top:0;">
             A copy of the <strong>whole volume</strong> in one zip: the database, every plan PDF,
@@ -557,7 +562,7 @@
         }
     </div>
 
-    <div class="hp-section">Storage</div>
+    <h2 class="hp-section">Storage</h2>
     <div class="hp-panel hp-muted">
         @PlanStorageService.Human(Model.UsedBytes) of @PlanStorageService.Human(Model.QuotaBytes) used
     </div>

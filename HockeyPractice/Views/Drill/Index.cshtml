@@ -91,7 +91,7 @@
        group can't rewrite what another team already published. *@
     @if (!Model.ShowingArchived)
     {
-        <div class="hp-section">Copy to another team</div>
+        <h2 class="hp-section">Copy to another team</h2>
         <div class="hp-panel">
             @if (Model.CopyTargets.Count == 0)
             {
@@ -122,7 +122,8 @@
                 <form method="post" asp-action="CopyAll" asp-route-slug="@slug" class="hp-row"
                       data-confirm="Copy all of these drills into the team you picked?">
                     @Html.AntiForgeryToken()
-                    <select class="hp-select" name="targetSlug" style="flex:1;min-width:12rem;">
+                    <select class="hp-select" name="targetSlug" aria-label="Team to copy the library to"
+                            style="flex:1;min-width:12rem;">
                         @foreach (var team in Model.CopyTargets)
                         {
                             <option value="@team.Slug">@team.Name</option>

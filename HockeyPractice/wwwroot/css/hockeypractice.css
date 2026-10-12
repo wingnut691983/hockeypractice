@@ -38,9 +38,54 @@
        Lightened here, and reset again in the print block below, or a plan printed from a phone
        in dark mode carries this value onto white paper. */
     --hp-success:   #3fbe7e;
+
+    /* Exactly the same problem as --hp-success above, missed when that one was fixed. #c0392b is
+       chosen to sit on white and as TEXT on a dark surface it fails outright: measured 3.14:1 on
+       --hp-surface, 2.79:1 on --hp-surface-2 and 3.42:1 on --hp-bg, against the 4.5 it needs.
+       This is the colour of delete confirmations and over-time warnings, which is the worst
+       category of text to leave hard to read. #ef7a6a measures 6.24 / 5.55 / 6.80 on those same
+       three. Reset in the print block below for the same reason the green is. */
+    --hp-danger:    #ef7a6a;
   }
 }
 
+
+/* No :focus-visible rule existed anywhere. Nothing sets outline:none, so the UA ring survived,
+   but a default ring on .hp-btn's filled var(--hp-primary) background with a 10px radius is close
+   to invisible. One rule, stated once, rather than the handful of elements that had their own.
+   :focus-visible and not :focus, so a mouse click on a button does not leave a ring behind. */
+:focus-visible {
+  outline: 3px solid var(--hp-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* On a filled primary button the ring would be the same colour as what it sits on, so it gets
+   the page background instead and reads against the fill. */
+.hp-btn-primary:focus-visible,
+.hp-page-current:focus-visible {
+  outline-color: var(--hp-text);
+}
+
+/* Visible only when focused. Positioned rather than display:none, because a hidden element is
+   not focusable and the link has to be reachable by Tab to do its job at all. */
+.hp-skip {
+  position: absolute;
+  left: .5rem;
+  top: -4rem;
+  z-index: 100;
+  padding: .6rem .9rem;
+  min-height: var(--hp-tap);
+  display: inline-flex;
+  align-items: center;
+  background: var(--hp-surface);
+  color: var(--hp-text);
+  border: 1px solid var(--hp-border);
+  border-radius: 10px;
+  box-shadow: var(--hp-shadow);
+  font-weight: 650;
+  transition: top .12s ease-out;
+}
+.hp-skip:focus { top: .5rem; }
 
 /* Team colours used as TEXT need a different treatment from team colours used as a
    BACKGROUND: a light gold is fine behind dark text but illegible as text on white. These
@@ -357,6 +402,11 @@ a.hp-card:active { transform: scale(.99); }
 .hp-section[id] { scroll-margin-top: 1rem; }
 
 .hp-drill-head { display: flex; align-items: flex-start; gap: .6rem; }
+/* min-width: 0 on the growing child, because a flex item will not shrink below its content by
+   default. Titles allow 140 characters and the time beside them is nowrap + flex-shrink: 0, so
+   without this a long title pushes the row wider than the phone. .hp-plan-summary already does
+   this; the drill head was the one that missed it. */
+.hp-drill-title { min-width: 0; overflow-wrap: anywhere; }
 /* Pushed to the right of the drill title, so a player scanning the plan can see how long each
    piece runs without it competing with the name. */
 .hp-drill-time {
@@ -380,8 +430,13 @@ a.hp-card:active { transform: scale(.99); }
   margin: .15rem 0 0;
 }
 /* pre-wrap so the coach's own line breaks survive. Razor encodes the text, so this is layout
-   only — it can't turn typed markup into live HTML. */
+   only — it can't turn typed markup into live HTML.
+   overflow-wrap is the other half: Description allows 4,000 characters and coaches paste URLs
+   into it, and one unbroken 90-character URL scrolled the whole page sideways on a 360px phone.
+   .hp-peek-text next door has carried this since Sept and renders the same kind of text; its
+   comment named this very rule as the one still missing. */
 .hp-drill-body {
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
   margin-top: .5rem;
   color: var(--hp-text);
@@ -582,11 +637,22 @@ a.hp-card:active { transform: scale(.99); }
   font-weight: 650;
   color: var(--hp-text);
 }
+.hp-tagchip-x::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
+}
+
 .hp-tagchip-text { overflow-wrap: anywhere; }
 
 /* Small, but still a real touch target — 24px square rather than the bare glyph, which on a
    phone would be almost impossible to hit without also hitting the chip next to it. */
+/* 24px. That clears WCAG 2.5.8 AA, which asks for 24, but not this stylesheet's own --hp-tap of
+   44. The hit area is grown to 40x32 rather than a full 44 square on purpose: chips sit inline
+   with a .35rem gap, so a 44px square would overlap the chip beside it and start removing the
+   wrong tag. Bigger than it was, and still inside its own chip. */
 .hp-tagchip-x {
+  position: relative;
   flex-shrink: 0;
   width: 24px; height: 24px;
   display: grid; place-items: center;
@@ -819,12 +885,29 @@ a.hp-card:active { transform: scale(.99); }
   border-color: var(--hp-border);
 }
 .hp-btn-danger { background: transparent; color: var(--hp-danger); border-color: var(--hp-border); }
-.hp-btn-sm { min-height: 36px; padding: .35rem .7rem; font-size: .84rem; }
+/* 36px tall, and the most-used button variant on the site, so it was also the most common
+   under-sized tap target. Raising min-height to 44 would make "small" the same size as normal and
+   lose the variant, so the HIT AREA grows instead and the button looks identical: 36 + 4 above
+   + 4 below = 44. Vertically only — the up/down reorder pair sits side by side 3px apart, and
+   growing sideways would make the two overlap, which trades one problem for a worse one. */
+.hp-btn-sm {
+  position: relative;
+  min-height: 36px; padding: .35rem .7rem; font-size: .84rem;
+}
+.hp-btn-sm::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
 
+/* overflow-wrap here for the same reason .hp-notice below has it: the admin page renders raw
+   exception strings into these, and a stack frame or a long path is one unbroken token that
+   scrolls the page sideways. .hp-notice had it and these two did not. */
 .hp-error {
   background: #fdecea; color: #8c2f24;
   border: 1px solid #f5c6c0;
   border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
+  overflow-wrap: anywhere;
 }
 .hp-notice {
   background: #e8f2ff; color: #1c4a80;
@@ -838,6 +921,7 @@ a.hp-card:active { transform: scale(.99); }
   background: #fff6e0; color: #6b4c14;
   border: 1px solid #f0d79a;
   border-radius: 10px; padding: .7rem .8rem; font-size: .9rem;
+  overflow-wrap: anywhere;
 }
 
 /* The site-wide version sits above the page rather than inside it, so it lands the same way on
@@ -914,7 +998,13 @@ a.hp-card:active { transform: scale(.99); }
 
 .hp-row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
 .hp-muted { color: var(--hp-muted); font-size: .86rem; }
-.hp-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Raw exception text and file paths land in these on the admin page, and a stack frame is one
+   unbroken token. Without the wrap it scrolls the page sideways at exactly the moment someone is
+   trying to read an error. */
+.hp-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
 
 .hp-tracking { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
 .hp-tracking span {
@@ -923,8 +1013,6 @@ a.hp-card:active { transform: scale(.99); }
 }
 .hp-tracking span.done { background: #e3f5eb; color: var(--hp-success); }
 @media (prefers-color-scheme: dark) { .hp-tracking span.done { background: #16301f; color: #7fe0ac; } }
-
-.hp-inline-form { display: contents; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
@@ -1607,11 +1695,15 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   white-space: nowrap;
 }
 .hp-identity-text strong { color: var(--hp-text); font-weight: 750; }
+/* 34px, and this is the primary call to action for a player who has not picked their name yet,
+   which makes it the single most important target on the page for exactly the people least able
+   to hit a small one. Grown outright rather than via a pseudo-element: it sits alone in its strip
+   with room around it. */
 .hp-identity a {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
+  min-height: var(--hp-tap);
   padding: 0 .6rem;
   border-radius: 8px;
   font-size: .8rem;
@@ -1670,8 +1762,21 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
 }
 .hp-showtoggle:focus-within { outline: 2px solid var(--hp-primary); outline-offset: 1px; }
 
-/* A link that won't be shown is dimmed, so scanning the list tells you the state. */
-.hp-linklist > li:has(.hp-showtoggle input:not(:checked)) .grow { opacity: .55; }
+/* A link that won't be shown is marked out, so scanning the list tells you the state.
+   This was opacity: .55 on the text. It read fine but measured 2.29:1, because the row's
+   secondary line is --hp-muted and dimming muted text composites it toward the background
+   twice over. The opacity that WOULD pass is about .90, at which point there is no visible
+   dim left and the signal is gone — so opacity was the wrong tool, not the wrong value.
+   A background tint carries the same "this one is different" at a glance and leaves every
+   character at full strength: muted on --hp-surface-2 measures 5.00:1, body text 16.01:1. */
+.hp-linklist > li:has(.hp-showtoggle input:not(:checked)) {
+  background: var(--hp-surface-2);
+}
+
+/* A list row in a state that is not actionable: already copied, name clash. Same reasoning as
+   the hidden-link row above — a tint rather than opacity, because the row's own text explains
+   the state and must stay readable while it does. */
+.hp-row-inactive { background: var(--hp-surface-2); }
 
 /* The team code, displayed for sharing — big enough to read out loud at the rink. */
 .hp-code-display {
@@ -1719,9 +1824,11 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
   backdrop-filter: blur(6px);
 }
 .hp-zoom[hidden] { display: none; }
+/* 40px, and the only way to zoom a PDF at all, since pinch-zoom is deliberately disabled on the
+   viewer. Four pixels short of the target on the control a reader needs most. */
 .hp-zoom button {
-  width: 40px;
-  height: 40px;
+  width: var(--hp-tap);
+  height: var(--hp-tap);
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -1893,6 +2000,10 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
        prefers-color-scheme still matches while printing, so without this line the added-time
        note prints pale green on white. Same trap as the *-text aliases below. */
     --hp-success:   #1a8a52;
+
+    /* And the same for the red, now that the dark block lightens it too. Without this a plan
+       printed from a phone in dark mode carries the pale coral onto white paper. */
+    --hp-danger:    #c0392b;
 
     /* Separate from the tokens above, and easy to miss: the dark-mode block also swaps the
        *-text aliases to the -ink-dark variants, which are the team colour LIGHTENED for a

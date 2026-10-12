@@ -18,7 +18,7 @@
     <a class="hp-btn hp-btn-accent hp-btn-block" style="margin:1rem 0;"
        asp-action="ChoosePlanKind" asp-route-slug="@slug">+ New practice plan</a>
 
-    <div class="hp-section">Plans</div>
+    <h2 class="hp-section">Plans</h2>
 
     @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
     {
@@ -92,7 +92,7 @@
         @await Html.PartialAsync("_Pager", Model.Pager)
     }
 
-    <div class="hp-section">Roster</div>
+    <h2 class="hp-section">Roster</h2>
     <div class="hp-panel">
         @if (Model.Roster.Count == 0)
         {
@@ -122,14 +122,16 @@
         <form method="post" asp-action="AddPlayer" asp-route-slug="@slug"
               class="hp-row" style="margin-top:.8rem;">
             @Html.AntiForgeryToken()
-            <input class="hp-input" name="name" placeholder="Player name" required style="flex:2;min-width:10rem;" />
+            <input class="hp-input" name="name" placeholder="Player name" required
+                   aria-label="Player name" style="flex:2;min-width:10rem;" />
             <input class="hp-input" name="jerseyNumber" placeholder="#" maxlength="4"
+                   aria-label="Jersey number"
                    inputmode="numeric" style="flex:0 0 4.5rem;" />
             <button type="submit" class="hp-btn">Add</button>
         </form>
     </div>
 
-    <div class="hp-section">Invite the team</div>
+    <h2 class="hp-section">Invite the team</h2>
     <div class="hp-panel">
         @if (Model.Ctx.Team.ViewCode is { } viewCode)
         {
@@ -164,7 +166,7 @@
         </p>
     </div>
 
-    <div class="hp-section">Branding</div>
+    <h2 class="hp-section">Branding</h2>
     <div class="hp-panel">
         <form method="post" asp-action="Branding" asp-route-slug="@slug"
               enctype="multipart/form-data" class="hp-form">
@@ -198,7 +200,7 @@
         </form>
     </div>
 
-    <div class="hp-section">Locker-room playlist</div>
+    <h2 class="hp-section">Locker-room playlist</h2>
     <div class="hp-panel">
         <form method="post" asp-action="Playlist" asp-route-slug="@slug" class="hp-form">
             @Html.AntiForgeryToken()
@@ -218,7 +220,7 @@
         </form>
     </div>
 
-    <div class="hp-section">Storage</div>
+    <h2 class="hp-section">Storage</h2>
     <div class="hp-panel">
         <div class="hp-meter">
             <div class="hp-meter-fill @(Model.StorageTight ? "tight" : "")"

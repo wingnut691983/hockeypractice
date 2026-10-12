@@ -10,6 +10,20 @@ data/
 *.md
 .claude/
 
+# The same three things .gitignore spends a paragraph on, for the same reason and in the second
+# place they can escape. A database carries every team's ViewCode in PLAINTEXT, deliberately, so
+# a manager can re-share the join link, plus the roster of minors. An archive carries that AND
+# the Data Protection key ring, which is the material that signs the access cookie: holding one
+# is enough to forge access, not merely to read a copy.
+#
+# Harmless today only because neither Dockerfile does `COPY . .` — the canonical one copies
+# global.json and HockeyPractice/, and Dockerfile.fast copies publish/. That is a property of
+# two files that nobody is obliged to preserve. One future `COPY . .` would push this to a
+# registry, and `restore/` currently holds two real databases.
+restore/
+*.db
+hockeypractice-*.zip
+
 # A framework-dependent publish ships SQLite's native library for every RID .NET knows about —
 # Windows, macOS, Android, MIPS, s390x, the lot. That's 24 MB, of which this container can only
 # ever load one: the base image is mcr.microsoft.com/dotnet/aspnet:8.0, which is Debian on

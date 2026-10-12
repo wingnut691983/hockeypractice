@@ -13,7 +13,6 @@ public class ManageViewModel
     public double UsedFraction => QuotaBytes <= 0 ? 0 : (double)UsedBytes / QuotaBytes;
     public bool StorageTight => UsedFraction >= 0.75;
 
-    public string? ViewCode { get; init; }
     public string? Notice { get; init; }
 
     /// <summary>Paging state for the plan list. Same pager the drill library uses.</summary>

@@ -1,0 +1,14 @@
+# Everything a team owns lives under /t/<slug>/ and is gated by a team code, so a crawler can
+# never read it anyway. Disallowing it is about not wasting a crawl budget on a wall of identical
+# code-entry pages, and about not having team slugs turn up in search results as bare URLs.
+User-agent: *
+Disallow: /t/
+Disallow: /admin
+Disallow: /s/
+
+# The three pages that are genuinely public and worth finding.
+Allow: /$
+Allow: /whats-new
+Allow: /how-it-works
+
+Sitemap: https://ebhockeyplan.com/sitemap.xml

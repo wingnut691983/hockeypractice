@@ -37,13 +37,13 @@
     {
         @if (Model.Next is not null)
         {
-            <div class="hp-section" style="margin-top:1.4rem;">Next practice</div>
+            <h2 class="hp-section" style="margin-top:1.4rem;">Next practice</h2>
             @await Html.PartialAsync("_PlanCard", Model.Next, new ViewDataDictionary(ViewData) { ["Next"] = true })
         }
 
         @if (Model.Upcoming.Count > 0)
         {
-            <div class="hp-section">Coming up</div>
+            <h2 class="hp-section">Coming up</h2>
             @foreach (var card in Model.Upcoming)
             {
                 @await Html.PartialAsync("_PlanCard", card)
@@ -52,7 +52,7 @@
 
         @if (Model.Past.Count > 0)
         {
-            <div class="hp-section">Earlier</div>
+            <h2 class="hp-section">Earlier</h2>
             @foreach (var card in Model.Past)
             {
                 @await Html.PartialAsync("_PlanCard", card)

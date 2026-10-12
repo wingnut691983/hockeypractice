@@ -1069,6 +1069,33 @@ answer in September.
   with a message naming both numbers, and the default config boots clean. A misconfigured cap is
   otherwise invisible until a coach tries a big upload, and then it looks like a broken site.
 
+- **`AllowedHosts` must stay `*` on this platform, and the audit was wrong to call it a one-line
+  fix.** Narrowing it to the real domains looks obviously correct and would have taken the site
+  down. The kubelet probes readiness and liveness at `http://<pod-ip>:8080/health`, so the Host
+  header on every probe is a **pod IP**, not a hostname, and no allow-list can contain it because
+  it changes each deploy. Measured against a Production-mode build: `Host: localhost` returned 200
+  and `Host: 10.42.0.17:8080` returned **400**. Every probe would have failed, the pod would never
+  have gone ready, and the deploy would have hung or rolled back. If host filtering is ever wanted
+  here it has to exempt `/health`, which means doing it in middleware ordered around that branch
+  rather than through the `AllowedHosts` setting.
+
+- **`opacity` is not a way to de-emphasise text, and the value that passes contrast has no visible
+  dim left.** Two places dimmed a row to signal state. They measured 2.29:1 and 2.60:1, because the
+  rows' secondary line is already `--hp-muted` and opacity composites it toward the background a
+  second time. The opacity that would reach 4.5:1 on muted text is about **0.90**, at which point
+  there is no dim to see and the signal is gone. So opacity was the wrong tool, not the wrong
+  value. Both now use a `--hp-surface-2` row tint, which carries the same "this one is different"
+  and leaves every character at full strength: muted on that tint measures 5.00:1.
+
+- **A contrast target computed against white is not a contrast target.** `Palette.AsTextOn` walked
+  lightness until it cleared 4.5:1 **against `#ffffff`** and stopped at the first hit, but the ink
+  it returns is also used on `--hp-surface-2` and `--hp-bg`, which are darker than white. So
+  anything that only just cleared the bar landed under it everywhere that was not a white card:
+  the default accent measured 4.57 on white, 4.04 on surface-2, 4.22 on bg, and four of six sample
+  team colours failed the same way. The target is now 5.0, which is the headroom the darkest
+  surface needs, and all six clear 4.5 everywhere. **If a surface darker than `--hp-bg` is ever
+  added, re-check this rather than assuming it still holds.**
+
 - **Paginating a list ordered by a non-unique column loses rows, and it looks like data loss.** The
   manage page orders plans by practice date, and a team can hold two practices on one day. SQLite
   is free to return equal keys in any order it likes, so without a tiebreaker a plan can appear on

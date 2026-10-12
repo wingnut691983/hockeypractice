@@ -797,14 +797,35 @@ public class SiteAdminController : Controller
     /// </summary>
     private void ScheduleRestart() => _ = Task.Run(async () =>
     {
-        await Task.Delay(TimeSpan.FromSeconds(2));
-        _lifetime.StopApplication();
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            _lifetime.StopApplication();
+        }
+        catch (Exception ex)
+        {
+            // Unobserved before this. If StopApplication throws, the pod keeps serving against a
+            // database that was swapped out from under its pooled connections, and the only
+            // symptom is the restore appearing not to have taken. Logging does not fix that, but
+            // it is the difference between a diagnosable incident and a mystery — and this runs
+            // in the recovery path, where mysteries are most expensive.
+            _log.LogError("Scheduled restart after a restore failed: {Error}. The process is "
+                          + "still running against the swapped database and must be restarted "
+                          + "manually.", ex.Message);
+        }
     });
 
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
-        catch (IOException) { /* best effort; the staged copy is disposable */ }
+        catch (IOException ex)
+        {
+            // Best effort by design — the staged copy is disposable and a failure here must not
+            // fail the restore. But these are the deletes that free quota on a 1 GiB volume with
+            // no resize path, so a run of silent failures is how the volume fills with nobody
+            // able to say why. Logged, never thrown.
+            _log.LogWarning("Could not delete staged file {Path}: {Error}", path, ex.Message);
+        }
     }
 
     /// <summary>

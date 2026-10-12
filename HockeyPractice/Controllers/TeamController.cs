@@ -60,7 +60,7 @@ public class TeamController : TeamScopedController
                 return RedirectToAction(nameof(Plans), new { slug });
         }
 
-        if (Access.LevelFor(User, team.Id) == TeamAccessLevel.None)
+        if (Access.RealLevelFor(User, team.Id) == TeamAccessLevel.None)
             return RedirectToAction(nameof(EnterCode), new { slug });
 
         return RedirectToAction(nameof(Plans), new { slug });

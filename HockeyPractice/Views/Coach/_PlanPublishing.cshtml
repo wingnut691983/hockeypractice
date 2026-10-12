@@ -11,7 +11,7 @@
 @* Next week's practice is usually last week's with a few changes, so this sits with Publishing
    rather than down by Delete: it belongs to what you do with a finished plan, not to tidying up.
    Renders for both kinds and in both states — a draft is just as reusable as a published plan. *@
-<div class="hp-section">Reuse</div>
+<h2 class="hp-section">Reuse</h2>
 <div class="hp-panel">
     <p class="hp-muted" style="margin-top:0;">
         Running this practice again? Make a copy to work from, with
@@ -22,7 +22,7 @@
        asp-route-slug="@slug" asp-route-id="@plan.Id">Duplicate this plan</a>
 </div>
 
-<div class="hp-section">Publishing</div>
+<h2 class="hp-section">Publishing</h2>
 <div class="hp-panel">
     @if (plan.Status == PlanStatus.Draft)
     {

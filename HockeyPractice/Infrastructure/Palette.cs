@@ -15,8 +15,21 @@ namespace HockeyPractice.Infrastructure;
 /// </summary>
 public static class Palette
 {
-    // WCAG AA for normal-size text. Large text would allow 3.0, but these labels are small.
-    private const double MinContrast = 4.5;
+    /// <summary>
+    /// Target for <see cref="AsTextOn"/>, deliberately above the 4.5 that WCAG AA asks for.
+    ///
+    /// AsTextOn walks lightness until it clears this against WHITE and stops at the first hit. But
+    /// the ink it returns is then used on --hp-surface-2 (#eef1f6) and --hp-bg (#f4f6f9) as well,
+    /// which are slightly darker than white, so a result that only just cleared 4.5 lands just
+    /// under it everywhere that is not a white card. Measured with the old 4.5 target: the default
+    /// accent produced 4.57 on white but 4.04 on surface-2 and 4.22 on bg, and four of six sample
+    /// team colours failed the same way.
+    ///
+    /// 5.0 is the headroom that covers the darkest surface this ink is used on. It is one number
+    /// rather than a per-site patch, which is the point: the failures were a family with one cause.
+    /// If a new surface darker than --hp-bg is ever added, re-check this rather than assuming.
+    /// </summary>
+    private const double MinContrast = 5.0;
 
     /// <summary>
     /// Memo for <see cref="CssVariables"/>, which was the whole cost of this class at runtime.

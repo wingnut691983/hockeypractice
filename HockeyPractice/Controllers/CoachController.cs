@@ -1195,8 +1195,17 @@ public class CoachController : TeamScopedController
     }
 
     /// <summary>
-    /// Rotates the shared view code. Every player uses the same code, so this is how a coach
-    /// cuts off someone who has left the team without waiting on a deploy.
+    /// Rotates the shared view code, which stops anyone NEW joining with the old one.
+    ///
+    /// It does not evict anybody, and the docstring here used to say it did. Access lives
+    /// entirely in a signed cookie claim with a 180-day sliding expiry and there is no
+    /// server-side session store, so every device already holding a claim keeps full access for
+    /// up to another 180 days, sliding on each visit. A coach told "this cuts off someone who has
+    /// left the team" would reasonably stop worrying at exactly the wrong moment.
+    ///
+    /// The only actual revocation is replacing the Data Protection key ring, which signs everyone
+    /// out of every team at once. If per-team eviction is ever wanted, it needs a stored token the
+    /// claim is checked against, not a rotation.
     /// </summary>
     [HttpPost("rotate-code")]
     [ValidateAntiForgeryToken]

@@ -2,7 +2,8 @@
     var status = ViewBag.Status as int?;
     var notFound = status == 404;
     var tooMany = status == 429;
-    ViewBag.Title = notFound ? "Page not found" : tooMany ? "Slow down a second" : "Something went wrong";
+    ViewBag.Title = (notFound ? "Page not found" : tooMany ? "Slow down a second" : "Something went wrong")
+                    + " – EBHockey Plans";
 }
 <div class="hp-rail"></div>
 <div class="hp-shell" style="text-align:center;">

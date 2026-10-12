@@ -5,6 +5,7 @@ using HockeyPractice.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
@@ -155,7 +156,16 @@ builder.Services.AddResponseCompression(options =>
 builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
 
-builder.Services.AddControllersWithViews();
+// AutoValidateAntiforgeryToken makes the check the DEFAULT for every unsafe verb rather than
+// something each action has to remember. All 41 mutating POSTs already carry
+// [ValidateAntiForgeryToken] and PlanController.Viewed carries [IgnoreAntiforgeryToken], so this
+// changes nothing today, which is the point: it is a guard against the 42nd POST being added
+// without the attribute and nobody noticing. An opt-out stays explicit and visible at the one
+// action that needs it, instead of an omission being indistinguishable from an oversight.
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
+});
 
 // Brute-forcing a 6-character team code is the only real attack surface here.
 //

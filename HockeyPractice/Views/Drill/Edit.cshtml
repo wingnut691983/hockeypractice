@@ -169,7 +169,7 @@
        it away — which on rink wifi would be a slow way to achieve nothing. *@
     @if (!Model.IsNew && Model.Drill is { } d && d.Diagrams.Count > 0)
     {
-        <div class="hp-section">Pictures on this drill</div>
+        <h2 class="hp-section">Pictures on this drill</h2>
         <div class="hp-panel">
             <p class="hp-muted" style="margin-top:0;font-size:.82rem;">
                 Shown to players in the order they were added.
@@ -211,7 +211,7 @@
        HTML and the browser drops the inner one, so this would submit the edit instead. *@
     @if (!Model.IsNew && Model.Drill is not null && Model.CopyTargets.Count > 0)
     {
-        <div class="hp-section">Copy this drill</div>
+        <h2 class="hp-section">Copy this drill</h2>
         <div class="hp-panel">
             <p class="hp-muted" style="margin-top:0;">
                 Sends a copy to another team you manage. They get their own to edit, so changes
@@ -229,7 +229,8 @@
             <form method="post" asp-action="Copy" asp-route-slug="@slug" asp-route-id="@Model.Drill.Id"
                   class="hp-row">
                 @Html.AntiForgeryToken()
-                <select class="hp-select" name="targetSlug" style="flex:1;min-width:11rem;">
+                <select class="hp-select" name="targetSlug" aria-label="Team to copy this drill to"
+                        style="flex:1;min-width:11rem;">
                     @foreach (var team in Model.CopyTargets)
                     {
                         <option value="@team.Slug">@team.Name</option>
@@ -247,7 +248,7 @@
 
     @if (!Model.IsNew && Model.Drill is not null)
     {
-        <div class="hp-section">This drill</div>
+        <h2 class="hp-section">This drill</h2>
         <div class="hp-panel">
             @if (Model.Drill.IsArchived)
             {

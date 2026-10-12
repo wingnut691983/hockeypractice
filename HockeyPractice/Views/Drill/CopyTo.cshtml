@@ -68,7 +68,7 @@
         }
         else
         {
-            <div class="hp-section">Your drills</div>
+            <h2 class="hp-section">Your drills</h2>
 
             @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
             {
@@ -126,8 +126,10 @@
                             {
                                 var drill = candidate.Card.Drill;
                                 var boxId = $"copy-{drill.Id}";
-                                <li style="flex-wrap:wrap;align-items:flex-start;
-                                           @(candidate.CanCopy ? "" : "opacity:.62;")">
+                                @* hp-row-inactive, not opacity: the row says why it cannot be
+                                   copied, and dimming measured 2.60:1 on that very explanation. *@
+                                <li class="@(candidate.CanCopy ? "" : "hp-row-inactive")"
+                                    style="flex-wrap:wrap;align-items:flex-start;">
                                     @* The label wraps only the checkbox and the drill's content, so
                                        tapping anywhere on the row ticks it — a 44px target is hard
                                        to hit on a phone otherwise. *@

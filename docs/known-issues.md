@@ -444,6 +444,49 @@ rather than a reasoned exposure argument.
 
 ---
 
+### 16. Batch P items deliberately not done in the final sweep
+
+Audit batch P was a sweep of eleven small security items. Six shipped in `v44`: the global
+antiforgery filter, `.dockerignore`, the unobserved restart task, the silent delete failures, and
+(earlier, in batch G) the request-size mismatch. One was **attempted and reverted** — see
+`AllowedHosts` in README's "What I'd flag", which is the most useful thing the sweep produced.
+
+These five were left, each for a reason rather than for lack of time:
+
+**a. The restore free-space fuse trusts declared sizes.** `VolumeBackupService` sums
+`entry.Length`, the declared uncompressed size from the zip central directory, and `ApplyFiles`
+then extracts the actual bytes. A crafted archive can fill the 1 GiB volume, which has no resize
+path. Site-admin gated and requires typing `REPLACE`.
+**Trigger: before any widening of who can upload an archive, or if restore is ever automated.**
+The fix is to count bytes as they are written and abort past the budget, which needs its own
+verification pass against a real archive — the audit named it a split candidate for that reason.
+
+**b. Draft drill diagrams are served at Player level.** `DrillController.Diagram` checks team
+membership but not whether the drill sits in a plan the player can see, unlike the three
+`PlanController` paths that all enforce `Status == Published`. Same-team only.
+**Trigger: a coach objecting that players can see a drill before the plan is published**, or any
+change that widens who holds a player code.
+
+**c. `VideoTitleService` has no response-size cap, no redirect policy and no concurrency cap.**
+A PDF with 200 links fires 200 simultaneous outbound requests from inside the upload. Not SSRF:
+the host is a literal and the video id is regex-constrained, so there is no attacker-controlled
+destination. Hardening, not a bug.
+**Trigger: an upload that hangs or times out on a link-heavy PDF.**
+
+**d. Claims accumulate without bound.** `TeamAccessService.ReissueAsync` copies every existing
+claim forward on each re-issue with no pruning of deleted teams. Past about 4 KB the cookie
+chunks. **Trigger: a manager of many teams reporting sign-in oddities, or any bulk team deletion.**
+
+**e. The demo team's player code is world-readable, by design but not by enforcement.**
+`HowItWorks` publishes a live team's plaintext code, selected by a hard-coded
+`DemoTeamSlug = "demoteam"` with no `IsDemo` flag on the row. The intent is deliberate; what is
+missing is enforcement, so renaming a real team to `demoteam` would put its code and roster on an
+ungated page. **Not fixed here because the fix is a schema column and this deploy was deliberately
+migration-free.** **Trigger: the next migration for any reason** — add `IsDemo` then and have
+`HowItWorks` require it.
+
+---
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.

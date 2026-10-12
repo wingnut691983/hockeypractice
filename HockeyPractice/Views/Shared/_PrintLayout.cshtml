@@ -31,11 +31,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@title</title>
+    @* This sheet is a full duplicate of Plan/Details at its own URL and with the same title, so
+       without this a crawler that ever reached one would have two copies of the same practice to
+       choose between. Nothing here is linked publicly, but noindex costs one line and does not
+       depend on that staying true. *@
+    <meta name="robots" content="noindex, nofollow" />
     <link rel="stylesheet" href="~/css/hockeypractice.css" asp-append-version="true" />
     <link rel="icon" href="~/favicon.ico" sizes="16x16 32x32 48x48" asp-append-version="true" />
 </head>
 <body>
-    @RenderBody()
+    @* Same main landmark as _Layout. No skip link: this layout has no chrome to skip. *@
+    <main>
+        @RenderBody()
+    </main>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

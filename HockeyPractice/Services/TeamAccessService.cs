@@ -27,9 +27,6 @@ public class TeamAccessService
     /// <summary>Cookie name for the coach's "see it as a player" preview.</summary>
     public const string PreviewCookie = "hp_preview";
 
-    public TeamAccessLevel LevelFor(ClaimsPrincipal user, int teamId) =>
-        RealLevelFor(user, teamId);
-
     /// <summary>
     /// Access as the viewer actually has it, ignoring any preview toggle. Authorisation must
     /// always use this; preview is a display concern and must never be able to grant anything.

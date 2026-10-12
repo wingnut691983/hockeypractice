@@ -50,7 +50,7 @@
 
     @if (Model.Videos.Count > 0)
     {
-        <div class="hp-section" style="margin-top:1.2rem;">Watch before practice</div>
+        <h2 class="hp-section" style="margin-top:1.2rem;">Watch before practice</h2>
         <div class="hp-videos">
             @for (var i = 0; i < Model.Videos.Count; i++)
             {
@@ -83,7 +83,7 @@
 
     @if (Model.IsDrillPlan)
     {
-        <div class="hp-section">The plan</div>
+        <h2 class="hp-section">The plan</h2>
 
         @if (Model.Drills.Count == 0)
         {
@@ -263,7 +263,7 @@
     }
     else
     {
-        <div class="hp-section">The plan</div>
+        <h2 class="hp-section">The plan</h2>
         <div class="hp-viewer-wrap">
             <div class="hp-viewer">
                 <iframe id="hp-pdf" src="@viewerUrl" title="@Model.Plan.Title" loading="lazy"></iframe>
@@ -284,7 +284,7 @@
     @if (Model.Ctx.IsManager)
     {
         var total = Model.Viewed.Count + Model.NotViewed.Count;
-        <div class="hp-section">Who's seen it</div>
+        <h2 class="hp-section">Who's seen it</h2>
         <div class="hp-panel">
             <strong>@Model.Viewed.Count of @total</strong> on the roster have opened this plan.
             @if (Model.AnonymousViews > 0)

@@ -145,7 +145,7 @@
         }
         else if (!Model.IsNew && Model.Links.Count > 0)
         {
-            <div class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</div>
+            <h2 class="hp-section" style="margin-bottom:.4rem;">Links found in the plan</h2>
             <p class="hp-muted" style="margin:0;">
                 Names come from the plan itself: a hyperlink's text, or the line and section
                 heading it sits under. Rename anything that reads badly, and turn off anything
@@ -175,7 +175,11 @@
                                         @link.Section
                                     </div>
                                 }
-                                <input class="hp-input" name="linkLabel" value="@link.Label" maxlength="140" />
+                                @* Repeated once per extracted video link, so without a name a screen reader announced
+                                   "edit text" N times in a row with nothing to tell them apart. The URL
+                                   below is the only thing that distinguishes them, so it is the name. *@
+                                <input class="hp-input" name="linkLabel" value="@link.Label" maxlength="140"
+                                       aria-label="Label for @link.Url" />
                                 <div class="hp-muted hp-mono"
                                      style="overflow-wrap:anywhere;font-size:.76rem;margin-top:.2rem;">
                                     @link.Url
@@ -231,7 +235,7 @@
        below — and so the Remove button can sit beside it without a formaction trick. *@
     @if (!Model.IsNew && Model.IsDrillPlan && Model.Plan is not null)
     {
-        <div class="hp-section">Overview picture</div>
+        <h2 class="hp-section">Overview picture</h2>
         <div class="hp-panel">
             <p class="hp-muted" style="margin-top:0;font-size:.82rem;">
                 One picture of how the whole practice is laid out, shown on the plan between the
@@ -332,7 +336,7 @@
         // drill returns you to the page of the picker you were looking at.
         var pageFilter = Model.LibraryPager.Page;
 
-        <div class="hp-section" id="hp-plan-drills">Drills in this plan</div>
+        <h2 class="hp-section" id="hp-plan-drills">Drills in this plan</h2>
         @if (Model.PlanDrills.Count == 0)
         {
             <div class="hp-empty">
@@ -376,11 +380,19 @@
                                   asp-route-planDrillId="@card.PlanDrillId" asp-route-drillTag="@tagFilter"
                                   asp-route-drillName="@nameFilter" asp-route-drillPage="@pageFilter">
                                 @Html.AntiForgeryToken()
+                                @* aria-label, not title. Accessible-name computation takes an
+                                   element's CONTENTS over its title, so the name here was the
+                                   arrow glyph itself. title is also invisible on touch, which is
+                                   most of this site's traffic. Naming the drill as well, because
+                                   a list of "Move up" repeated nine times says nothing about
+                                   which one. _TagEditor.cshtml does the same for its chips. *@
                                 <button type="submit" name="direction" value="up"
-                                        class="hp-btn hp-btn-quiet hp-btn-sm" title="Move up"
+                                        class="hp-btn hp-btn-quiet hp-btn-sm"
+                                        aria-label="Move @card.Drill.Title up"
                                         @(i == 0 ? "disabled" : "")>&uarr;</button>
                                 <button type="submit" name="direction" value="down"
-                                        class="hp-btn hp-btn-quiet hp-btn-sm" title="Move down"
+                                        class="hp-btn hp-btn-quiet hp-btn-sm"
+                                        aria-label="Move @card.Drill.Title down"
                                         @(i == Model.PlanDrills.Count - 1 ? "disabled" : "")>&darr;</button>
                                 <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm"
                                         formaction="@Url.Action("RemoveDrill", "Coach", new { slug, id = planId, planDrillId = card.PlanDrillId, drillTag = tagFilter, drillName = nameFilter, drillPage = pageFilter })">
@@ -465,7 +477,7 @@
            whole library and its pager in between it was something you had to go hunting for. *@
         @await Html.PartialAsync("_PlanPublishing", Model)
 
-        <div class="hp-section" id="hp-drill-picker">Add a drill</div>
+        <h2 class="hp-section" id="hp-drill-picker">Add a drill</h2>
 
         @await Html.PartialAsync("_SearchFilters", new SearchFiltersModel
         {
@@ -561,7 +573,7 @@
 
         @if (!Model.IsDrillPlan)
         {
-            <div class="hp-section">Replace the PDF</div>
+            <h2 class="hp-section">Replace the PDF</h2>
             <div class="hp-panel">
                 <p class="hp-muted" style="margin-top:0;">
                     Swap in a corrected file. The link players already have keeps working, and

@@ -143,7 +143,7 @@
 
     @if (Model.Videos.Count > 0)
     {
-        <div class="hp-section">Watch before practice</div>
+        <h2 class="hp-section">Watch before practice</h2>
         @* Deliberately not .hp-videos: that is an overflow-x scroller, and a scroll container
            prints only the slice that happens to be visible. Text URLs and no thumbnails — a
            remote lazily-loaded image is the least likely thing on the page to reach paper. *@
@@ -186,7 +186,7 @@
                         : pictures == 2 ? "hp-print-d2"
                         : "hp-print-dn";
 
-            <article class="hp-drill hp-print-drill @density">
+            <article class="hp-drill @density">
                 <div class="hp-drill-head">
                     <span class="hp-drill-num">@(i + 1)</span>
                     <h2 class="hp-drill-title">@drill.Title</h2>
