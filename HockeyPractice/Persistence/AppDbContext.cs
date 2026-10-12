@@ -32,12 +32,23 @@ public class AppDbContext : DbContext
             .HasOne(p => p.Team).WithMany(t => t.Players)
             .HasForeignKey(p => p.TeamId).OnDelete(DeleteBehavior.Cascade);
 
+        // Every roster read asks the same question: this team's players, still active. The
+        // foreign key gives TeamId alone, so IsActive was filtered after the fact. Mirrors the
+        // Drill (TeamId, IsArchived) index below, which is the same shape for the same reason.
+        b.Entity<Player>().HasIndex(p => new { p.TeamId, p.IsActive });
+
         b.Entity<PracticePlan>()
             .HasOne(p => p.Team).WithMany(t => t.Plans)
             .HasForeignKey(p => p.TeamId).OnDelete(DeleteBehavior.Cascade);
 
         // Listing a team's plans always sorts by practice date.
         b.Entity<PracticePlan>().HasIndex(p => new { p.TeamId, p.PracticeDateLocal });
+
+        // "Does any other plan still point at this PDF?" Only the TeamId prefix helped before,
+        // and this one runs immediately before the app deletes a file from the volume
+        // (CoachController.DropUnreferencedPdfAsync). Two plans sharing a PDF is the ordinary
+        // case here, since duplicating a plan gives both rows the same key.
+        b.Entity<PracticePlan>().HasIndex(p => new { p.TeamId, p.PdfKey });
 
         b.Entity<PlanLink>()
             .HasOne(l => l.PracticePlan).WithMany(p => p.Links)
@@ -71,6 +82,12 @@ public class AppDbContext : DbContext
             .HasIndex(d => new { d.TeamId, d.CopiedFromDrillId })
             .IsUnique()
             .HasFilter("[CopiedFromDrillId] IS NOT NULL");
+
+        // The unique index above leads with TeamId, which answers "does this team already hold a
+        // copy". It cannot answer the other direction — "which teams did this drill go to" — which
+        // DrillController.CopiedToAsync asks with no TeamId in hand, on every drill edit page
+        // load. A leading-column index is no help to a query that does not filter on that column.
+        b.Entity<Drill>().HasIndex(d => d.CopiedFromDrillId);
 
         b.Entity<DrillTag>()
             .HasOne(t => t.Drill).WithMany(d => d.Tags)

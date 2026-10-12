@@ -354,6 +354,16 @@ public class TeamController : TeamScopedController
     /// picked so a player is recognised across their phone and the family iPad; otherwise
     /// falls back to the per-device key.
     /// </summary>
+    /// <summary>
+    /// Which of this team's plans the viewer has already opened, for the tick on each card.
+    ///
+    /// The <c>PlayerId == null</c> on the anonymous branch matters for the same reason it does in
+    /// PlanController.HasViewedAsync, and it was missing here too: without it, any row carrying
+    /// this device key matched, including rows belonging to an identified player. On a family
+    /// phone one sibling had already used, a second child browsing without picking their name saw
+    /// their sibling's plans ticked as read. The write path has always carried this predicate;
+    /// both read paths had lost it.
+    /// </summary>
     private async Task<HashSet<int>> MyViewedPlanIdsAsync(int teamId, int? playerId, string viewerKey)
     {
         if (playerId is null && string.IsNullOrEmpty(viewerKey))
@@ -363,7 +373,7 @@ public class TeamController : TeamScopedController
 
         views = playerId is int id
             ? views.Where(v => v.PlayerId == id)
-            : views.Where(v => v.ViewerKey == viewerKey);
+            : views.Where(v => v.PlayerId == null && v.ViewerKey == viewerKey);
 
         return (await views.Select(v => v.PracticePlanId).ToListAsync()).ToHashSet();
     }

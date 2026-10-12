@@ -262,7 +262,13 @@ public class PlanController : TeamScopedController
         // A manager opening their own plan to check who has read it is not a "view" — without
         // this, every glance at the tracking dashboard silently inflated the anonymous-view
         // count, since the same client-side beacon fires on this page for everyone.
-        if (ctx!.IsManager) return NoContent();
+        //
+        // IsRealManager, not IsManager. IsManager is the DISPLAYED level, which the preview
+        // toggle deliberately clamps to Player, so this guard stopped working the moment a coach
+        // previewed their own plan — and the row it then wrote is permanent. Preview is supposed
+        // to be presentational and never change what anyone can do; this was the one place it
+        // changed stored data. See known-issues #7.
+        if (ctx!.IsRealManager) return NoContent();
 
         var plan = await Db.Plans.FirstOrDefaultAsync(
             p => p.Id == id && p.TeamId == ctx.Team.Id && p.Status == PlanStatus.Published);
@@ -310,12 +316,35 @@ public class PlanController : TeamScopedController
         return NoContent();
     }
 
+    /// <summary>
+    /// Has this viewer already opened this plan? Mirrors the two identities the write path in
+    /// <see cref="Viewed"/> uses: the player when one is known, the device only when nobody is.
+    ///
+    /// The <c>PlayerId == null</c> on the anonymous branch is doing two jobs and neither is
+    /// optional.
+    ///
+    /// It is correctness first. Without it this matched ANY row carrying that device key,
+    /// including rows that belong to an identified player. On a family phone that a sibling has
+    /// already used, a second child opening the plan without picking their name was told they had
+    /// already seen it, because the query found their sibling's row. The write path at
+    /// <see cref="Viewed"/> always carried this predicate; the read path had simply lost it.
+    ///
+    /// It is also what makes the index usable. The unique index on
+    /// <c>(PracticePlanId, ViewerKey)</c> is PARTIAL, filtered to <c>PlayerId IS NULL</c>, and
+    /// SQLite will only use a partial index when the query's own WHERE implies that filter. A
+    /// query that does not say so gets a full scan of what is the fastest-growing table in the
+    /// schema, and nothing about the schema looks wrong when it happens: a partial index the
+    /// queries cannot use is indistinguishable from one they can. Check the query plan, not the
+    /// index list.
+    /// </summary>
     private async Task<bool> HasViewedAsync(int planId, int? playerId, string viewerKey)
     {
         if (playerId is int id)
             return await Db.PlanViews.AnyAsync(v => v.PracticePlanId == planId && v.PlayerId == id);
 
         return !string.IsNullOrEmpty(viewerKey) &&
-               await Db.PlanViews.AnyAsync(v => v.PracticePlanId == planId && v.ViewerKey == viewerKey);
+               await Db.PlanViews.AnyAsync(v => v.PracticePlanId == planId
+                                                && v.PlayerId == null
+                                                && v.ViewerKey == viewerKey);
     }
 }

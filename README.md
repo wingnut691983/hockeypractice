@@ -1069,6 +1069,35 @@ answer in September.
   with a message naming both numbers, and the default config boots clean. A misconfigured cap is
   otherwise invisible until a coach tries a big upload, and then it looks like a broken site.
 
+- **A partial index is invisible when it is broken, and the query has to say the filter out loud.**
+  `PlanViews` has a unique index on `(PracticePlanId, ViewerKey)` filtered to
+  `PlayerId IS NULL`. SQLite will only use a partial index when the query's own WHERE implies that
+  filter, and the read path did not carry it, so the busiest lookup on the fastest-growing table in
+  the schema was a full scan. **Nothing about the schema looks wrong when this happens** — a
+  partial index the queries cannot use is identical in `sqlite_master` to one they can. Measured
+  with `EXPLAIN QUERY PLAN`: `SCAN PlanViews` with the old predicate,
+  `SEARCH PlanViews USING INDEX IX_PlanViews_PracticePlanId_ViewerKey` with
+  `PlayerId IS NULL` added. **Check the plan, never the index list.**
+
+- **The same missing predicate was telling the wrong sibling they had already read the plan.** Views
+  are recorded two ways: against the player when one is known, against the device when nobody is.
+  The write path always kept those apart. Both read paths (`PlanController.HasViewedAsync` and
+  `TeamController.MyViewedPlanIdsAsync`) had lost the distinction, so any row carrying that device
+  key matched — including rows belonging to an identified player. On a family phone one child had
+  already used, a second child browsing without picking their name saw their sibling's plans ticked
+  as read. Reproduced against the real row: the old predicate matched the sibling's row, the new
+  one does not. **One word fixed the scan and the wrong answer together**, which is the reason to
+  look at a slow query before assuming it is only slow.
+
+- **`IsManager` is the displayed level and preview deliberately lies about it.** The guard stopping
+  a coach's own glance from inflating the view count checked `ctx.IsManager`. Preview mode clamps
+  that to Player on purpose, so the guard switched itself off exactly when a coach previewed, and
+  the row it then wrote was permanent. `IsRealManager` is the one that means what it says.
+  Measured both ways on the same request: **1 view recorded with the old guard, 0 with the fix.**
+  `TeamAccessService` says preview is presentational and must never change what anyone can do;
+  this was the one place it changed stored data. If you add another guard around preview, use
+  `IsRealManager` and assume `IsManager` will betray you.
+
 - **The app decoded nine image formats while accepting four, and that is where its only reachable
   CVE lived.** `Image.LoadAsync` uses ImageSharp's default configuration, which registers BMP, GIF,
   JPEG, PBM, PNG, QOI, TGA, TIFF and WebP. This app has only ever accepted JPEG, PNG, GIF and WebP

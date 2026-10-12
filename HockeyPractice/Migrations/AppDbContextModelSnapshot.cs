@@ -53,6 +53,8 @@ namespace HockeyPractice.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CopiedFromDrillId");
+
                     b.HasIndex("TeamId", "CopiedFromDrillId")
                         .IsUnique()
                         .HasFilter("[CopiedFromDrillId] IS NOT NULL");
@@ -282,7 +284,7 @@ namespace HockeyPractice.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TeamId");
+                    b.HasIndex("TeamId", "IsActive");
 
                     b.ToTable("Players");
                 });
@@ -343,6 +345,8 @@ namespace HockeyPractice.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TeamId", "PdfKey");
 
                     b.HasIndex("TeamId", "PracticeDateLocal");
 

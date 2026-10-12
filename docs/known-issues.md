@@ -236,7 +236,7 @@ which renders `AdminLogin` correctly. Only a POST with a lapsed ticket hits the 
 **Trigger: an admin reporting a 404 during admin work.** Fix by redirecting to `Index` the way the
 team controller redirects to `EnterCode`.
 
-### 7. A coach previewing as a player records a plan view
+### 7. A coach previewing as a player records a plan view — FIXED, awaiting deploy (12 October 2026)
 
 `PlanController.Viewed` guards with `if (ctx!.IsManager) return NoContent();`. `TeamContext.IsManager`
 is the *display* level, which the preview toggle deliberately clamps to Player. So the guard added
@@ -249,6 +249,11 @@ do. This is the one place it changes stored data.
 **Trigger: none needed, it is simply wrong.** One-word fix: use `ctx.IsRealManager`. Left here only
 because the damage is a slightly inflated count on the coach's own dashboard. Worth folding into
 the next change that touches this file.
+
+✅ **Fixed in audit batch I**, folded in exactly as this entry suggested, because that batch
+changes the same two `PlanViews` queries. Measured both ways on the same request: a coach posting
+the beacon while in preview recorded **1** view with the old guard and **0** with the fix. Close
+this entry when batch I deploys.
 
 ### 8. The join link shares a 30/minute per-team rate budget
 
