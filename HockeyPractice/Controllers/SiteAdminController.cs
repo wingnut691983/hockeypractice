@@ -774,7 +774,7 @@ public class SiteAdminController : Controller
     /// </summary>
     [HttpPost("backup/replaced/delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteReplaced()
+    public IActionResult DeleteReplaced()
     {
         if (!_access.IsSiteAdmin(User)) return Forbid();
 
