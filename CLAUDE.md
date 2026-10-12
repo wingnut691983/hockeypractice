@@ -142,9 +142,9 @@ own, then L+M+N+O in one session. P and Q fold in item by item. **No schema migr
 
 Read its "Where to resume" section first. If you are asked to work on the site generally, or to
 pick up improvements, that file is the backlog. **Finding 1.1, the unsalted code hashing that was
-its highest-severity item, is closed** (batch D, `v30`, codes rotated 23 Sep 2026). **Batch K is the
-only one still needing a decision from the user before it can start:** the page size, and whether
-the player-facing plan list should page at all.
+its highest-severity item, is closed** (batch D, `v30`, codes rotated 23 Sep 2026). **Nothing is
+blocked on a decision any more** — batch K's two product calls were made on 12 October 2026 and are
+recorded in its section.
 
 The division of labour: this file is for work still expected to happen; `docs/known-issues.md` is
 for decisions not to act, organised by trigger. When a batch is dropped rather than shipped, it
