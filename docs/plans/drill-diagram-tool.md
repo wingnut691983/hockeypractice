@@ -6,7 +6,7 @@
 
 ## Context
 
-Coaches attach pictures to drills on the drill edit page (`Views/Drill/Edit.cshtml`). Today a picture can be uploaded or pasted. Most coaches don't have a drill diagram to hand. They sketch one on paper and photograph it, or screenshot one from somewhere else. This adds a third option, **Draw a diagram**. It opens an editor with a blank rink and a palette of the standard hockey annotations (from the legend the coach supplied). The finished drawing saves as an ordinary drill picture, so plans, printing, copying and backups keep working with no changes.
+Coaches attach pictures to drills on the drill edit page (`Views/Drill/Edit.cshtml`). Today a picture can be uploaded or pasted. Most coaches don't have a drill diagram to hand. They sketch one on paper and photograph it, or screenshot one from somewhere else. This adds a third option, **Draw a diagram**. It opens an editor with a blank rink and a palette of the standard hockey annotations (from the legend the coach supplied, described symbol by symbol under "The legend" below). The finished drawing saves as an ordinary drill picture, so plans, printing, copying and backups keep working with no changes.
 
 Decisions already made with the user:
 - **Re-editable.** The drawing's pieces are saved with the picture, so "Edit drawing" reopens it exactly as it was. The same data powers "Copy as next stage" for progressions.
@@ -20,7 +20,7 @@ Decisions already made with the user:
 2. That opens a full-screen editor over the page. On the left (or across the top on narrow screens) is the tool palette. In the middle is a white rink. Across the top are Undo, Redo, Delete, the rink view picker, Cancel and **Use this diagram**.
 3. The coach picks a tool and draws:
    - **Paths** (drag, or click points): forward skating, backward skating, skating with puck, pass, shot, sidestep, crossovers. Each has an end-cap choice: arrow (the default), stop `||`, or none.
-   - **Stamps** (tap to place, drag to move, a handle to rotate): X player, O opponent, F, C, W, D, G, coach ©, puck, stick, cone, net, pivot, turn.
+   - **Stamps** (tap to place, drag to move, a handle to rotate): X player, O opponent, F, C, W, D, G, coach ©, puck, stick, cone, net, pivot, turn, stop.
    - **Extras the legend doesn't have, but coaches use constantly:** numbered sequence markers (1, 2, 3 for the order of play), a short text label, and six ink colours to tell groups apart: black (the default), red, orange, green, blue and purple, decided 12 October 2026. A fixed palette rather than a picker, so every colour is checked on the white rink and on paper. Pick the exact shades for that, not from a colour wheel: orange must stay clearly apart from red. Yellow was considered and dropped, because it vanishes on white and prints faint. Check all six in print preview before shipping. Red and green look alike to a colour-blind player (roughly 1 in 12 boys), so the colour is never the only difference: line style and labels carry the meaning, and colour only groups.
 4. Select mode moves, rotates, recolours or deletes anything. Shift-drag (or the straight-line toggle) gives a dead-straight pass. On a PC there are keyboard shortcuts: Delete, Ctrl+Z / Ctrl+Y, and Esc to deselect.
 5. **Use this diagram** stages the drawing exactly the way a pasted picture is staged today. The preview appears, and it uploads when the drill is saved. This works on a brand-new drill that has no id yet.
@@ -30,11 +30,12 @@ Decisions already made with the user:
 
 ### Storage: a small side table, not a column on DrillDiagram and not a file
 - Add a new `DrillDiagramSketch` table: `DrillDiagramId` (PK and FK, cascade delete), `Json` (`TEXT`, capped at 64 KB). A diagram with no row is an uploaded or pasted picture and behaves as it does today. `DrillDiagram.Sketch` becomes a navigation property, never `Include`d by the read paths.
-- **Plain `TEXT`, not SQLite JSONB.** The server never looks inside the JSON. It checks it, stores it, and hands it back whole. JSONB only pays off for querying or editing inside the JSON in SQL. (It also needs SQLite 3.45 or later, which only arrives with the .NET 10 upgrade.)
+- **Plain `TEXT`, not SQLite JSONB.** The server never looks inside the JSON. It checks it, stores it, and hands it back whole. JSONB only pays off for querying or editing inside the JSON in SQL. (The .NET 10 upgrade did bring a SQLite new enough for it. That changes nothing here.)
 - **Why not a column on `DrillDiagram`:** EF loads every column, and plan views, the drill list and print all do `Include(d => d.Diagrams)`. A column would put every drawing's JSON on every player's plan view for nothing. A separate table is only read by the editor and the copy path.
 - The rule this follows: small structured data that's edited with a row goes in the database, and large binary files stay on disk. The picture itself stays a WebP file. Expected size is 2 to 8 KB per drawing, so 1,000 drawings is about 5 MB, against roughly 100 to 600 KB for each picture file.
 - I chose the database over a `diagram-*.json` file next to the picture because the row travels on its own. It is in the nightly backup and restores consistently with the row. It is deleted with the row. It does not need to be added to `PlanStorageService.CopyDiagram` or `DeleteDiagram`. A typical drawing is 2 to 8 KB.
 - EF migration `AddDrillDiagramSketch`.
+- **The same migration adds `Team.IsDemo`** (bool, default false, set true for `demoteam`), and `HowItWorks` requires it instead of trusting the hard-coded `DemoTeamSlug`. This is `known-issues.md` #16e, whose trigger is "the next migration for any reason". The .NET 10 upgrade deliberately shipped without a migration, so this is that migration. Remove #16e from `known-issues.md` when it ships.
 
 ### Picture output: unchanged pipeline
 - The editor renders the SVG to a canvas at 1600px wide (`SiteOptions.DiagramMaxWidth`) on a white background and exports a PNG.
@@ -58,15 +59,45 @@ Decisions already made with the user:
   - `{ t: "text", x, y, s, color }`
   - `{ t: "num", x, y, n }`
 - **Freehand:** pointer events with `touch-action: none` (works with mouse, finger and pen). The raw points are simplified (Ramer-Douglas-Peucker), then smoothed (Catmull-Rom). **Click-points mode** fits the same curve through the points the coach taps.
-- **Path styles** are generated along the smoothed curve:
-  - forward: solid line
-  - pass: dashed
-  - with puck: a sine wave along the normal
-  - backward: repeated scallops
-  - shot: two parallel offset lines with an open arrowhead
-  - sidestep: perpendicular ticks
-  - crossovers: X glyphs at intervals
-  - end caps: arrow, `||` stop, or none
+- **Path styles** are generated along the smoothed curve, as "The legend" below describes. End caps: arrow, `||` stop, or none. The default depends on the style, matching the legend.
+
+### The legend
+The coach supplied a standard drills legend on 12 October 2026. The image is kept locally at
+`docs/plans/reference/drill-legend.png` and is **gitignored on purpose**: the repo is public, and
+the legend appears to come from a published hockey book, so it is not ours to republish. This
+section is the committed record of what it shows. If the image is missing, work from this.
+
+**Paths** (all drawn left to right in the legend):
+
+| Symbol | What it looks like | Default end |
+|---|---|---|
+| Forward skating | A plain solid line | Arrow |
+| Backward skating | A row of small scallops: shallow arcs joined end to end, like a chain of cups, along the path | Arrow |
+| Skating with the puck | A smooth sine wave along the path | Arrow |
+| Pass / path of puck | A dashed line | Arrow |
+| Shot | Two parallel lines close together, ending in one open, hollow arrowhead (like ⇒) | Hollow double arrow |
+| Sidestep | Short vertical ticks, evenly spaced, **with no line through them** | None |
+| Cross-overs | A row of small X marks, **with no line joining them** | None |
+
+**Stamps:**
+
+| Symbol | What it looks like |
+|---|---|
+| Pivot | A small standalone glyph: a short stem with a tight loop curling back on itself, like a cursive "ℓ" |
+| Turn | A short hooked arrow: a line that curls back over itself, then ends in an arrowhead (like ↪) |
+| Stop | Two short vertical bars, `||` |
+| Player | A small `X` |
+| Opponent | A small hollow circle, `O` |
+| Forward, Center, Winger, Defenseman, Goaltender | The plain capital letters `F`, `C`, `W`, `D`, `G` |
+| Coach | A circled C, `©` |
+| Puck | A small solid black dot |
+| Stick | A hockey stick drawn like a check mark: a long shaft and a short blade at an angle |
+| Cone | A small solid black triangle |
+| Net | A top-down net: a shallow U-shaped arc for the back of the net, with short posts at the open ends |
+
+This settles two earlier questions. **Pivot and turn are standalone glyphs** in the legend, not
+shapes on a path, so they stay stamps that rotate. **Stop is both:** the legend draws it alone, so
+it is a stamp, and the `||` end cap stays too, because "skate here, then stop" is the common case.
 - **Undo/redo:** a snapshot stack of the model. Drawings are small, so this is simple and reliable.
 - **Phone:** the warning banner, two-finger pinch-zoom and pan on the `viewBox`, and the palette collapses to a bottom sheet.
 - **Leaving with unsaved changes:** Cancel asks to confirm with an in-page prompt, not a browser `confirm()`, if the drawing has changed.
@@ -85,6 +116,7 @@ Decisions already made with the user:
 
 ### Files touched
 - `Models/DrillDiagram.cs` (the `Sketch` navigation and the doc comment update), new `Models/DrillDiagramSketch.cs`, and `Persistence/AppDbContext.cs` mapping
+- `Models/Team.cs` (`IsDemo`), `Controllers/HomeController.cs` (`HowItWorks` requires it), and `docs/known-issues.md` (remove #16e)
 - `Migrations/…AddDrillDiagramSketch.cs` (generated)
 - `Controllers/DrillController.cs`: `AddDiagramsAsync`, the new sketch action, `CopyDrillAsync`
 - `Views/Drill/Edit.cshtml`: the Draw button, the editor host element, Edit drawing / Copy as next stage on drawn pictures, and a hook into the existing staging script so drawn files reuse the paste preview
@@ -93,7 +125,7 @@ Decisions already made with the user:
 - `README.md`: "Things worth knowing" (drawn diagrams and why sketches sit in their own table), and "What I'd flag" for the FileName reassignment and the `textContent` rule
 
 ### Building it in two steps
-1. **Editor and new drawings.** This covers the rink views, all the paths and stamps, freehand and click mode, undo/redo, saving into a new picture, and the sketch table.
+1. **Editor and new drawings.** This covers the rink views, all the paths and stamps, freehand and click mode, undo/redo, saving into a new picture, the sketch table, and `IsDemo` (it rides on the same migration).
 2. **Re-editing.** This adds Edit drawing, Copy as next stage, and the docs. Copying sketches between teams moves into step 1, because it is one line and a drill copied before step 2 ships would otherwise lose its editability for good.
 
 **No automated tests exist in this repo**, so the curve and pattern geometry is checked by eye in the browser. I'll keep that code in pure functions so tests can be added later without a rewrite.
@@ -102,7 +134,7 @@ Each step is deployable on its own.
 
 ## Verification
 - `dotnet build` is clean. `dotnet run` then checks in Chrome at desktop width, a tablet width (1024 and 768), and 360px, in both light and dark mode:
-  - draw each of the 7 path styles and each of the 14 stamps
+  - draw each of the 7 path styles and each of the 15 stamps, side by side with the legend image
   - switch rink views with items present
   - undo and redo
   - save on a **new** drill and on an existing one
@@ -118,4 +150,3 @@ Each step is deployable on its own.
 ## Things I'd like from you (not blocking)
 - **A reference diagram or two you like the look of** (from a book, an app or a PDF you use), so the line weights and rink colours match what your players are used to.
 - **Your rink.** Is it NHL size (200 × 85), or do you mostly skate on a wider international or Olympic sheet? The geometry is one constant either way.
-- **Pivot and turn.** In the legend they look like shapes *on* a skating path rather than standalone symbols. I've planned them as stamps you drop onto a path. If your coaches draw them as part of the line, they could instead be path end options (a hook or a loop at the end).

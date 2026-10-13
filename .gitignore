@@ -500,3 +500,7 @@ restore/
 # the Data Protection key ring, which is the material that signs the access cookie. Anyone
 # holding one could forge access to the site, not merely read a copy of it.
 hockeypractice-*.zip
+
+# Third-party reference images for planned work (e.g. the drill diagram legend). The repo is
+# public and these are not ours to republish; keep them local.
+docs/plans/reference/
