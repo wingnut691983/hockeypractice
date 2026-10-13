@@ -51,6 +51,7 @@ Decisions already made with the user:
 - **Validation:** check the size cap, check the JSON parses with `v == 1`, and reject anything else. The JSON is never rendered by the server into HTML. It goes to the editor in a `data-` attribute (Razor-encoded), and the editor builds all text with `textContent`, never `innerHTML`. That matters because drills copied from another team carry that team's text labels.
 
 ### Editor (new `wwwroot/js/drill-sketch.js` and a CSS block in `hockeypractice.css`)
+- **The editor knows nothing about drills.** Its whole interface is: open it with an optional drawing (the JSON), and it hands back a PNG and the JSON, or a cancel. No drill ids, no form fields, no URLs inside `drill-sketch.js`. Only the wiring on `Views/Drill/Edit.cshtml` knows where the result goes. That is what lets a plan's overview picture use the same editor later (step 3 below) without a rewrite.
 - Vanilla JS and SVG with no library, keeping to the site's no-framework rule. It is **loaded lazily** when Draw is first clicked, so the drill page's weight for players and phones doesn't change. It should come in at roughly 25 to 35 KB unminified.
 - **Rink geometry** is drawn in feet (200 × 85, 28 ft corners, goal lines 11 ft from the end boards, blue lines 75 ft from them, 15 ft circles, faceoff dots). Half rink and one zone are just different `viewBox`es of the same drawing, so a coach can switch views without losing what's drawn.
 - **Model:** `{ v: 1, rink: "full|half|zone", items: [...] }`. Each item is one of:
@@ -113,6 +114,7 @@ it is a stamp, and the `||` end cap stays too, because "skate here, then stop" i
 - **Duplicate.** Duplicating a selected item, plus a "start from another drawing on this drill" option when opening a new one (reusing the player setup is the common case).
 - **Replace order of operations.** The Edit drawing endpoint writes the new file, then updates the row, then deletes the old file. If the database save fails, it deletes the new file instead. It gets the same `[RequestSizeLimit]` as the upload actions. `MaintenanceMiddleware` already covers it.
 - **Alt text.** A drawn picture gets alt text generated from its contents ("Half rink: 3 players, 2 passes, 1 shot"), which is better than nothing for a screen reader.
+- **Two coaches editing the same drawing: the last save wins, silently.** Accepted, not solved. It is how every drill edit already behaves, and two coaches editing one drill at the same moment is rare on a team this size. Revisit only if a coach reports losing a drawing this way.
 
 ### Files touched
 - `Models/DrillDiagram.cs` (the `Sketch` navigation and the doc comment update), new `Models/DrillDiagramSketch.cs`, and `Persistence/AppDbContext.cs` mapping
@@ -127,6 +129,10 @@ it is a stamp, and the `||` end cap stays too, because "skate here, then stop" i
 ### Building it in two steps
 1. **Editor and new drawings.** This covers the rink views, all the paths and stamps, freehand and click mode, undo/redo, saving into a new picture, the sketch table, and `IsDemo` (it rides on the same migration).
 2. **Re-editing.** This adds Edit drawing, Copy as next stage, and the docs. Copying sketches between teams moves into step 1, because it is one line and a drill copied before step 2 ships would otherwise lose its editability for good.
+
+3. **Later, not part of this plan: draw a plan's ice layout.** Since 22 September a plan can carry one overview picture showing how the ice is laid out for station practices. That is exactly what a coach would rather draw than photograph. It needs a "Draw the ice layout" button on the plan editor and somewhere to keep the overview's JSON (there is no picture row to hang it on, so probably a column or a small table keyed on the plan). Decide the storage then. The editor itself should need no change, which is what the "knows nothing about drills" rule above protects.
+
+Deliberately out of scope: drawing on top of an uploaded photo, and a shared library of drawings across drills. Both are bigger features with their own questions.
 
 **No automated tests exist in this repo**, so the curve and pattern geometry is checked by eye in the browser. I'll keep that code in pure functions so tests can be added later without a rewrite.
 
@@ -145,6 +151,7 @@ Each step is deployable on its own.
 - Hostile label text (`<img onerror>`) round-trips as plain text.
 - An oversize or malformed sketch posted by hand is rejected with a message, not a 500.
 - Players' drill and plan pages download no editor script (check the network panel).
+- **The six ink colours survive compression.** Every picture is saved as lossy WebP at quality 85 (`PlanStorageService`). That was checked on black line art and text, never on colour, and lossy WebP keeps less colour detail than brightness, so thin red and orange lines can come out fuzzy or start to look alike. Draw all six as thin lines, save, and view the stored picture at 1:1 and on a phone. If they degrade, save drawn pictures lossless instead: the comment there measured line art at about the same size either way (14.7 KB lossless against 20.9 KB lossy), so it costs nothing.
 - After deploying, fetch `https://ebhockeyplan.com/` and confirm the build contains the new Draw button markup on a drill edit page, or the What's New entry.
 
 ## Things I'd like from you (not blocking)
