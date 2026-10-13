@@ -132,13 +132,15 @@ found clean, so a later pass doesn't re-derive it.
 
 ## Planned work
 
-`docs/plans/` holds work that has been planned and agreed but not started. Do it in this order:
+`docs/plans/` holds work that has been planned and agreed but not started:
 
-1. **`docs/plans/dotnet-10-upgrade.md`**: move from .NET 8 to .NET 10. **Hard deadline: .NET 8
-   support ends 10 November 2026.** StatsLogic has the same deadline and needs its own pass in its
-   own repo.
-2. **`docs/plans/drill-diagram-tool.md`**: a "Draw a diagram" editor on the drill edit page, with
-   a blank rink and the standard hockey annotations, re-editable after saving.
+- **`docs/plans/drill-diagram-tool.md`**: a "Draw a diagram" editor on the drill edit page, with
+  a blank rink and the standard hockey annotations, re-editable after saving. Its migration is the
+  first since the upgrade, so it trips `known-issues.md` #16e: add `IsDemo` in the same pass.
+
+The .NET 10 upgrade shipped as `v45` on 12 October 2026 and its plan was deleted. Running the
+amd64 image locally now needs `DOTNET_EnableWriteXorExecute=0`; see README "Deploying".
+**StatsLogic is still on .NET 8** and has the 10 November 2026 deadline in its own repo.
 
 Delete each file when its work ships, the same finish line the audit plan used.
 
