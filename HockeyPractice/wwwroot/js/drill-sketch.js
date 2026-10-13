@@ -248,7 +248,7 @@
     }
 
     // Every shape a path style draws, in view units, as { d, w, fill?, dash? }. k scales weights.
-    // The legend is the reference for each: see docs/plans/drill-diagram-tool.md, "The legend".
+    // The legend is the reference for each: see docs/drill-legend.md.
     function pathShapes(style, end, poly, k) {
         var out = [], m = measure(poly);
         if (m.L < 0.05) return out;

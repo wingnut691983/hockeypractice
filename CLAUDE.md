@@ -134,11 +134,15 @@ found clean, so a later pass doesn't re-derive it.
 
 `docs/plans/` holds work that has been planned and agreed but not started:
 
-- **`docs/plans/drill-diagram-tool.md`**: the "Draw a diagram" editor. **Built (both steps) and
-  verified locally on 12 October 2026, not yet deployed.** It carried the `IsDemo` migration, so
-  `known-issues.md` #16e is closed. Browser-tested at desktop (dark) and 360px on 13 October.
-  Still owed: light mode, print preview of the six inks, and a real pinch and pen on a tablet.
-  Delete the plan when it ships.
+- Nothing planned is waiting right now. The drill diagram editor shipped as `v46` on 13 October
+  2026 and its plan was deleted. Its legend and rink reference now live in
+  `docs/drill-legend.md`, and the checks it still owes are `known-issues.md` #17.
+- **Next candidate, not yet planned in detail: draw a plan's ice layout.** A plan's overview
+  picture (since 22 September) is what a coach would rather draw than photograph. It needs a
+  "Draw the ice layout" button on the plan editor and somewhere to keep the drawing's JSON; there
+  is no picture row to hang it on, so probably a column or small table keyed on the plan. The
+  editor should need no change, because it knows nothing about drills (`HPSketch.open`,
+  `HPSketch.toSvg`).
 
 The .NET 10 upgrade shipped as `v45` on 12 October 2026 and its plan was deleted. Running the
 amd64 image locally now needs `DOTNET_EnableWriteXorExecute=0`; see README "Deploying".

@@ -481,6 +481,21 @@ chunks. **Trigger: a manager of many teams reporting sign-in oddities, or any bu
 
 ---
 
+### 17. Drawing editor checks not yet done in a browser
+
+The editor shipped in `v46` (13 October 2026) after testing in Chrome at desktop width in dark
+mode and at 360px in a frame. Three things were not checked:
+
+- **Light mode.** The browser used was in dark mode throughout. The editor chrome uses the site's
+  tokens, so it should follow, but nobody has looked.
+- **Print preview of the six inks.** Drawn pictures are stored lossless, so compression is not a
+  concern, but how red and orange and green and blue separate on a real printer is unseen.
+- **A real finger and pen on a tablet.** Pinch-zoom and pen-then-finger-pans were only driven with
+  simulated events.
+
+**Trigger: a coach reporting trouble drawing on an iPad or phone, or a printed plan whose drawing
+is hard to read.** Look at those first, in that order.
+
 ## Small items
 
 Individually not worth a commit; worth sweeping the next time each file is open.
