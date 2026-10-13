@@ -1331,6 +1331,19 @@ The app slug is pinned in `upturtle.yaml`. Two Dockerfiles exist:
   `Dockerfile.fast`, which is what should have happened in the first place: publish 3.7s, image
   1.9s.
 
+- **Running the amd64 image locally on .NET 10 needs `-e DOTNET_EnableWriteXorExecute=0`, and
+  production must never get it.** Found during the .NET 10 upgrade on 12 October 2026: the
+  `linux/amd64` image dies before printing anything, with `Process terminated. UnhandledException`
+  and a one-frame stack in `InvokeStub_JsonConvertedValueReaderWriter`. `/health` never answers.
+  The same build ran cleanly natively on the Mac, and ran cleanly in the same emulated container
+  with W^X off ("Database ready", pages served), so it is .NET 10's W^X under QEMU, not the app or
+  the Ubuntu base. The .NET 8 image ran emulated with W^X on, which is why it never came up before.
+  Production is real amd64 and runs with W^X on, which is the point of W^X. So pass the variable
+  to a local `podman run`, and do not "fix" a local crash by adding it to the Dockerfile or the
+  app's env vars. Building `--platform linux/arm64` to dodge emulation does not work either: it
+  starts, then every query fails, because `.dockerignore` strips every native SQLite library
+  except `linux-x64`.
+
 ```sh
 # Dockerfile.fast path (recommended on an M-series Mac):
 dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish
@@ -1364,12 +1377,12 @@ images and 5.8 GB to 21 and 960 MB.
 rather than incidental: production is the common case and should not need a decision.
 
 There is a second app on this UpTurtle account, **`statslogic`**, which is a different project
-living in `~/Documents/git/statslogic_ut`. It is also ASP.NET Core 8 on SQLite with a `publish/`
-directory and a `Dockerfile.fast`, so a build run from the wrong directory produces a valid image
-of the wrong site, and neither the registry nor the provisioner would object. The check that
-catches it is the app id: the image reference `get_registry_credentials` hands back is
-`package.upturtle.com/<app id>/app`, and that id must match the one above before anything is
-pushed. Do it every time; it is one tool call. The account-wide rules live in `~/.claude/CLAUDE.md`.
+living in `~/Documents/git/statslogic_ut`. It is also ASP.NET Core on SQLite (still .NET 8 until
+its own upgrade) with a `publish/` directory and a `Dockerfile.fast`, so a build run from the
+wrong directory produces a valid image of the wrong site, and neither the registry nor the
+provisioner would object. The check that catches it is the app id: the image reference
+`get_registry_credentials` hands back is `package.upturtle.com/<app id>/app`, and that id must
+match the one above before anything is pushed. Do it every time; it is one tool call. The account-wide rules live in `~/.claude/CLAUDE.md`.
 
 The two apps have separate 1 GiB volumes, so their databases, uploads and `dpkeys` are unrelated.
 They do share the R2 bucket `ebhpbackup`, kept apart only by `ARCHIVE_S3_PREFIX`

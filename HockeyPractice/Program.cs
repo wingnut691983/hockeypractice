@@ -358,7 +358,7 @@ var forwarded = new ForwardedHeadersOptions
 // initializer is Add-syntax over zero elements, so it adds nothing and leaves the loopback
 // defaults exactly where they were. It compiles, it reads like it clears the list, and it
 // changes nothing.
-forwarded.KnownNetworks.Clear();
+forwarded.KnownIPNetworks.Clear();
 forwarded.KnownProxies.Clear();
 app.UseForwardedHeaders(forwarded);
 

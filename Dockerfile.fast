@@ -9,7 +9,7 @@
 # Usage:
 #   dotnet publish HockeyPractice/HockeyPractice.csproj -c Release -o ./publish
 #   podman build --platform linux/amd64 -f Dockerfile.fast -t <image>:<tag> .
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY publish/ ./
 

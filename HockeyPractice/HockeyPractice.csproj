@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <!-- Shrinks drill diagrams on upload. Pinned to 3.x deliberately: 4.x moved to a paid licence
          and fails the build with "No Six Labors license found" until you buy one. 3.1.x is the
@@ -45,7 +45,7 @@
          endpoints. S3BackupStore sets it to WhenRequired explicitly so the default can never
          move under us on an upgrade. If an upload ever fails with a checksum or signature
          error, that setting is the first thing to look at.
-         Fully managed with a net8.0 target and no runtimes/ native assets, which is what the
+         Fully managed with a net8.0 target (run unchanged on net10.0) and no runtimes/ native assets, which is what the
          ImageSharp note above requires of every package here. -->
     <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
   </ItemGroup>

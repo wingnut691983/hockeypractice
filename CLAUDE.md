@@ -5,7 +5,7 @@ Coach uploads a plan PDF; players open a link, see the videos to watch before pr
 
 ## Stack
 
-ASP.NET Core 8 MVC · EF Core + SQLite · PdfPig for link extraction · pdf.js for inline viewing.
+ASP.NET Core 10 MVC · EF Core + SQLite · PdfPig for link extraction · pdf.js for inline viewing.
 No Bootstrap, no jQuery — bespoke mobile-first CSS. Keep page weight low; players load this on rink wifi.
 
 ## Non-obvious constraints
@@ -156,8 +156,9 @@ What survives it, and where:
 - **`docs/known-issues.md`** holds what was deliberately not done, each with a trigger. Entries
   #15 and #16 are the audit's leftovers: the ImageSharp version decision, and five security items
   from the final sweep.
-- **`docs/post-audit-checks.md`** is a short list of checks that need a team code or the site-admin
-  code, so no terminal session could run them. Delete it once you have been through it.
+
+The checks that needed a team code or the site-admin code (`docs/post-audit-checks.md`) were run
+in production by hand on 12 October 2026 and the file was deleted.
 
 If you are asked to pick up improvements, start from `docs/plans/` (above), then
 `known-issues.md` and its triggers.
@@ -223,9 +224,10 @@ is production on purpose. Confirm the app id above appears in the image ref befo
 is what catches an image built in the wrong repo. The account-wide rules are in `~/.claude/CLAUDE.md`.
 
 **There is a second UpTurtle app on this account, `statslogic`, and it is a different project in a
-different repo** (`~/Documents/git/statslogic_ut`). It is also ASP.NET Core 8 on SQLite with a
-`publish/` directory and a `Dockerfile.fast`, so a build run from the wrong directory produces a
-valid image of the wrong site. Nothing downstream catches that except the app id check.
+different repo** (`~/Documents/git/statslogic_ut`). It is also ASP.NET Core on SQLite (still
+.NET 8 until its own upgrade) with a `publish/` directory and a `Dockerfile.fast`, so a build
+run from the wrong directory produces a valid image of the wrong site. Nothing downstream
+catches that except the app id check.
 
 **Both apps write backups to the same R2 bucket (`ebhpbackup`), kept apart only by
 `ARCHIVE_S3_PREFIX`.** This app's is `hockeypractice/` and StatsLogic's is `statslogic/`.

@@ -558,7 +558,8 @@ Recorded so the next pass does not spend time here again:
 - The R2 client settings (`RequestChecksumCalculation`, `UseChunkEncoding`, the exact version pin).
 - XSS across the views and the tag-suggestion JavaScript, which builds nodes with `textContent`.
 - pdf.js is 6.2.108, well clear of CVE-2024-4367.
-- `mcr.microsoft.com/dotnet/aspnet:8.0` does ship tzdata, verified by running the image, so
+- `mcr.microsoft.com/dotnet/aspnet:8.0` does ship tzdata, verified by running the image, and so does
+  `aspnet:10.0` (Ubuntu 24.04), verified the same way on 12 October 2026, so
   `WhenLabel` resolves `America/Chicago` correctly in production rather than silently falling back
   to UTC.
 

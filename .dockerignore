@@ -26,8 +26,11 @@ hockeypractice-*.zip
 
 # A framework-dependent publish ships SQLite's native library for every RID .NET knows about —
 # Windows, macOS, Android, MIPS, s390x, the lot. That's 24 MB, of which this container can only
-# ever load one: the base image is mcr.microsoft.com/dotnet/aspnet:8.0, which is Debian on
-# amd64, so linux-x64 (glibc) is the one it needs. NOT linux-musl-x64 — that's for Alpine.
+# ever load one: the base image is mcr.microsoft.com/dotnet/aspnet:10.0, which is Ubuntu 24.04 on
+# amd64 (it was Debian 12 on 8.0), so linux-x64 (glibc) is the one it needs. NOT linux-musl-x64 —
+# that's for Alpine. A side effect: an image built with --platform linux/arm64 for a quick native
+# test on a Mac starts, then fails every query with a TypeInitializationException from
+# SqliteConnection, because its library was stripped here. That is this rule, not a bug.
 #
 # Only affects Dockerfile.fast, which copies the host's publish/ output. The canonical Dockerfile
 # publishes inside the build container, where this doesn't apply.
