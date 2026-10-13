@@ -82,6 +82,25 @@
             }, g);
         };
     }
+    // Feet per glyph unit. Stamps are drawn in a 10-unit box, so a letter comes out about 2.7 ft
+    // tall. Blockers are the exception that is drawn to scale, so they convert through this.
+    var GLYPH_FT = 0.4;
+
+    // A padded blocker, drawn at its real size: item.len feet long and 1 ft wide, lying across the
+    // view until rotated. The only stamp that is not a symbol, because where it sits on the ice and
+    // how much of the lane it closes is the whole point of drawing one. One stamp with a length
+    // rather than a stamp per size: the coach asked for it to be stretched on the rink, since real
+    // blockers come in 6 and 10 ft and lining several up end to end is common too.
+    var BLOCKER_DEFAULT = 6, BLOCKER_MIN = 2, BLOCKER_MAX = 40;
+    function drawBlocker(g, ink, item) {
+        var len = item && item.len ? item.len : BLOCKER_DEFAULT;
+        var u = len / GLYPH_FT, w = 1 / GLYPH_FT;
+        el('rect', {
+            x: f2(-u / 2), y: f2(-w / 2), width: f2(u), height: f2(w), rx: f2(w / 3),
+            fill: ink, 'fill-opacity': 0.3, stroke: ink, 'stroke-width': 0.6
+        }, g);
+    }
+
     var MARKS = {
         X:     { label: 'Player',     draw: stroked('M-3.3,-3.3L3.3,3.3M3.3,-3.3L-3.3,3.3', 1.3) },
         O:     { label: 'Opponent',   draw: function (g, ink) {
@@ -95,7 +114,7 @@
                      el('circle', { r: 4.6, fill: 'none', stroke: ink, 'stroke-width': 0.9 }, g);
                      el('text', { x: 0, y: 2.4, 'font-size': 6.8, 'font-weight': 700, 'font-family': FONT,
                                   'text-anchor': 'middle', fill: ink }, g).textContent = 'C'; } },
-        puck:  { label: 'Puck',       draw: function (g, ink) { el('circle', { r: 1.9, fill: ink }, g); } },
+        puck:  { label: 'Puck',       draw: function (g, ink) { el('circle', { r: 1.35, fill: ink }, g); } },
         stick: { label: 'Stick', rot: true, draw: stroked('M-4.6,0.6L-2.1,3.6L4.8,-4.4', 1.3) },
         cone:  { label: 'Cone',       draw: function (g, ink) {
                      el('path', { d: 'M0,-3.3L3,2.7L-3,2.7Z', fill: ink, stroke: ink,
@@ -105,10 +124,12 @@
                  draw: stroked('M-3.6,3.8C-1.5,2.8 2.2,-0.6 1.6,-3C1.2,-4.6 -1,-4 -0.7,-1.8C-0.4,0.6 2,2.6 4.2,3.2', 1) },
         turn:  { label: 'Turn',  rot: true,
                  draw: stroked('M-4.5,2.8C-4.5,-3.6 3.4,-3.8 3.4,1.6M1.4,-0.4L3.4,2.6L5.3,-0.4', 1) },
-        stop:  { label: 'Stop',  rot: true, draw: stroked('M-1.3,-3.2L-1.3,3.2M1.3,-3.2L1.3,3.2', 1.2) }
+        stop:  { label: 'Stop',  rot: true, draw: stroked('M-1.3,-3.2L-1.3,3.2M1.3,-3.2L1.3,3.2', 1.2) },
+        // Not in the legend; coaches use them constantly. Real length, so the icon is drawn apart.
+        blocker: { label: 'Blocker', rot: true, scaled: true, draw: drawBlocker }
     };
     var MARK_ORDER = ['X', 'O', 'F', 'C', 'W', 'D', 'G', 'coach', 'puck', 'stick', 'cone', 'net',
-                      'pivot', 'turn', 'stop'];
+                      'pivot', 'turn', 'stop', 'blocker'];
 
     // ── Small helpers ───────────────────────────────────────────────────
     function el(name, attrs, parent) {
@@ -153,8 +174,12 @@
             ? { x: 0, y: LEN - V.x1, w: WID, h: V.x1 - V.x0 }
             : { x: V.x0, y: 0, w: V.x1 - V.x0, h: WID };
     }
-    // Line weights and stamp sizes are set for a picture 360px wide, so they scale with the
-    // view's width rather than staying fixed in feet. Every vertical view is 85 ft wide (k = 1).
+    // What is DRAWN is sized in rink feet, the same in every view, so a sideways rink and an
+    // upright one show a player the same size relative to the ice. The first version scaled
+    // drawings with the view's width, which made the sideways view draw everything 2.35x too big;
+    // the coach compared it against a published drill and every line and letter was about twice
+    // the size it should be. scaleOf is now used only for touch and selection tolerances (how
+    // near a tap must land, the selection box, handles), which are about fingers, not the picture.
     function scaleOf(view) { return viewRect(view).w / WID; }
     function turnOf(view) { return VIEWS[view].vertical ? -90 : 0; }
 
@@ -253,18 +278,20 @@
         var out = [], m = measure(poly);
         if (m.L < 0.05) return out;
 
-        var lw = 0.45 * k, head = 2.1 * k, headW = 1.8 * k;
+        // Measured off a published drill the coach supplied as the target: lines about 0.3 ft,
+        // arrowheads about 1.7 ft, a puck-carry wave about 0.75 ft either side.
+        var lw = 0.3 * k, head = 1.7 * k, headW = 1.4 * k;
         var arrow = end === 'arrow';
         // Lines stop short of an arrowhead so no stroke pokes through its tip.
         var s1 = Math.max(0, m.L - (arrow ? head * 0.8 : 0));
 
         switch (style) {
             case 'pass':
-                out.push({ d: pd(cut(m, s1)), w: lw, dash: [1.5 * k, 1.0 * k] });
+                out.push({ d: pd(cut(m, s1)), w: lw, dash: [1.3 * k, 0.9 * k] });
                 break;
             case 'puck': {
                 // A whole number of half-waves, so the wave lands on the line at the arrow.
-                var P = s1 / Math.max(1, Math.round(s1 / (1.4 * k))), A = 0.7 * k;
+                var P = s1 / Math.max(1, Math.round(s1 / (1.25 * k))), A = 0.75 * k;
                 out.push({ d: pd(offsetRun(m, s1, 0.15 * k, function (s) {
                     return A * Math.sin(Math.PI * s / P);
                 })), w: lw });
@@ -272,7 +299,7 @@
             }
             case 'backward': {
                 // Shallow cups joined end to end, all on one side of the path.
-                var C = s1 / Math.max(1, Math.round(s1 / (3.2 * k))), D = 0.8 * k;
+                var C = s1 / Math.max(1, Math.round(s1 / (2.6 * k))), D = 0.65 * k;
                 out.push({ d: pd(offsetRun(m, s1, 0.12 * k, function (s) {
                     return D * Math.abs(Math.sin(Math.PI * s / C));
                 })), w: lw });
@@ -280,7 +307,7 @@
             }
             case 'shot': {
                 // Two parallel lines into one open, hollow arrowhead, like =>.
-                var off = 0.5 * k, sEnd = arrow ? m.L - head * 0.75 : m.L;
+                var off = 0.42 * k, sEnd = arrow ? m.L - head * 0.75 : m.L;
                 [off, -off].forEach(function (o) {
                     out.push({ d: pd(offsetRun(m, Math.max(0, sEnd), 0.4 * k, function () { return o; })), w: lw * 0.85 });
                 });
@@ -296,7 +323,7 @@
             }
             case 'sidestep': {
                 // Short ticks across the path, with no line through them.
-                var gap = 1.25 * k, half = 0.9 * k, d = '';
+                var gap = 0.95 * k, half = 0.7 * k, d = '';
                 for (var s = gap / 2; s <= s1 + 1e-6; s += gap) {
                     var q = at(m, s);
                     d += pd([[q.x - q.ty * half, q.y + q.tx * half], [q.x + q.ty * half, q.y - q.tx * half]]);
@@ -306,7 +333,7 @@
             }
             case 'crossover': {
                 // A row of small X marks, with nothing joining them.
-                var gx = 2.3 * k, hx = 0.65 * k, dx = '';
+                var gx = 1.9 * k, hx = 0.5 * k, dx = '';
                 for (var sx = gx / 2; sx <= s1 + 1e-6; sx += gx) {
                     var qx = at(m, sx), ax = (qx.tx - qx.ty) * hx, ay = (qx.ty + qx.tx) * hx,
                         bx = (qx.tx + qx.ty) * hx, by = (qx.ty - qx.tx) * hx;
@@ -325,8 +352,8 @@
             var bx2 = e.x - e.tx * head, by2 = e.y - e.ty * head, hw = headW / 2;
             out.push({ d: pd([[e.x, e.y], [bx2 - e.ty * hw, by2 + e.tx * hw], [bx2 + e.ty * hw, by2 - e.tx * hw]]) + 'Z', fill: true });
         } else if (end === 'stop') {
-            var bar = 1.1 * k, sd = '';
-            [0, 0.6 * k].forEach(function (back) {
+            var bar = 0.9 * k, sd = '';
+            [0, 0.5 * k].forEach(function (back) {
                 var q2 = at(m, m.L - back);
                 sd += pd([[q2.x - q2.ty * bar, q2.y + q2.tx * bar], [q2.x + q2.ty * bar, q2.y - q2.tx * bar]]);
             });
@@ -366,6 +393,7 @@
             case 'mark': {
                 if (!MARKS.hasOwnProperty(it.kind) || x === null || y === null) return null;
                 var m = { t: 'mark', kind: it.kind, x: x, y: y, rot: num(it.rot, -3600, 3600, 0) % 360, color: color };
+                if (it.kind === 'blocker') m.len = Math.round(num(it.len, BLOCKER_MIN, BLOCKER_MAX, BLOCKER_DEFAULT));
                 if (typeof it.label === 'string' && it.label.trim()) m.label = it.label.trim().slice(0, 2);
                 return m;
             }
@@ -388,7 +416,7 @@
     var clipSeq = 0;
     var RED = '#efa7a7', BLUE = '#a7bfe6', BOARDS = '#7d8794', CREASE = '#e4eefb';
 
-    function drawRink(parent, view, k) {
+    function drawRink(parent, view) {
         var id = 'hps-clip-' + (++clipSeq);
         var V = VIEWS[view];
         var g = el('g', { transform: V.vertical ? 'matrix(0 -1 1 0 0 ' + LEN + ')' : null }, parent);
@@ -397,7 +425,7 @@
         el('rect', { x: 0, y: 0, width: LEN, height: WID, rx: 28, ry: 28, fill: '#fff' }, g);
 
         var c = el('g', { 'clip-path': 'url(#' + id + ')' }, g);
-        var thin = 0.32 * k;
+        var thin = 0.3;
         el('rect', { x: 11 - thin / 2, y: 0, width: thin, height: WID, fill: RED }, c);
         el('rect', { x: 189 - thin / 2, y: 0, width: thin, height: WID, fill: RED }, c);
         el('rect', { x: 74.5, y: 0, width: 1, height: WID, fill: BLUE }, c);
@@ -431,7 +459,7 @@
         el('rect', { x: 7.7, y: 39.5, width: 3.3, height: 6, rx: 1, fill: 'none', stroke: BOARDS, 'stroke-width': thin }, c);
         el('rect', { x: 189, y: 39.5, width: 3.3, height: 6, rx: 1, fill: 'none', stroke: BOARDS, 'stroke-width': thin }, c);
 
-        el('rect', { x: 0, y: 0, width: LEN, height: WID, rx: 28, ry: 28, fill: 'none', stroke: BOARDS, 'stroke-width': 0.55 * k }, g);
+        el('rect', { x: 0, y: 0, width: LEN, height: WID, rx: 28, ry: 28, fill: 'none', stroke: BOARDS, 'stroke-width': 0.6 }, g);
     }
 
     function halo(attrs, w) {
@@ -442,9 +470,9 @@
         return attrs;
     }
 
-    function drawMarkGlyph(parent, kind, ink, angle) {
+    function drawMarkGlyph(parent, kind, ink, angle, item) {
         var inner = el('g', { transform: MARKS[kind].rot && angle ? 'rotate(' + f2(angle) + ')' : null }, parent);
-        MARKS[kind].draw(inner, ink);
+        MARKS[kind].draw(inner, ink, item);
     }
 
     // One item, in view coordinates. Hit areas are left out of an export.
@@ -455,7 +483,7 @@
         if (item.t === 'path') {
             var vp = item.pts.map(function (p) { return toView(view, p); });
             var poly = item.str ? vp : catmull(vp);
-            pathShapes(item.style, item.end, poly, k).forEach(function (sh) {
+            pathShapes(item.style, item.end, poly, 1).forEach(function (sh) {
                 el('path', {
                     d: sh.d, fill: sh.fill ? ink : 'none', stroke: sh.fill ? 'none' : ink,
                     'stroke-width': sh.fill ? null : f2(sh.w), 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
@@ -472,18 +500,25 @@
         if (item.t === 'text') {
             var tg = el('g', { transform: 'translate(' + f2(v[0]) + ' ' + f2(v[1]) + ')' }, g);
             if (!forExport)
-                el('rect', { x: f2(-0.9 * k * item.s.length), y: f2(-1.6 * k), width: f2(1.8 * k * item.s.length), height: f2(3.6 * k), fill: 'transparent' }, tg);
+                el('rect', { x: f2(-0.7 * item.s.length), y: f2(-1.4 * k), width: f2(1.4 * item.s.length), height: f2(2.8 * k), fill: 'transparent' }, tg);
             var t = el('text', halo({
-                x: 0, y: f2(1.1 * k), 'font-size': f2(3.1 * k), 'font-weight': 650, 'font-family': FONT,
+                x: 0, y: 0.85, 'font-size': 2.4, 'font-weight': 650, 'font-family': FONT,
                 'text-anchor': 'middle', fill: ink
-            }, f2(0.7 * k)), tg);
+            }, 0.55), tg);
             t.textContent = item.s;
             return g;
         }
 
-        var s = 0.42 * k;
+        // GLYPH_FT per glyph unit: a letter about 2.7 ft tall, an X about 2.6 ft across. Lines
+        // match the coach's reference drill exactly; stamps sit a little larger than its bare
+        // letters because the reference wraps each one in a 5 ft badge and these have none.
+        var s = GLYPH_FT;
         var outer = el('g', { transform: 'translate(' + f2(v[0]) + ' ' + f2(v[1]) + ') scale(' + f2(s) + ')' }, g);
-        if (!forExport) el('rect', { x: -5.5, y: -5.5, width: 11, height: 11, fill: 'transparent' }, outer);
+        // The hit area keeps a finger's size in every view, however small the stamp is drawn.
+        if (!forExport) {
+            var hit = Math.max(5.5, 2.6 * k / s);
+            el('rect', { x: f2(-hit), y: f2(-hit), width: f2(2 * hit), height: f2(2 * hit), fill: 'transparent' }, outer);
+        }
 
         if (item.t === 'num') {
             el('circle', { r: 3.5, fill: '#fff', stroke: ink, 'stroke-width': 0.9 }, outer);
@@ -494,10 +529,10 @@
             return g;
         }
 
-        drawMarkGlyph(outer, item.kind, ink, item.rot + turnOf(view));
+        drawMarkGlyph(outer, item.kind, ink, item.rot + turnOf(view), item);
         if (item.label) {
             el('text', halo({
-                x: 4.6, y: 6, 'font-size': 5, 'font-weight': 700, 'font-family': FONT, fill: ink
+                x: 3.6, y: 5.4, 'font-size': 5, 'font-weight': 700, 'font-family': FONT, fill: ink
             }, 1.4), outer).textContent = item.label;
         }
         return g;
@@ -505,7 +540,7 @@
 
     function drawScene(svg, model, view, forExport) {
         var k = scaleOf(view);
-        drawRink(svg, view, k);
+        drawRink(svg, view);
         var items = el('g', { 'class': 'hps-items' }, svg);
         model.items.forEach(function (it, i) { drawItem(items, it, view, k, i, forExport); });
         return items;
@@ -569,7 +604,7 @@
         // Thicker than the real line, or a 42px icon of a hairline is indistinguishable from the
         // next one.
         var svg = el('svg', { viewBox: '0 0 48 16', width: 42, height: 14, 'aria-hidden': 'true', focusable: 'false' });
-        pathShapes(style, PATHS[style].end, [[2, 8], [46, 8]], 1.7).forEach(function (sh) {
+        pathShapes(style, PATHS[style].end, [[2, 8], [46, 8]], 2.1).forEach(function (sh) {
             el('path', {
                 d: sh.d, fill: sh.fill ? 'currentColor' : 'none', stroke: sh.fill ? 'none' : 'currentColor',
                 'stroke-width': sh.fill ? null : f2(sh.w * 2.2), 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
@@ -580,7 +615,14 @@
     }
     function markIcon(kind) {
         var svg = el('svg', { viewBox: '-6 -6 12 12', width: 22, height: 22, 'aria-hidden': 'true', focusable: 'false' });
-        drawMarkGlyph(svg, kind, 'currentColor', 0);
+        if (MARKS[kind].scaled) {
+            // Drawn to scale it would not fit the icon.
+            var len = 10;
+            el('rect', { x: -len / 2, y: -1.1, width: len, height: 2.2, rx: 0.7, fill: 'currentColor', 'fill-opacity': 0.3,
+                         stroke: 'currentColor', 'stroke-width': 0.7 }, svg);
+        } else {
+            drawMarkGlyph(svg, kind, 'currentColor', 0);
+        }
         return svg;
     }
     function glyphIcon(draw) {
@@ -708,6 +750,10 @@
             el('text', { y: 3, 'font-size': 9, 'font-weight': 700, 'font-family': FONT, 'text-anchor': 'middle', fill: 'currentColor' }, s).textContent = 'Aa';
         }));
 
+        h('p', { className: 'hps-hint' }, secMarks.parentNode,
+            'To number a player (F1, D2), tap the stamp and type in the Label box beside it. ' +
+            'To lengthen a blocker, drag the handle on its end.');
+
         var secOpts = h('div', { className: 'hps-sec hps-opts' }, palette);
 
         h('div', { className: 'hps-h' }, secOpts, 'Line end');
@@ -743,9 +789,17 @@
         h('span', {}, straightLabel, 'Straight lines (or hold Shift)');
         straightBox.addEventListener('change', function () { st.straight = straightBox.checked; });
 
-        var labelWrap = h('label', { className: 'hps-field' }, secOpts);
-        h('span', { className: 'hps-h' }, labelWrap, 'Label this stamp (e.g. 1 for X1)');
-        var labelInput = h('input', { type: 'text', className: 'hp-input', maxlength: '2', autocomplete: 'off' }, labelWrap);
+        // The label box floats beside the selected stamp rather than living in the palette. In the
+        // palette it sat below the colours and line options, off the bottom of the screen, and a
+        // coach looking for how to make an F into F1 never found it.
+        var labelPop = h('label', { className: 'hps-labelpop', hidden: true }, stage);
+        h('span', {}, labelPop, 'Label');
+        var labelInput = h('input', { type: 'text', maxlength: '2', autocomplete: 'off', autocapitalize: 'characters',
+                                      'aria-label': 'Label for this stamp, up to 2 characters' }, labelPop);
+        var lenNote = h('span', { className: 'hps-len', hidden: true }, labelPop);
+        labelInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); labelInput.blur(); }
+        });
 
         var textWrap = h('label', { className: 'hps-field' }, secOpts);
         h('span', { className: 'hps-h' }, textWrap, 'Text to place');
@@ -929,8 +983,34 @@
             syncPalette();
             syncButtons();
         }
+        // A blocker's long axis in view coordinates: its centre, unit direction, and the end that
+        // carries the length handle.
+        function blockerAxis(it) {
+            var c = toView(model.rink, [it.x, it.y]);
+            var a = (it.rot + turnOf(model.rink)) * Math.PI / 180, dir = [Math.cos(a), Math.sin(a)];
+            return { c: c, dir: dir, end: [c[0] + dir[0] * it.len / 2, c[1] + dir[1] * it.len / 2] };
+        }
+
+        // Puts the label box just below and right of the selected stamp, kept inside the stage.
+        function placeLabelPop(vx, vy) {
+            var ctm = svg.getScreenCTM();
+            if (!ctm) return;
+            var p = svg.createSVGPoint();
+            p.x = vx; p.y = vy;
+            p = p.matrixTransform(ctm);
+            var box = stage.getBoundingClientRect();
+            var sel = model.items[selected];
+            lenNote.hidden = !(sel && sel.kind === 'blocker');
+            if (!lenNote.hidden) lenNote.textContent = sel.len + ' ft';
+            labelPop.hidden = false;
+            var w = labelPop.offsetWidth || 110, hgt = labelPop.offsetHeight || 40;
+            labelPop.style.left = Math.max(4, Math.min(box.width - w - 4, p.x - box.left + 4)) + 'px';
+            labelPop.style.top = Math.max(4, Math.min(box.height - hgt - 4, p.y - box.top + 4)) + 'px';
+        }
         function drawOverlay() {
             while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+            var sel = model.items[selected];
+            if (!sel || sel.t !== 'mark') labelPop.hidden = true;
             var k = scaleOf(model.rink), z = 1 / zoom.s;
             var it = model.items[selected];
             if (it) {
@@ -942,22 +1022,29 @@
                         fill: 'none', stroke: '#1e88e5', 'stroke-width': f2(0.25 * k * z),
                         'stroke-dasharray': f2(0.8 * k * z) + ' ' + f2(0.5 * k * z), 'pointer-events': 'none'
                     }, overlay);
+                    if (it.t === 'mark') placeLabelPop(b.x + b.width + pad, b.y + b.height + pad);
                     if (it.t === 'mark' && MARKS[it.kind].rot) {
                         var v = toView(model.rink, [it.x, it.y]), hy = b.y - pad - 3 * k * z;
                         el('line', { x1: v[0], y1: b.y - pad, x2: v[0], y2: hy, stroke: '#1e88e5', 'stroke-width': f2(0.25 * k * z), 'pointer-events': 'none' }, overlay);
                         el('circle', { cx: v[0], cy: hy, r: f2(1.3 * k * z), fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(0.35 * k * z), 'data-h': 'rot', 'class': 'hps-rot' }, overlay);
                     }
+                    if (it.t === 'mark' && it.kind === 'blocker') {
+                        // A square, so it reads as a different handle from the round rotate one.
+                        var ax = blockerAxis(it), hs = 1.1 * k * z;
+                        el('rect', { x: f2(ax.end[0] - hs), y: f2(ax.end[1] - hs), width: f2(2 * hs), height: f2(2 * hs),
+                                     fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(0.35 * k * z), 'data-h': 'len', 'class': 'hps-len-h' }, overlay);
+                    }
                 }
             }
             if (gesture && gesture.kind === 'stroke' && gesture.pts.length > 1) {
                 var pts = gesture.straight ? [gesture.pts[0], gesture.pts[gesture.pts.length - 1]] : gesture.pts;
-                el('path', { d: pd(pts), fill: 'none', stroke: INKS[st.color], 'stroke-width': f2(0.45 * k), 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.7, 'pointer-events': 'none' }, overlay);
+                el('path', { d: pd(pts), fill: 'none', stroke: INKS[st.color], 'stroke-width': 0.3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.7, 'pointer-events': 'none' }, overlay);
             }
             if (pending && pending.pts.length) {
                 var all = pending.pts.concat(pending.hover ? [pending.hover] : []);
                 if (all.length > 1) {
                     var poly = st.straight ? all : catmull(all);
-                    pathShapes(st.tool.slice(5), st.end, poly, k).forEach(function (sh) {
+                    pathShapes(st.tool.slice(5), st.end, poly, 1).forEach(function (sh) {
                         el('path', {
                             d: sh.d, fill: sh.fill ? INKS[st.color] : 'none', stroke: sh.fill ? 'none' : INKS[st.color],
                             'stroke-width': sh.fill ? null : f2(sh.w), 'stroke-linecap': 'round', opacity: 0.75,
@@ -982,7 +1069,6 @@
             });
             INK_ORDER.forEach(function (n) { inkButtons[n].setAttribute('aria-pressed', n === st.color ? 'true' : 'false'); });
             Object.keys(modeButtons).forEach(function (m) { modeButtons[m].setAttribute('aria-pressed', m === st.mode ? 'true' : 'false'); });
-            labelWrap.hidden = !(it && it.t === 'mark');
             textWrap.hidden = !(st.tool === 'text' || (it && it.t === 'text'));
             stage.setAttribute('data-tool', st.tool.split(':')[0]);
         }
@@ -1034,7 +1120,7 @@
 
         function cancelGesture() {
             if (!gesture) return;
-            if (gesture.kind === 'move' || gesture.kind === 'rotate') restoreNoHistory();
+            if (gesture.kind === 'move' || gesture.kind === 'rotate' || gesture.kind === 'resize') restoreNoHistory();
             gesture = null;
             render();
         }
@@ -1072,6 +1158,14 @@
 
             if (e.target.getAttribute && e.target.getAttribute('data-h') === 'rot' && model.items[selected]) {
                 gesture = { kind: 'rotate', id: e.pointerId };
+                return;
+            }
+            if (e.target.getAttribute && e.target.getAttribute('data-h') === 'len' && model.items[selected]) {
+                // The far end stays where it is and only the dragged end moves, which is how you
+                // would slide a real blocker's end along the boards.
+                var ax0 = blockerAxis(model.items[selected]), len0 = model.items[selected].len;
+                gesture = { kind: 'resize', id: e.pointerId, dir: ax0.dir,
+                            fixed: [ax0.c[0] - ax0.dir[0] * len0 / 2, ax0.c[1] - ax0.dir[1] * len0 / 2] };
                 return;
             }
 
@@ -1118,6 +1212,7 @@
             } else {
                 // Placed upright in the view it was drawn in.
                 item = { t: 'mark', kind: tool.slice(5), x: r1(r[0]), y: r1(r[1]), rot: -turnOf(model.rink), color: st.color };
+                if (item.kind === 'blocker') item.len = BLOCKER_DEFAULT;
             }
             model.items.push(item);
             // Selected once placed, so the label box beside it labels this stamp.
@@ -1166,6 +1261,16 @@
                     render();
                     break;
                 }
+                case 'resize': {
+                    var bl = model.items[selected];
+                    var along = (p[0] - gesture.fixed[0]) * gesture.dir[0] + (p[1] - gesture.fixed[1]) * gesture.dir[1];
+                    bl.len = Math.max(BLOCKER_MIN, Math.min(BLOCKER_MAX, Math.round(along)));
+                    var mid = toRink(model.rink, [gesture.fixed[0] + gesture.dir[0] * bl.len / 2,
+                                                  gesture.fixed[1] + gesture.dir[1] * bl.len / 2]);
+                    bl.x = r1(mid[0]); bl.y = r1(mid[1]);
+                    render();
+                    break;
+                }
                 case 'rotate': {
                     var item = model.items[selected];
                     var c = toView(model.rink, [item.x, item.y]);
@@ -1190,7 +1295,10 @@
             gesture = null;
             var k = scaleOf(model.rink);
 
-            if (g.kind === 'move' || g.kind === 'rotate') { if (g.kind === 'rotate' || g.moved) commit(); else render(); return; }
+            if (g.kind === 'move' || g.kind === 'rotate' || g.kind === 'resize') {
+                if (g.kind !== 'move' || g.moved) commit(); else render();
+                return;
+            }
             if (g.kind === 'stroke') { finishStroke(g, e.type === 'pointercancel'); return; }
             if (g.kind === 'place') {
                 if (e.type !== 'pointercancel' && dist(clientToView(e.clientX, e.clientY), g.start) < 1.5 * k) placeStamp(g.start);

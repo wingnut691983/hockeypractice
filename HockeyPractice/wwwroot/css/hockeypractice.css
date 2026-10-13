@@ -2283,6 +2283,25 @@ html.hps-open, html.hps-open body { overflow: hidden; }
 .hps-field[hidden] { display: none; }
 
 .hps-collapse { display: none; }
+.hps-hint { font-size: .74rem; color: var(--hp-muted); margin: .45rem 0 0; line-height: 1.35; }
+
+/* Floats beside the selected stamp; see placeLabelPop. 16px input text so iOS does not zoom the
+   page when it takes focus. */
+.hps-labelpop {
+  position: absolute; z-index: 3;
+  display: flex; align-items: center; gap: .35rem;
+  padding: .2rem .3rem .2rem .55rem;
+  background: var(--hp-surface); color: var(--hp-text);
+  border: 1px solid var(--hp-border); border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, .25);
+  font-size: .78rem; font-weight: 650;
+}
+.hps-labelpop input {
+  width: 3rem; min-height: 32px; padding: .1rem .4rem;
+  font: inherit; font-size: 16px; font-weight: 700; text-align: center;
+  border: 1px solid var(--hp-border); border-radius: 6px;
+  background: var(--hp-bg); color: var(--hp-text);
+}
 
 .hps-stage {
   flex: 1;
@@ -2299,6 +2318,8 @@ html.hps-open, html.hps-open body { overflow: hidden; }
 .hps-stage[data-tool="num"] .hps-svg,
 .hps-stage[data-tool="text"] .hps-svg { cursor: crosshair; }
 .hps-rot { cursor: grab; }
+.hps-len-h { cursor: ew-resize; }
+.hps-len { font-weight: 700; padding-right: .25rem; white-space: nowrap; }
 
 .hps-ask {
   position: absolute; inset: 0; z-index: 5;

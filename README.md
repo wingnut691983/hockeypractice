@@ -68,8 +68,14 @@ slow KDF. See "What I'd flag".
 - **Drawing a drill diagram.** Besides uploading or pasting a picture, a coach can press **Draw a
   diagram** on the drill page. It opens a full-screen editor with a blank rink (full, full
   sideways, half, or one zone) and the standard drill legend: seven line styles (skate, backward,
-  with puck, pass, shot, sidestep, crossovers), fifteen stamps (X, O, F, C, W, D, G, coach, puck,
-  stick, cone, net, pivot, turn, stop), order numbers, short text, and six ink colours. Lines are
+  with puck, pass, shot, sidestep, crossovers), sixteen stamps (X, O, F, C, W, D, G, coach, puck,
+  stick, cone, net, pivot, turn, stop, and a padded blocker), order numbers, short text, and six
+  ink colours. Any stamp takes a one- or two-character label (F1, D2), typed into a box that
+  appears beside the stamp when it is selected. The blocker is the one stamp drawn to scale, 1 ft
+  wide, and it starts at 6 ft and stretches from a square handle on its end (2 to 40 ft, whole feet,
+  the far end staying put), with its length shown beside it. One stretchable blocker rather than a
+  stamp per size was the coach's call: real ones come in 6 and 10 ft, and several are often lined
+  up end to end. Lines are
   drawn by dragging (smoothed automatically) or by tapping points. **Use this diagram** stages the
   result exactly like a pasted picture, so it uploads when the drill is saved, which also works on
   a drill that doesn't exist yet. A drawn picture then shows **Edit drawing**, which saves over it
@@ -255,6 +261,24 @@ answer in September.
   `inline-flex`) showed with nothing to finish or zoom, and an empty `.hp-paste-chip` had been
   sitting under every pasted picture on the drill form since that preview was written. Both now
   have a `[hidden]` rule. Anything new that toggles `.hidden` on a styled element needs one too.
+
+- **Drawings are sized in rink feet, the same in every view; only touch tolerances scale.**
+  `v46` sized lines and stamps relative to the view's width, reasoning that a picture should be
+  legible at 360px whatever the view. The effect was that the sideways full rink, 200 ft across
+  instead of 85, drew everything 2.35 times bigger in feet: lines over a foot thick, arrowheads
+  nearly 5 ft long, letters as tall as a faceoff circle's hash marks. The coach compared it against
+  a published drill and every object was about twice the size it should be. Now lines are 0.3 ft,
+  arrowheads 1.7 ft, the puck wave 0.75 ft either side and letters about 2.7 ft, measured off that
+  reference (`docs/drill-legend.md`), in every view. `scaleOf(view)` still sizes the hit areas,
+  selection box and handles, because those are about a finger, not the picture. Don't put it back
+  on the drawing: a sideways rink on a phone is small, and the answer is the upright view, which
+  is the default for that reason.
+
+- **The stamp label box floats beside the selected stamp, not in the tool panel.** It started in
+  the panel under the colour and line options, which put it below the bottom of the screen on most
+  laptops, and the coach reported not being able to tell whether F1 or D2 was possible at all.
+  The palette also says so in a line under the stamps. The box has no placeholder on purpose: a
+  faint "1" in an empty box read as a label already set.
 
 - **The drawing editor places a stamp on release, not on contact.** On a phone the first finger
   of a pinch-zoom lands a moment before the second, so placing on `pointerdown` left a stray stamp

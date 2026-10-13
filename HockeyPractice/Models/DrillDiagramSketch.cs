@@ -94,7 +94,7 @@ public class DrillDiagramSketch
     /// </summary>
     private static string Describe(string rink, JsonElement items)
     {
-        int players = 0, opponents = 0, coaches = 0, pucks = 0, cones = 0,
+        int players = 0, opponents = 0, coaches = 0, pucks = 0, cones = 0, blockers = 0,
             skating = 0, passes = 0, shots = 0;
 
         foreach (var item in items.EnumerateArray())
@@ -111,6 +111,7 @@ public class DrillDiagramSketch
                     case "coach": coaches++; break;
                     case "puck": pucks++; break;
                     case "cone": cones++; break;
+                    case "blocker": blockers++; break;
                 }
             }
             else if (t == "path")
@@ -134,6 +135,7 @@ public class DrillDiagramSketch
         Add(shots, "shot", "shots");
         Add(pucks, "puck", "pucks");
         Add(cones, "cone", "cones");
+        Add(blockers, "blocker", "blockers");
 
         var view = rink switch
         {

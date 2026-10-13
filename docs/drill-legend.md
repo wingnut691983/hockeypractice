@@ -38,9 +38,22 @@ the committed record of what it shows. If the image is missing, work from this.
 | Cone | A small solid black triangle |
 | Net | A top-down net: a shallow U-shaped arc for the back of the net, with short posts at the open ends |
 
+**Added beyond the legend:** a padded blocker, which coaches use constantly. Real ones are 6 or
+10 ft long and about 1 ft wide. Drawn to scale as a rounded bar (ink outline, light fill of the
+same ink), rotatable, and stretchable from a handle on its end, starting at 6 ft. Unlike the
+symbolic stamps, which are a fixed size whatever they stand for.
+
 This settles two earlier questions. **Pivot and turn are standalone glyphs** in the legend, not
 shapes on a path, so they stay stamps that rotate. **Stop is both:** the legend draws it alone, so
 it is a stamp, and the `||` end cap stays too, because "skate here, then stop" is the common case.
+
+## Sizes
+
+Measured on 13 October 2026 off a published drill the coach supplied as the target, and the same
+in every rink view: lines about 0.3 ft thick, filled arrowheads 1.7 ft long, the puck-carry wave
+0.75 ft either side of the path, pass dashes 1.3 ft on and 0.9 ft off, the shot's two lines 0.84
+ft apart, letters and stamps about 2.7 ft tall (a little larger than the reference's bare letters,
+which sit inside 5 ft badges), the puck about 1 ft across.
 
 ## The rink
 
