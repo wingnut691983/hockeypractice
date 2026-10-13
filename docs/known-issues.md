@@ -451,7 +451,9 @@ antiforgery filter, `.dockerignore`, the unobserved restart task, the silent del
 (earlier, in batch G) the request-size mismatch. One was **attempted and reverted** — see
 `AllowedHosts` in README's "What I'd flag", which is the most useful thing the sweep produced.
 
-These five were left, each for a reason rather than for lack of time:
+These were left, each for a reason rather than for lack of time. A fifth, **e**, the demo team
+chosen by a hard-coded slug, was fixed with the drill-diagram migration in October 2026 by adding
+`Team.IsDemo`:
 
 **a. The restore free-space fuse trusts declared sizes.** `VolumeBackupService` sums
 `entry.Length`, the declared uncompressed size from the zip central directory, and `ApplyFiles`
@@ -476,14 +478,6 @@ destination. Hardening, not a bug.
 **d. Claims accumulate without bound.** `TeamAccessService.ReissueAsync` copies every existing
 claim forward on each re-issue with no pruning of deleted teams. Past about 4 KB the cookie
 chunks. **Trigger: a manager of many teams reporting sign-in oddities, or any bulk team deletion.**
-
-**e. The demo team's player code is world-readable, by design but not by enforcement.**
-`HowItWorks` publishes a live team's plaintext code, selected by a hard-coded
-`DemoTeamSlug = "demoteam"` with no `IsDemo` flag on the row. The intent is deliberate; what is
-missing is enforcement, so renaming a real team to `demoteam` would put its code and roster on an
-ungated page. **Not fixed here because the fix is a schema column and this deploy was deliberately
-migration-free.** **Trigger: the next migration for any reason** — add `IsDemo` then and have
-`HowItWorks` require it.
 
 ---
 

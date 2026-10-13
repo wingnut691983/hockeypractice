@@ -112,6 +112,15 @@ public class Team
         new(@"^https://open\.spotify\.com/(intl-[a-z]{2}/)?playlist/[A-Za-z0-9]+(\?\S*)?$",
             RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// The team /how-it-works offers as a live player-side preview, publishing its player code to
+    /// anyone. A flag on the row rather than a hard-coded slug, so renaming a real team to the
+    /// demo's old slug can't put that team's code and roster on an ungated page. Set by the
+    /// migration that added it (for "demoteam") and otherwise only by hand in the database, on
+    /// purpose: nothing in the UI should be able to make a team world-readable.
+    /// </summary>
+    public bool IsDemo { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
     public List<Player> Players { get; set; } = new();

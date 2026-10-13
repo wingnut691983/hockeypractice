@@ -241,7 +241,7 @@
                                 @* Real alt text, not alt="": a diagram is content, and an empty alt
                                    would leave a screen-reader user with nothing at all here. *@
                                 <img class="hp-drill-diagram" src="@pictureUrl" loading="lazy"
-                                     alt="Diagram for @drill.Title" />
+                                     alt="@(picture.AltText ?? $"Diagram for {drill.Title}")" />
                             }
                         }
 

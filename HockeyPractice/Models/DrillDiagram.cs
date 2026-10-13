@@ -27,6 +27,21 @@ public class DrillDiagram
     /// <summary>Stored size, summed per drill so quota use stays visible.</summary>
     public long Bytes { get; set; }
 
+    /// <summary>
+    /// Alt text for a drawn picture, generated from what is drawn ("Half rink drawing: 3 players,
+    /// 2 passes"). Null for uploaded pictures, whose views fall back to "Diagram for ...". On this
+    /// row rather than in <see cref="Sketch"/> because the plan views need it and must not load
+    /// the drawing's JSON to get it.
+    /// </summary>
+    [MaxLength(200)]
+    public string? AltText { get; set; }
+
+    /// <summary>
+    /// The drawing behind this picture, when it was drawn here. Never Include()d by the read
+    /// paths; see DrillDiagramSketch for why it is a separate table.
+    /// </summary>
+    public DrillDiagramSketch? Sketch { get; set; }
+
     public bool IsPdf => FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
@@ -36,9 +51,12 @@ public class DrillDiagram
     ///
     /// The URL cannot carry the file name itself: it is keyed on this row's id
     /// (<c>/drills/{id}/diagram/{diagramId}</c>), so the same address can outlive the file behind
-    /// it. Today nothing reassigns <see cref="FileName"/> — it is written once, at insert, and
-    /// removing a diagram deletes the row — so the address is stable by construction. The token
-    /// exists for the case that isn't: a restore rolls the DrillDiagrams ids back and reissues
+    /// it. Exactly one path reassigns <see cref="FileName"/>: saving an edited drawing
+    /// (DrillController.ReplaceSketch) writes a new file under a fresh GUID and points this row at
+    /// it, so the picture keeps its id and its place in the order. The fresh GUID is what makes
+    /// that safe, because it changes this token and no browser goes on believing the old bytes
+    /// are current. Anything else that ever reassigns FileName must do the same. The token also
+    /// covers the case nobody chose: a restore rolls the DrillDiagrams ids back and reissues
     /// them to different pictures, so a browser told "immutable, one year" against a bare URL
     /// would paint the wrong diagram until the cache expired. Same reasoning as
     /// PracticePlan.OverviewVersion, which has the same hazard for the same reason.

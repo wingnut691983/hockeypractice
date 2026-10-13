@@ -254,7 +254,7 @@
                                    out as a blank box. Details keeps its lazy loading — that
                                    page is the one that has to be cheap on rink wifi. *@
                                 <img class="hp-drill-diagram" src="@pictureUrl"
-                                     decoding="sync" alt="Diagram @n for @drill.Title" />
+                                     decoding="sync" alt="@(picture.AltText ?? $"Diagram {n} for {drill.Title}")" />
                             }
                         }
                     </div>

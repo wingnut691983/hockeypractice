@@ -65,6 +65,17 @@ slow KDF. See "What I'd flag".
   where the number came from: a lengthened drill reads **25 min (15 min + 10 min)** with the added
   part in green, in the running order and on the drill card, on screen and on the printed sheet. A
   drill with no library time at all just shows its total, since there is nothing to have added to.
+- **Drawing a drill diagram.** Besides uploading or pasting a picture, a coach can press **Draw a
+  diagram** on the drill page. It opens a full-screen editor with a blank rink (full, full
+  sideways, half, or one zone) and the standard drill legend: seven line styles (skate, backward,
+  with puck, pass, shot, sidestep, crossovers), fifteen stamps (X, O, F, C, W, D, G, coach, puck,
+  stick, cone, net, pivot, turn, stop), order numbers, short text, and six ink colours. Lines are
+  drawn by dragging (smoothed automatically) or by tapping points. **Use this diagram** stages the
+  result exactly like a pasted picture, so it uploads when the drill is saved, which also works on
+  a drill that doesn't exist yet. A drawn picture then shows **Edit drawing**, which saves over it
+  and keeps its place in the order, and **Copy as next stage**, which starts a new picture from it
+  for a progression. The editor is `wwwroot/js/drill-sketch.js`, loaded only when Draw is first
+  pressed, so a player's page weight doesn't change.
 - **Duplicating a plan.** Next week's practice is usually last week's with a few changes, so any
   plan can be copied: **Duplicate this plan** in the editor's Reuse panel, or **Duplicate** on the
   plan page. It opens a form with the title, rink, note and tags already filled in and the date
@@ -110,12 +121,13 @@ slow KDF. See "What I'd flag".
   and follow dark mode, and so no access is needed to see them. Nothing inside one is a real
   control. See "What I'd flag" before changing how they are built.
 
-  The page ends with a link into the demo team, as a player sees it. Its slug is a constant in
-  `HomeController` (`DemoTeamSlug`), because a slug is the visible half of every link to a team and
-  is not a secret; the code that opens it is, and is not stored there. It is read from the team's
-  own row when the page renders, so rotating the demo team's code needs no code change. Rename or
-  delete that team and the panel quietly disappears, which is why nothing else on the page depends
-  on it.
+  The page ends with a link into the demo team, as a player sees it. That team is whichever row
+  has `Team.IsDemo` set. It used to be a hard-coded slug (`demoteam`), which meant renaming a real
+  team to that slug would have published its player code and roster on an ungated page; the
+  migration that added the flag set it once for `demoteam`. There is deliberately no UI for it:
+  making a team world-readable should take a hand edit in the database, not a click. The code is
+  read from the team's own row when the page renders, so rotating it needs no code change. Delete
+  that team and the panel quietly disappears, which is why nothing else on the page depends on it.
 - **Team colours.** A manager sets two brand colours; every place they're used as a button
   background or as text is computed for WCAG-legible contrast rather than assumed white-on-team-
   colour, so a light team colour (gold, white, powder blue) doesn't produce unreadable buttons.
@@ -219,6 +231,48 @@ plan. That answers "is last night's backup actually restorable", which is the qu
 answer in September.
 
 ## What I'd flag
+
+- **Saving an edited drawing is the one path that reassigns `DrillDiagram.FileName`, and it must
+  keep minting a new GUID.** `DrillController.ReplaceSketch` writes the new picture under a fresh
+  `diagram-<guid>.webp`, points the existing row at it (so the picture keeps its id and its place
+  in the order), and only then deletes the old file. The fresh name is not tidiness: the Diagram
+  URL is keyed on the row id and cached for a year as `immutable` against its `?v=<guid>` token,
+  so overwriting the file in place would leave every phone that had seen the old drawing showing
+  it for a year. If the row fails to save, the new file is the one deleted. Verified locally: the
+  row kept id 26, the file name changed, and the old file was gone from the volume.
+
+- **Every piece of text a drawing carries is set with `textContent`, never `innerHTML`.** A drill
+  copied from another team carries that team's labels and text, so a drawing is input from
+  someone else. The JSON reaches the editor through a Razor-encoded `data-sketch` attribute, the
+  editor re-checks every item against a whitelist (`cleanModel`) and drops what it doesn't
+  recognise, and the server only checks the envelope (`v == 1`, a known rink, an item list, 64 KB).
+  Checked with a label of `<img src=x onerror=alert(1)>`: it appears on the page only encoded, and
+  in the exported picture as literal text.
+
+- **An element with its own `display` ignores the `hidden` attribute**, because the browser's
+  `[hidden] { display: none }` is a weak user-agent rule and any author `display` beats it. Found
+  twice in one browser pass: the editor's Finish line and Zoom out buttons (`.hp-btn` is
+  `inline-flex`) showed with nothing to finish or zoom, and an empty `.hp-paste-chip` had been
+  sitting under every pasted picture on the drill form since that preview was written. Both now
+  have a `[hidden]` rule. Anything new that toggles `.hidden` on a styled element needs one too.
+
+- **The drawing editor places a stamp on release, not on contact.** On a phone the first finger
+  of a pinch-zoom lands a moment before the second, so placing on `pointerdown` left a stray stamp
+  behind every zoom. The second finger cancels whatever the first one started (a stroke, a move,
+  a placement). Moving a stamp is still a drag that starts on it.
+
+- **A staged drawing survives in `localStorage` until the drill is known to have saved.** On a new
+  drill, a save that bounces re-renders the form and the browser drops every staged file, and with
+  a pasted picture that just means pasting again, but a drawing would be gone. So the editor keeps
+  its JSON under `hp-sketch:<team>:<drill or new>` marked `staged`, the edit page clears staged
+  copies when it loads *without* an error, and offers them back when it loads *with* one. Draw is
+  also disabled until the name and run time are filled in on a new drill, which removes the common
+  cause. **Razor renders `data-*` attributes even when their value is null**, unlike ordinary
+  attributes, and that broke this the first time: the form's `data-failed="@(error ? "1" : null)"`
+  came out as `data-failed=""` on every page, `hasAttribute` was always true, so every load counted
+  as a failed save, staged copies were never cleared, and the "your drawing wasn't saved" hint
+  would have shown on every visit. Found in the browser, not the build. The script now tests the
+  value (`=== '1'`), and the same applies to `data-sketch` on plain pictures.
 
 - **A plan PDF is deleted only when no row still points at it, and "replaced with the same file"
   is the case that catches you out.** Since PDFs are named by their hash, duplicating a plan gives
@@ -1216,6 +1270,22 @@ answer in September.
   order does not either, because it already carries move, remove and the per-drill time control
   and the coach already chose those drills. `_DrillRow` itself stays context-free: the only thing
   added to it was a class on the snippet so CSS can hide it while a peek is open.
+
+- **A drawn picture is an ordinary drill picture plus a row in `DrillDiagramSketches`.** The
+  picture is a WebP in the drill's directory like any upload, so plans, print, the `?v=` token,
+  copying and backups all treat it the same. The drawing behind it (the JSON the editor reopens) is
+  in its own table keyed on the picture's id, cascade-deleted with it. Not a column on
+  `DrillDiagram`, because EF loads every column and every plan view does
+  `Include(d => d.Diagrams)`: a column would ship every drawing's JSON to every player for
+  nothing. Not a file beside the picture either, because a row is already in the nightly archive,
+  restores consistently with its picture row and is deleted with it, with nothing added to
+  `PlanStorageService`. Only the drill edit page and the copy path read the table.
+  `DrillDiagram.AltText` holds the generated description ("Half rink drawing: 3 players, 2
+  passes") on the picture row itself, because the plan views need it and must not load the JSON.
+  Drawn pictures are stored **lossless**: they are known line art, which the measurements in
+  `ShrinkToWebpAsync` show comes out smaller lossless, and lossy WebP keeps less colour detail than
+  brightness, which is what thin red and orange ink needs. Measured on a busy test drawing: 68.9 KB
+  for a 1600 x 3765 full rink.
 
 - **A plan can carry one overview picture, and it lives in the plan's own directory.**
   `teams/<team>/plans/<planId>/overview-<guid>.webp`, with the name on `PracticePlan.OverviewFileName`

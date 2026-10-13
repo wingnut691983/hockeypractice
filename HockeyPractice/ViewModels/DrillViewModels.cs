@@ -355,4 +355,10 @@ public class DrillEditViewModel
     /// informed decision rather than a guess, since the attempt would be refused anyway.
     /// </summary>
     public List<string> CopiedTo { get; init; } = new();
+
+    /// <summary>
+    /// The drawing behind each drawn picture, keyed on the picture's id, for the editor to reopen.
+    /// Pictures with no entry were uploaded or pasted.
+    /// </summary>
+    public Dictionary<int, string> Sketches { get; init; } = new();
 }

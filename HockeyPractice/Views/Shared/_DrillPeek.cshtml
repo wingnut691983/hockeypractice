@@ -58,7 +58,7 @@
                    a file check. loading="lazy" is NOT a substitute: it is a hint the spec lets a
                    browser ignore, and WebKit has had bugs here in both directions, including the
                    one where the image never loads and the peek opens to empty boxes. *@
-                <img class="hp-peek-diagram" data-src="@pictureUrl" alt="Diagram for @Model.Drill.Title" />
+                <img class="hp-peek-diagram" data-src="@pictureUrl" alt="@(picture.AltText ?? $"Diagram for {Model.Drill.Title}")" />
             }
         }
 
@@ -69,7 +69,7 @@
                 {
                     <img class="hp-peek-diagram"
                          src="@Url.Action("Diagram", "Drill", new { slug, id = Model.Drill.Id, diagramId = picture.Id, v = picture.Version })"
-                         alt="Diagram for @Model.Drill.Title" />
+                         alt="@(picture.AltText ?? $"Diagram for {Model.Drill.Title}")" />
                 }
             </noscript>
         }

@@ -91,7 +91,7 @@ public class DrillController : TeamScopedController
     [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadRequestBytes)]
     public async Task<IActionResult> Create(string slug, string title, string? description,
         string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams,
-        string? returnUrl)
+        List<string>? sketches, string? returnUrl)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -119,7 +119,7 @@ public class DrillController : TeamScopedController
             Db.DrillTags.Add(new DrillTag { DrillId = drill.Id, Name = name, NormalizedName = norm });
 
         var notice = "Drill saved.";
-        var rejected = await AddDiagramsAsync(ctx.Team.Id, drill, diagrams);
+        var rejected = await AddDiagramsAsync(ctx.Team.Id, drill, diagrams, sketches);
         if (rejected is not null)
         {
             // Keep the drill rather than discarding everything the coach typed over a bad file —
@@ -155,6 +155,7 @@ public class DrillController : TeamScopedController
             UsedInPlans = await UsedInPlanCountAsync(drill.Id),
             CopyTargets = copyTargets,
             CopiedTo = await CopiedToAsync(drill.Id, copyTargets),
+            Sketches = await SketchesForAsync(drill.Id),
             Notice = notice
         });
     }
@@ -164,7 +165,8 @@ public class DrillController : TeamScopedController
     [RequestSizeLimit(MaxUploadRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadRequestBytes)]
     public async Task<IActionResult> Update(string slug, int id, string title, string? description,
-        string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams)
+        string? videoUrl, string? runTimeMinutes, List<string>? tags, List<IFormFile>? diagrams,
+        List<string>? sketches)
     {
         var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
         if (failure is not null) return failure;
@@ -188,7 +190,7 @@ public class DrillController : TeamScopedController
         var notice = $"Saved \"{drill.Title}\".";
         // New pictures ADD to the drill now rather than replacing what's there — a progression
         // builds up over several visits. Removing one is its own explicit action.
-        var rejected = await AddDiagramsAsync(ctx!.Team.Id, drill, diagrams);
+        var rejected = await AddDiagramsAsync(ctx!.Team.Id, drill, diagrams, sketches);
         var diagramFailed = rejected is not null;
         if (diagramFailed) notice = $"Saved, but {rejected}";
 
@@ -228,6 +230,79 @@ public class DrillController : TeamScopedController
         _storage.DeleteDiagram(ctx!.Team.Id, id, diagram.FileName);
 
         return RedirectToAction(nameof(Edit), new { slug, id, notice = "Picture removed." });
+    }
+
+    /// <summary>
+    /// Saves an edited drawing over the picture it was drawn as, keeping the picture's id and so
+    /// its place in the order. Called by the drawing editor with fetch, so it answers JSON: on a
+    /// failure the editor stays open with the drawing intact, which a redirect could not do.
+    ///
+    /// The order is the same one the plan overview uses for a replaced picture: write the new
+    /// file, point the row at it, and only then delete the old one. If the row fails to save, the
+    /// new file is the one removed, and the drill still shows the picture it had.
+    /// </summary>
+    [HttpPost("{id:int}/diagram/{diagramId:int}/sketch")]
+    [ValidateAntiForgeryToken]
+    [RequestSizeLimit(MaxUploadRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxUploadRequestBytes)]
+    public async Task<IActionResult> ReplaceSketch(string slug, int id, int diagramId,
+        IFormFile? picture, string? sketch)
+    {
+        var (ctx, failure) = await ResolveAsync(slug, TeamAccessLevel.Manager);
+        if (failure is not null) return failure;
+
+        // Joined through the drill, as RemoveDiagram is, so a diagram id from another team can't
+        // be reached by pairing it with a slug this browser does manage.
+        var diagram = await Db.DrillDiagrams.Include(d => d.Sketch)
+            .FirstOrDefaultAsync(d => d.Id == diagramId && d.DrillId == id
+                                      && d.Drill!.TeamId == ctx!.Team.Id);
+        if (diagram is null) return NotFound();
+
+        if (!DrillDiagramSketch.TryRead(sketch, out var json, out var alt, out var sketchError))
+            return Json(new { ok = false, error = $"Not saved: {sketchError}" });
+
+        if (picture is null || picture.Length == 0)
+            return Json(new { ok = false, error = "Not saved: the picture didn't arrive. Try again." });
+
+        var saved = await _storage.SaveDiagramAsync(ctx!.Team.Id, id, picture, drawn: true);
+        if (!saved.Ok)
+            return Json(new { ok = false, error = $"Not saved: {saved.Error}" });
+
+        // SaveDiagramAsync accepts a PDF for a drill picture. A drawing never is one, so a PDF
+        // here was posted by hand and is refused rather than stored as a "drawing".
+        if (saved.FileName!.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            _storage.DeleteDiagram(ctx.Team.Id, id, saved.FileName);
+            return Json(new { ok = false, error = "Not saved: a drawing has to be an image." });
+        }
+
+        var oldFile = diagram.FileName;
+        diagram.FileName = saved.FileName;
+        diagram.Bytes = saved.Bytes;
+        diagram.AltText = alt;
+        if (diagram.Sketch is null)
+            diagram.Sketch = new DrillDiagramSketch { Json = json };
+        else
+            diagram.Sketch.Json = json;
+
+        try
+        {
+            await Db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            _storage.DeleteDiagram(ctx.Team.Id, id, saved.FileName);
+            _log.LogWarning("Saving drawing {DiagramId} failed: {Error}", diagramId, ex.Message);
+            return Json(new { ok = false, error = "Not saved: something went wrong storing it. Try again." });
+        }
+
+        _storage.DeleteDiagram(ctx.Team.Id, id, oldFile);
+
+        return Json(new
+        {
+            ok = true,
+            url = Url.Action(nameof(Edit), new { slug, id, notice = "Drawing updated." })
+        });
     }
 
     [HttpPost("{id:int}/archive")]
@@ -727,13 +802,22 @@ public class DrillController : TeamScopedController
                 DrillId = copy.Id, Name = tag.Name, NormalizedName = tag.NormalizedName
             });
 
+        // The drawings come too, or a copied drawing would land as a flat picture the other team
+        // could never edit. One query per drill, and only for this table: the read paths that
+        // loaded the drill deliberately left the JSON out.
+        var sketches = await SketchesForAsync(drill.Id);
+
         foreach (var diagram in drill.Diagrams.OrderBy(d => d.Id))
         {
             var copied = _storage.CopyDiagram(fromTeamId, drill.Id, toTeamId, copy.Id, diagram.FileName);
             if (copied is not null)
                 Db.DrillDiagrams.Add(new DrillDiagram
                 {
-                    DrillId = copy.Id, FileName = copied, Bytes = diagram.Bytes
+                    DrillId = copy.Id, FileName = copied, Bytes = diagram.Bytes,
+                    AltText = diagram.AltText,
+                    Sketch = sketches.TryGetValue(diagram.Id, out var json)
+                        ? new DrillDiagramSketch { Json = json }
+                        : null
                 });
         }
     }
@@ -818,6 +902,12 @@ public class DrillController : TeamScopedController
         return drills.Select(ToCard).ToList();
     }
 
+    /// <summary>The drawings behind a drill's pictures, keyed on the picture's id.</summary>
+    private Task<Dictionary<int, string>> SketchesForAsync(int drillId) =>
+        Db.DrillDiagramSketches.AsNoTracking()
+            .Where(s => s.Diagram!.DrillId == drillId)
+            .ToDictionaryAsync(s => s.DrillDiagramId, s => s.Json);
+
     /// <summary>
     /// How many PLANS use this drill — distinct plans, not PlanDrill rows.
     ///
@@ -860,7 +950,8 @@ public class DrillController : TeamScopedController
             RetainedDescription = description,
             RetainedVideoUrl = videoUrl,
             RetainedRunTime = runTimeMinutes,
-            RetainedTags = tags
+            RetainedTags = tags,
+            Sketches = drill is null ? new() : await SketchesForAsync(drill.Id)
         });
     }
 
@@ -908,11 +999,28 @@ public class DrillController : TeamScopedController
     /// Partial success is the normal outcome to plan for: one bad file among four shouldn't cost
     /// the coach the other three, so the good ones are kept and the message names what didn't
     /// make it.
+    ///
+    /// <paramref name="sketches"/> carries the drawings behind any pictures made in the drawing
+    /// editor, one hidden field each, as "&lt;staged file name&gt;|&lt;json&gt;". The staging script names
+    /// each drawn file uniquely (sketch-…png) and keeps these fields in step with the files, so
+    /// the file name is the whole pairing. A drawing whose JSON is refused still saves its
+    /// picture: the picture is what the players see, and only its re-editing is lost.
     /// </summary>
-    private async Task<string?> AddDiagramsAsync(int teamId, Drill drill, List<IFormFile>? files)
+    private async Task<string?> AddDiagramsAsync(int teamId, Drill drill, List<IFormFile>? files,
+        List<string>? sketches = null)
     {
         var incoming = (files ?? new List<IFormFile>()).Where(f => f.Length > 0).ToList();
         if (incoming.Count == 0) return null;
+
+        var drawings = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in sketches ?? new List<string>())
+        {
+            var bar = entry?.IndexOf('|') ?? -1;
+            if (bar <= 0) continue;
+            var name = entry![..bar];
+            if (SketchFileName.IsMatch(name)) drawings[name] = entry[(bar + 1)..];
+        }
+        string? sketchError = null;
 
         var existing = await Db.DrillDiagrams.CountAsync(d => d.DrillId == drill.Id);
         var room = MaxDiagrams - existing;
@@ -928,13 +1036,30 @@ public class DrillController : TeamScopedController
         {
             if (added >= room) { skippedForRoom++; continue; }
 
-            var saved = await _storage.SaveDiagramAsync(teamId, drill.Id, file);
+            drawings.TryGetValue(file.FileName, out var drawing);
+
+            var saved = await _storage.SaveDiagramAsync(teamId, drill.Id, file, drawn: drawing is not null);
             if (saved.Ok)
             {
-                Db.DrillDiagrams.Add(new DrillDiagram
+                var row = new DrillDiagram
                 {
                     DrillId = drill.Id, FileName = saved.FileName!, Bytes = saved.Bytes
-                });
+                };
+
+                if (drawing is not null && !saved.FileName!.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (DrillDiagramSketch.TryRead(drawing, out var json, out var alt, out var err))
+                    {
+                        row.Sketch = new DrillDiagramSketch { Json = json };
+                        row.AltText = alt;
+                    }
+                    else
+                    {
+                        sketchError ??= err;
+                    }
+                }
+
+                Db.DrillDiagrams.Add(row);
                 added++;
             }
             else
@@ -951,8 +1076,15 @@ public class DrillController : TeamScopedController
         if (skippedForRoom > 0)
             return $"only {added} fitted, because a drill holds {MaxDiagrams} pictures.";
 
+        if (sketchError is not null)
+            return $"a drawing was saved as a plain picture and can't be edited again: {sketchError}";
+
         return null;
     }
+
+    /// <summary>The name the staging script gives a drawn file: sketch-, a page-unique token, .png.</summary>
+    private static readonly System.Text.RegularExpressions.Regex SketchFileName =
+        new(@"^sketch-[a-z0-9-]{1,40}\.png$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     /// <summary>Minutes, or null when the coach hasn't estimated it. Validated before this runs.</summary>
     private static int? ParseRunTime(string? raw) =>

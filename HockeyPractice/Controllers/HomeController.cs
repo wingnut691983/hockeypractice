@@ -9,20 +9,6 @@ namespace HockeyPractice.Controllers;
 
 public class HomeController : Controller
 {
-    /// <summary>
-    /// The team offered at the end of /how-it-works, as a player would see it.
-    ///
-    /// Hardcoded rather than configured because a slug is not a secret: it is the visible part of
-    /// every link to that team. The code that opens it is a secret, and is not here. It is read
-    /// from the team's own row at request time, so rotating the demo team's code needs no change
-    /// to this file and no redeploy.
-    ///
-    /// If the demo team is renamed or deleted, change this and the last panel follows. A slug that
-    /// matches nothing simply leaves that panel out, so getting it wrong costs the panel, not the
-    /// page.
-    /// </summary>
-    private const string DemoTeamSlug = "demoteam";
-
     private readonly AppDbContext _db;
     private readonly TeamAccessService _access;
 
@@ -74,9 +60,15 @@ public class HomeController : Controller
     [Route("how-it-works")]
     public async Task<IActionResult> HowItWorks()
     {
+        // The team offered at the end, as a player would see it. Chosen by Team.IsDemo, not by
+        // slug: this publishes a live team's player code, and a hard-coded "demoteam" slug meant
+        // renaming a real team to that would have put its code and roster on this ungated page.
+        // The code itself is read from the row at request time, so rotating it needs no redeploy.
+        //
         // No such team, or a team with no player code, and the last panel is simply left out. The
         // rest of the page is worth serving either way, so this never fails the request.
-        var demo = await _db.Teams.FirstOrDefaultAsync(t => t.Slug == DemoTeamSlug);
+        var demo = await _db.Teams.AsNoTracking()
+            .Where(t => t.IsDemo).OrderBy(t => t.Id).FirstOrDefaultAsync();
         return View(demo?.ViewCode is { Length: > 0 } ? demo : null);
     }
 

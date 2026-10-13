@@ -15,7 +15,7 @@ namespace HockeyPractice.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "8.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
             modelBuilder.Entity("HockeyPractice.Models.Drill", b =>
                 {
@@ -70,6 +70,10 @@ namespace HockeyPractice.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("AltText")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<long>("Bytes")
                         .HasColumnType("INTEGER");
 
@@ -86,6 +90,20 @@ namespace HockeyPractice.Migrations
                     b.HasIndex("DrillId");
 
                     b.ToTable("DrillDiagrams");
+                });
+
+            modelBuilder.Entity("HockeyPractice.Models.DrillDiagramSketch", b =>
+                {
+                    b.Property<int>("DrillDiagramId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("DrillDiagramId");
+
+                    b.ToTable("DrillDiagramSketches");
                 });
 
             modelBuilder.Entity("HockeyPractice.Models.DrillTag", b =>
@@ -418,6 +436,9 @@ namespace HockeyPractice.Migrations
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsDemo")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("LogoFileName")
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
@@ -532,6 +553,17 @@ namespace HockeyPractice.Migrations
                         .IsRequired();
 
                     b.Navigation("Drill");
+                });
+
+            modelBuilder.Entity("HockeyPractice.Models.DrillDiagramSketch", b =>
+                {
+                    b.HasOne("HockeyPractice.Models.DrillDiagram", "Diagram")
+                        .WithOne("Sketch")
+                        .HasForeignKey("HockeyPractice.Models.DrillDiagramSketch", "DrillDiagramId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Diagram");
                 });
 
             modelBuilder.Entity("HockeyPractice.Models.DrillTag", b =>
@@ -649,6 +681,11 @@ namespace HockeyPractice.Migrations
                     b.Navigation("Diagrams");
 
                     b.Navigation("Tags");
+                });
+
+            modelBuilder.Entity("HockeyPractice.Models.DrillDiagram", b =>
+                {
+                    b.Navigation("Sketch");
                 });
 
             modelBuilder.Entity("HockeyPractice.Models.PracticePlan", b =>

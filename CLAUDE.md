@@ -134,9 +134,11 @@ found clean, so a later pass doesn't re-derive it.
 
 `docs/plans/` holds work that has been planned and agreed but not started:
 
-- **`docs/plans/drill-diagram-tool.md`**: a "Draw a diagram" editor on the drill edit page, with
-  a blank rink and the standard hockey annotations, re-editable after saving. Its migration is the
-  first since the upgrade, so it trips `known-issues.md` #16e: add `IsDemo` in the same pass.
+- **`docs/plans/drill-diagram-tool.md`**: the "Draw a diagram" editor. **Built (both steps) and
+  verified locally on 12 October 2026, not yet deployed.** It carried the `IsDemo` migration, so
+  `known-issues.md` #16e is closed. Browser-tested at desktop (dark) and 360px on 13 October.
+  Still owed: light mode, print preview of the six inks, and a real pinch and pen on a tablet.
+  Delete the plan when it ships.
 
 The .NET 10 upgrade shipped as `v45` on 12 October 2026 and its plan was deleted. Running the
 amd64 image locally now needs `DOTNET_EnableWriteXorExecute=0`; see README "Deploying".

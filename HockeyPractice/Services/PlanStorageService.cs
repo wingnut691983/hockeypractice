@@ -292,8 +292,14 @@ public class PlanStorageService
     /// it was handed. A PDF is stored as-is (it can't be shrunk); anything else must actually
     /// decode as an image, which is a stronger check than any extension or magic-byte table.
     /// </summary>
+    /// <param name="drawn">
+    /// True for a picture made in the drawing editor, which is clean line art on white. That is
+    /// stored lossless: see the measurements in ShrinkToWebpAsync, where line art comes out
+    /// smaller lossless than lossy, and lossy WebP keeps less colour detail than brightness, which
+    /// is exactly what thin red and orange ink lines need.
+    /// </param>
     public async Task<DiagramResult> SaveDiagramAsync(int teamId, int drillId, IFormFile file,
-        CancellationToken ct = default)
+        bool drawn = false, CancellationToken ct = default)
     {
         if (file.Length == 0) return new DiagramResult(false, "That file is empty.");
 
@@ -324,7 +330,7 @@ public class PlanStorageService
             }
             else
             {
-                var error = await ShrinkToWebpAsync(file, target, ct);
+                var error = await ShrinkToWebpAsync(file, target, ct, lossless: drawn);
                 if (error is not null)
                 {
                     TryDelete(target);
@@ -354,7 +360,7 @@ public class PlanStorageService
     /// header and its largest real use is as the og:image, where chat apps want roughly 300px.
     /// </param>
     private async Task<string?> ShrinkToWebpAsync(IFormFile file, string target, CancellationToken ct,
-        string? notAnImageMessage = null, int? maxWidth = null)
+        string? notAnImageMessage = null, int? maxWidth = null, bool lossless = false)
     {
         var widest = maxWidth ?? _options.DiagramMaxWidth;
         // The default names PDF as acceptable because the drill path accepts one. The overview
@@ -410,9 +416,14 @@ public class PlanStorageService
             // both to keep the smaller would roughly double CPU on a path that accepts four
             // large photos in one request. Quality 85 on line art was checked at 1:1 pixels and
             // shows no visible ringing on 15px text or thin rink lines.
+            //
+            // That accepted case is the one exception: a picture from the drawing editor is known
+            // to be line art, so the caller says so and it goes lossless (SaveDiagramAsync).
             await using var destination = File.Create(target);
             await image.SaveAsWebpAsync(destination,
-                new WebpEncoder { Quality = 85, FileFormat = WebpFileFormatType.Lossy }, ct);
+                lossless
+                    ? new WebpEncoder { FileFormat = WebpFileFormatType.Lossless }
+                    : new WebpEncoder { Quality = 85, FileFormat = WebpFileFormatType.Lossy }, ct);
             return null;
         }
         // Deliberately broad. The filter here used to name three exception types, and the decode

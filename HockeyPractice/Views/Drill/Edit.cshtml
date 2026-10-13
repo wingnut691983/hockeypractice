@@ -1,9 +1,17 @@
 @using HockeyPractice.Services
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider FileVersions
 @model DrillEditViewModel
 @{
     ViewBag.Title = (Model.IsNew ? "New drill" : "Edit drill") + " – " + Model.Ctx.Team.Name;
     ViewBag.Team = Model.Ctx.Team;
     var slug = Model.Ctx.Team.Slug;
+
+    // The drawing editor is loaded only when Draw is pressed. asp-append-version works on tags,
+    // not on a URL a script reads later, so the versioned path is built here; without the hash a
+    // redeploy could leave a coach running yesterday's editor from cache.
+    var sketchSrc = FileVersions.AddFileVersionToPath(Context.Request.PathBase, "/js/drill-sketch.js");
+    var draftKey = $"hp-sketch:{slug}:{(Model.Drill?.Id.ToString() ?? "new")}";
+    var room = HockeyPractice.Controllers.DrillController.MaxDiagrams - (Model.Drill?.Diagrams.Count ?? 0);
 }
 @await Html.PartialAsync("_TeamHeader", Model.Ctx)
 
@@ -31,6 +39,7 @@
        with nothing to indicate anything went wrong. *@
     <form method="post" enctype="multipart/form-data" class="hp-form" style="margin-top:1rem;"
           id="hp-drill-form"
+          data-failed="@(Model.Error is not null ? "1" : null)"
           asp-action="@(Model.IsNew ? "Create" : "Update")"
           asp-route-slug="@slug" asp-route-id="@Model.Drill?.Id">
         @Html.AntiForgeryToken()
@@ -124,6 +133,18 @@
             <input type="file" id="diagram" name="diagrams" multiple hidden
                    accept="image/*,application/pdf,.pdf" />
 
+            @* Script-only, so hidden until the staging script below finds it can attach a file. A
+               drawing is staged exactly as a pasted picture is, and its editable copy rides in a
+               hidden field named for that file (hp-sketch-fields). *@
+            <div class="hp-draw-row" id="hp-draw-row" hidden
+                 data-src="@sketchSrc" data-draft="@draftKey" data-room="@room">
+                <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm" id="hp-draw">
+                    Draw a diagram
+                </button>
+                <span class="hp-draw-note" id="hp-draw-note" aria-live="polite"></span>
+            </div>
+            <div id="hp-sketch-fields" hidden></div>
+
             @* Filled in by the paste/drop script. Hidden until something is actually staged, so a
                coach is never looking at an empty box wondering whether it worked. *@
             @* The label rides on a data attribute rather than being interpolated into the script
@@ -175,10 +196,19 @@
                 Shown to players in the order they were added.
             </p>
             <div class="hp-diagram-grid">
+                @{ var position = 0; }
                 @foreach (var picture in d.Diagrams.OrderBy(x => x.Id))
                 {
+                    position++;
                     var url = Url.Action("Diagram", new { slug, id = d.Id, diagramId = picture.Id, v = picture.Version });
-                    <div class="hp-diagram-item">
+                    Model.Sketches.TryGetValue(picture.Id, out var sketchJson);
+                    @* The drawing goes to the editor in a data attribute, which Razor encodes. It is
+                       never rendered as markup: the editor sets all of its text with textContent,
+                       which matters because a copied drill carries another team's labels. *@
+                    <div class="hp-diagram-item" data-diagram-id="@picture.Id"
+                         data-position="@position"
+                         data-sketch="@sketchJson"
+                         data-sketch-url="@(sketchJson is null ? null : Url.Action("ReplaceSketch", new { slug, id = d.Id, diagramId = picture.Id }))">
                         @if (picture.IsPdf)
                         {
                             <a class="hp-paste-chip" href="@url" target="_blank" rel="noopener noreferrer">
@@ -189,18 +219,29 @@
                         {
                             <a href="@url" target="_blank" rel="noopener noreferrer">
                                 <img class="hp-drill-diagram" style="max-height:9rem;margin-top:0;"
-                                     src="@url" alt="Picture on @d.Title" />
+                                     src="@url" alt="@(picture.AltText ?? $"Picture on {d.Title}")" />
                             </a>
                         }
                         <div class="hp-muted" style="font-size:.75rem;">
                             @PlanStorageService.Human(picture.Bytes)
                         </div>
-                        <form method="post" asp-action="RemoveDiagram" asp-route-slug="@slug"
-                              asp-route-id="@d.Id" asp-route-diagramId="@picture.Id"
-                              data-confirm="Remove this picture from the drill?">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
-                        </form>
+                        <div class="hp-diagram-actions">
+                            @if (sketchJson is not null)
+                            {
+                                <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm hp-edit-drawing" hidden>
+                                    Edit drawing
+                                </button>
+                                <button type="button" class="hp-btn hp-btn-quiet hp-btn-sm hp-copy-drawing" hidden>
+                                    Copy as next stage
+                                </button>
+                            }
+                            <form method="post" asp-action="RemoveDiagram" asp-route-slug="@slug"
+                                  asp-route-id="@d.Id" asp-route-diagramId="@picture.Id"
+                                  data-confirm="Remove this picture from the drill?">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="hp-btn hp-btn-danger hp-btn-sm">Remove</button>
+                            </form>
+                        </div>
                     </div>
                 }
             </div>
@@ -316,6 +357,31 @@
     var clear = document.getElementById('hp-paste-clear');
     var objectUrl = null;
 
+    // Drawn pictures waiting to be saved: staged file name -> the drawing's JSON. The hidden
+    // fields that carry them are rebuilt from input.files on every preview, never maintained on
+    // their own, so clearing, re-picking files by hand or a bfcache restore cannot leave a
+    // drawing's JSON attached to the wrong picture.
+    var drawings = {};
+    var sketchFields = document.getElementById('hp-sketch-fields');
+
+    function syncSketchFields(staged) {
+        if (!sketchFields) return 0;
+        while (sketchFields.firstChild) sketchFields.removeChild(sketchFields.firstChild);
+        var present = {};
+        staged.forEach(function (f) {
+            if (!Object.prototype.hasOwnProperty.call(drawings, f.name)) return;
+            present[f.name] = true;
+            var field = document.createElement('input');
+            field.type = 'hidden';
+            field.name = 'sketches';
+            field.value = f.name + '|' + drawings[f.name];
+            sketchFields.appendChild(field);
+        });
+        Object.keys(drawings).forEach(function (n) { if (!present[n]) delete drawings[n]; });
+        return Object.keys(present).length;
+    }
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
     // Assigning to input.files works everywhere current but throws on older Safari. If it does,
     // leave the file picker exactly as it was and say nothing — the coach still has a way in.
     function canInject() {
@@ -331,6 +397,8 @@
         releaseUrl();
 
         var staged = input.files ? Array.prototype.slice.call(input.files) : [];
+        var drawn = syncSketchFields(staged);
+        updateDrawState();
         if (!staged.length) { hidePreview(); return; }
 
         // Preview the most recent one — a strip of thumbnails would crowd the form, and the count
@@ -351,13 +419,20 @@
         }
 
         var base = preview.dataset.readyLabel || 'Ready to save';
+        var pictures = staged.length - drawn;
         label.textContent = staged.length === 1
             ? base
-            : staged.length + ' pictures ready to save';
+            : drawn === 0
+                ? staged.length + ' pictures ready to save'
+                : [drawn ? plural(drawn, 'drawing', 'drawings') : null,
+                   pictures ? plural(pictures, 'picture', 'pictures') : null]
+                      .filter(Boolean).join(', ') + ' ready to save';
         preview.hidden = false;
     }
 
     function hidePreview() {
+        syncSketchFields(input.files ? Array.prototype.slice.call(input.files) : []);
+        updateDrawState();
         releaseUrl();
         preview.hidden = true;
         thumb.hidden = true;
@@ -470,6 +545,175 @@
             e.preventDefault();
             input.click();
         });
+    }
+
+    // ── Drawing ──────────────────────────────────────────────────────
+    // The editor (wwwroot/js/drill-sketch.js) knows nothing about drills. Everything about where
+    // a drawing goes lives here: a new one is staged into the file input like a pasted picture,
+    // and an edited one is posted straight over the picture it was drawn as.
+    var drawRow = document.getElementById('hp-draw-row');
+    var drawBtn = document.getElementById('hp-draw');
+    var drawNote = document.getElementById('hp-draw-note');
+    var titleInput = document.getElementById('title');
+    var runInput = document.getElementById('runTimeMinutes');
+    // The value, not the attribute's presence: Razor renders data-* attributes even when the
+    // value is null, so data-failed="" is on every page and hasAttribute was always true.
+    var formFailed = form.getAttribute('data-failed') === '1';
+    var draftKey = drawRow ? drawRow.dataset.draft : null;
+    var editButtons = Array.prototype.slice.call(document.querySelectorAll('.hp-edit-drawing'));
+    var copyButtons = Array.prototype.slice.call(document.querySelectorAll('.hp-copy-drawing'));
+    var drawSeq = 0;
+    var loadingEditor = null;
+
+    function roomLeft() {
+        return parseInt(drawRow.dataset.room, 10) - (input.files ? input.files.length : 0);
+    }
+
+    // On a new drill, a save that bounces (a missing run time, say) re-renders the form and the
+    // browser drops every staged file. So Draw waits until the fields that can bounce it are
+    // filled in. The editor's autosave is the second line of defence.
+    function fieldsReady() {
+        return titleInput.value.trim() !== '' && runInput.checkValidity();
+    }
+
+    function updateDrawState() {
+        if (!drawRow || drawRow.hidden) return;
+        var room = roomLeft() > 0, ready = fieldsReady();
+        drawBtn.disabled = !room || !ready;
+        drawNote.textContent = !room
+            ? 'This drill has no room for another picture.'
+            : !ready
+                ? 'Fill in the name and run time first, so a drawing can\'t be lost if the save bounces.'
+                : '';
+        copyButtons.forEach(function (b) { b.disabled = !room; });
+    }
+
+    function loadEditor() {
+        if (window.HPSketch) return Promise.resolve(window.HPSketch);
+        if (loadingEditor) return loadingEditor;
+        loadingEditor = new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = drawRow.dataset.src;
+            script.onload = function () { if (window.HPSketch) resolve(window.HPSketch); else reject(new Error()); };
+            script.onerror = function () { loadingEditor = null; reject(new Error()); };
+            document.head.appendChild(script);
+        });
+        return loadingEditor;
+    }
+
+    function editorFailed() {
+        drawNote.textContent = 'The drawing tool didn\'t load. Check the connection and try again.';
+    }
+
+    // Other drawings on this drill, offered as a starting point. Reusing the player setup from
+    // the previous stage is the common case.
+    function starters() {
+        var list = [];
+        document.querySelectorAll('.hp-diagram-item[data-sketch]').forEach(function (item) {
+            if (item.dataset.sketch) list.push({ label: 'Picture ' + item.dataset.position, sketch: item.dataset.sketch });
+        });
+        var n = 0;
+        Object.keys(drawings).forEach(function (name) {
+            list.push({ label: 'Unsaved drawing ' + (++n), sketch: drawings[name] });
+        });
+        return list;
+    }
+
+    function stageDrawing(png, json) {
+        var name = 'sketch-' + Date.now().toString(36) + '-' + (++drawSeq) + '.png';
+        drawings[name] = json;
+        var ok = false;
+        try { ok = accept([new File([png], name, { type: 'image/png' })]); } catch (e) { ok = false; }
+        if (!ok) {
+            delete drawings[name];
+            throw new Error('This browser can\'t attach the drawing to the form. A current Chrome, Edge or Safari can.');
+        }
+    }
+
+    function openNew(sketch, title) {
+        loadEditor().then(function (editor) {
+            return editor.open({
+                title: title,
+                sketch: sketch || null,
+                starters: sketch ? [] : starters(),
+                draft: { key: draftKey, keepOnUse: true, offerStaged: formFailed },
+                onUse: function (result) { stageDrawing(result.png, result.json); }
+            });
+        }, editorFailed);
+    }
+
+    function openEdit(item) {
+        var token = form.querySelector('input[name="__RequestVerificationToken"]');
+        var next = null;
+        loadEditor().then(function (editor) {
+            return editor.open({
+                title: 'Edit drawing',
+                sketch: item.dataset.sketch,
+                draft: { key: draftKey + ':' + item.dataset.diagramId, keepOnUse: false, offerStaged: false },
+                onUse: function (result) {
+                    var body = new FormData();
+                    if (token) body.append('__RequestVerificationToken', token.value);
+                    body.append('picture', result.png, 'drawing.png');
+                    body.append('sketch', result.json);
+                    return fetch(item.dataset.sketchUrl, {
+                        method: 'POST', body: body, credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    }).then(function (res) {
+                        return res.json().catch(function () { return { ok: false }; });
+                    }, function () {
+                        throw new Error('Not saved: no connection. Your drawing is still here, so try again.');
+                    }).then(function (data) {
+                        if (!data || !data.ok)
+                            throw new Error((data && data.error) || 'Not saved. Your drawing is still here, so try again.');
+                        next = data.url;
+                    });
+                }
+            });
+        }, editorFailed).then(function (used) {
+            if (used && next) window.location.assign(next);
+        });
+    }
+
+    if (drawRow && canInject()) {
+        drawRow.hidden = false;
+        copyButtons.forEach(function (b) { b.hidden = false; });
+
+        drawBtn.addEventListener('click', function () { openNew(null, 'Draw a diagram'); });
+        titleInput.addEventListener('input', updateDrawState);
+        runInput.addEventListener('input', updateDrawState);
+        copyButtons.forEach(function (b) {
+            b.addEventListener('click', function () {
+                openNew(b.closest('.hp-diagram-item').dataset.sketch, 'Next stage');
+            });
+        });
+        updateDrawState();
+    }
+    // Editing posts on its own and attaches nothing to the form, so it doesn't need DataTransfer.
+    if (drawRow && window.fetch && window.FormData) {
+        editButtons.forEach(function (b) {
+            b.hidden = false;
+            b.addEventListener('click', function () { openEdit(b.closest('.hp-diagram-item')); });
+        });
+    }
+
+    // A drawing stays in storage after it is staged, until the drill is known to have saved.
+    // Landing here without an error means the last save went through (or was never attempted),
+    // so a staged copy is finished with. Landing here WITH an error means the browser just
+    // dropped the staged file, and the copy in storage is the only one left.
+    if (draftKey) {
+        try {
+            var kept = JSON.parse(localStorage.getItem(draftKey) || 'null');
+            if (kept && kept.staged) {
+                if (!formFailed) localStorage.removeItem(draftKey);
+                else if (drawRow && !drawRow.hidden) {
+                    var hint = document.createElement('div');
+                    hint.className = 'hp-draw-note';
+                    hint.style.width = '100%';
+                    hint.textContent = 'Your drawing wasn\'t saved with the drill. Press Draw a diagram to get it back.';
+                    drawRow.appendChild(hint);
+                }
+            }
+        } catch (e) { /* storage unavailable: nothing to tidy or offer */ }
     }
 
     // Coming back via the Back button restores the page from the bfcache, but a file put into the

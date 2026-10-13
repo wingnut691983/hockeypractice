@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Drill> Drills => Set<Drill>();
     public DbSet<DrillTag> DrillTags => Set<DrillTag>();
     public DbSet<DrillDiagram> DrillDiagrams => Set<DrillDiagram>();
+    public DbSet<DrillDiagramSketch> DrillDiagramSketches => Set<DrillDiagramSketch>();
     public DbSet<PlanDrill> PlanDrills => Set<PlanDrill>();
     public DbSet<PlanView> PlanViews => Set<PlanView>();
     public DbSet<Subscriber> Subscribers => Set<Subscriber>();
@@ -98,6 +99,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(d => d.DrillId).OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<DrillDiagram>().HasIndex(d => d.DrillId);
+
+        // Cascade so removing a picture, a drill or a team takes its drawing with it, with no
+        // code path having to remember. Keyed on the picture, so a picture has at most one.
+        b.Entity<DrillDiagramSketch>()
+            .HasOne(s => s.Diagram).WithOne(d => d.Sketch)
+            .HasForeignKey<DrillDiagramSketch>(s => s.DrillDiagramId).OnDelete(DeleteBehavior.Cascade);
 
         b.Entity<DrillTag>().HasIndex(t => new { t.DrillId, t.NormalizedName }).IsUnique();
         b.Entity<DrillTag>().HasIndex(t => t.NormalizedName);

@@ -460,6 +460,12 @@ a.hp-card:active { transform: scale(.99); }
      dimensions, letterbox rather than distort. */
   align-self: flex-start;
   object-fit: contain;
+
+  /* A drawn full rink is portrait, 85 ft wide and 200 tall. With no height cap it rendered
+     about 1,650px tall on a desktop plan. The proportion guards above are what make this safe:
+     max-width and max-height resolve together, so a tall picture gets narrower, never squashed.
+     Print has its own caps further down, which outrank this. */
+  max-height: 85vh;
 }
 
 /* ── Drill peek ─────────────────────────────────────────────────────────────
@@ -557,10 +563,18 @@ a.hp-card:active { transform: scale(.99); }
   object-fit: contain;
 }
 
+/* The "Draw a diagram" choice and the drawn-picture buttons are script-only, so they start
+   hidden and the staging script reveals them. */
+.hp-draw-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
+.hp-draw-note { font-size: .78rem; color: var(--hp-muted); }
+.hp-diagram-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+
 /* A drill's pictures on the edit form: side by side on a desktop, stacking on a phone. */
 .hp-diagram-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  /* 11rem, not 9: a drawn picture carries "Copy as next stage", which wrapped onto two lines in
+     a 9rem column and made its button twice the height of its neighbours. */
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
   gap: .8rem;
 }
 .hp-diagram-item {
@@ -715,6 +729,9 @@ a.hp-card:active { transform: scale(.99); }
   border-radius: 8px;
   background: #fff;   /* diagrams are line art on white; keep that behind transparency */
 }
+/* display below beats the browser's [hidden] rule, so an empty chip sat under every pasted
+   picture until this was added. */
+.hp-paste-chip[hidden] { display: none; }
 .hp-paste-chip {
   display: inline-flex; align-items: center;
   font-size: .8rem; font-weight: 650;
@@ -2155,3 +2172,175 @@ body:has(.hp-tabs) .hp-footer { padding-bottom: calc(5rem + env(safe-area-inset-
     print-color-adjust: exact;
   }
 }
+
+
+/* ── Drawing editor (wwwroot/js/drill-sketch.js) ────────────────────────────
+   Full screen over the drill page. Its chrome follows the site theme; the rink itself is always
+   white with dark ink, because what it makes is a picture that also gets printed. Tools sit on
+   the left on a tablet or computer and in a bottom sheet on a phone. */
+
+html.hps-open, html.hps-open body { overflow: hidden; }
+
+.hps {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;   /* above the bottom tab bar and the video player */
+  display: flex;
+  flex-direction: column;
+  background: var(--hp-bg);
+  color: var(--hp-text);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+.hps:focus { outline: none; }
+/* The site's buttons set display, which beats the browser's own [hidden] rule, so Finish line and
+   Zoom out showed when there was nothing to finish or zoom. */
+.hps [hidden] { display: none !important; }
+
+.hps-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .6rem;
+  background: var(--hp-surface);
+  border-bottom: 1px solid var(--hp-border);
+}
+.hps-title { font-size: .95rem; margin-right: auto; padding: 0 .3rem; }
+.hps-group { display: flex; gap: .3rem; }
+.hps-viewsel { width: auto; min-height: 36px; padding-top: .3rem; padding-bottom: .3rem; font-size: .9rem; }
+.hps-top .hp-btn:disabled { opacity: .45; cursor: default; }
+
+/* In the rink's column, above the rink, and never above the palette. Banners come and go as the
+   coach works; spanning the whole editor they shifted the palette, so the next tap after the
+   first change landed on the wrong tool. Floating them over the rink instead hid the net. */
+.hps-msgs { flex: none; display: flex; flex-direction: column; gap: 1px; background: var(--hp-border); }
+.hps-msgs:empty, .hps-msgs:not(:has(> :not([hidden]))) { display: none; }
+.hps-msg {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .4rem .8rem;
+  padding: .4rem .8rem;
+  background: var(--hp-surface-2);
+  font-size: .86rem;
+}
+.hps-msg[hidden] { display: none; }
+.hps-msg-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.hps-msg-quiet { color: var(--hp-muted); }
+.hps-msg-err { color: var(--hp-danger); font-weight: 650; }
+
+.hps-body { flex: 1; display: flex; min-height: 0; }
+
+.hps-palette {
+  width: 15.5rem;
+  flex: none;
+  overflow-y: auto;
+  padding: .5rem .6rem calc(1rem + env(safe-area-inset-bottom));
+  background: var(--hp-surface);
+  border-right: 1px solid var(--hp-border);
+}
+.hps-sec { margin-bottom: .7rem; }
+.hps-h { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--hp-muted); margin: .35rem 0 .3rem; display: block; }
+.hps-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; }
+.hps-tool {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .15rem;
+  min-height: var(--hp-tap);
+  padding: .3rem .2rem;
+  border: 1px solid var(--hp-border);
+  border-radius: 8px;
+  background: var(--hp-surface);
+  color: var(--hp-text);
+  cursor: pointer;
+}
+.hps-tool span { font-size: .66rem; line-height: 1.15; text-align: center; }
+.hps-tool[aria-pressed="true"] { border-color: var(--hp-primary); box-shadow: inset 0 0 0 1px var(--hp-primary); background: var(--hp-surface-2); }
+
+.hps-seg { display: flex; border: 1px solid var(--hp-border); border-radius: 8px; overflow: hidden; }
+.hps-seg button {
+  font: inherit; font-size: .8rem; flex: 1; min-height: 36px; border: 0;
+  background: var(--hp-surface); color: var(--hp-text); cursor: pointer;
+}
+.hps-seg button + button { border-left: 1px solid var(--hp-border); }
+.hps-seg button[aria-pressed="true"] { background: var(--hp-primary); color: var(--hp-on-primary, #fff); font-weight: 700; }
+.hps-seg button:disabled { opacity: .4; cursor: default; }
+
+.hps-inks { display: flex; flex-wrap: wrap; gap: .4rem; }
+.hps-ink {
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+  border: 2px solid var(--hp-surface);
+  box-shadow: 0 0 0 1px var(--hp-border);
+}
+.hps-ink[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--hp-text); }
+
+.hps-check { display: flex; align-items: center; gap: .45rem; font-size: .82rem; margin-top: .55rem; min-height: 36px; }
+.hps-check input { width: 1.1rem; height: 1.1rem; }
+.hps-field { display: block; margin-top: .4rem; }
+.hps-field[hidden] { display: none; }
+
+.hps-collapse { display: none; }
+
+.hps-stage {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--hp-surface-2);
+}
+.hps-svg { display: block; flex: 1; min-height: 0; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.hps-stage[data-tool="path"] .hps-svg,
+.hps-stage[data-tool="mark"] .hps-svg,
+.hps-stage[data-tool="num"] .hps-svg,
+.hps-stage[data-tool="text"] .hps-svg { cursor: crosshair; }
+.hps-rot { cursor: grab; }
+
+.hps-ask {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+  background: rgba(6, 9, 14, .55);
+}
+.hps-ask-box {
+  max-width: 24rem; padding: 1rem 1.1rem;
+  background: var(--hp-surface); border: 1px solid var(--hp-border);
+  border-radius: var(--hp-radius); box-shadow: var(--hp-shadow);
+}
+.hps-ask-box p { margin: 0 0 .9rem; }
+.hps-ask-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+
+@media (max-width: 760px) {
+  /* Every pixel of height goes to the rink: measured at 360 x 740, the first version left it
+     about 150px tall under a three-row top bar, two tall banners and the tool sheet. Two compact
+     rows here: Cancel, view, Use; then the edit buttons spread across. */
+  .hps-title { display: none; }
+  .hps-top { gap: .3rem; padding: .3rem .4rem; }
+  .hps-top .hp-btn-sm { min-height: 32px; padding: .25rem .55rem; font-size: .78rem; }
+  .hps-viewsel { flex: 1; min-width: 0; min-height: 32px; font-size: .8rem; padding-top: .2rem; padding-bottom: .2rem; }
+  .hps-group { order: 5; width: 100%; justify-content: space-between; }
+  .hps-group .hp-btn-sm { flex: 1; }
+  .hps-msg { padding: .25rem .5rem; font-size: .78rem; gap: .25rem .5rem; }
+  .hps-msg .hp-btn-sm { min-height: 30px; padding: .15rem .5rem; font-size: .76rem; }
+  .hps-body { flex-direction: column-reverse; }
+  .hps-palette {
+    width: auto;
+    max-height: 30vh;
+    border-right: 0;
+    border-top: 1px solid var(--hp-border);
+    padding-top: 0;
+  }
+  .hps-collapse {
+    display: block; position: sticky; top: 0; z-index: 1; width: 100%;
+    font: inherit; font-size: .8rem; font-weight: 650; min-height: 36px;
+    border: 0; border-bottom: 1px solid var(--hp-border);
+    background: var(--hp-surface); color: var(--hp-muted); cursor: pointer;
+  }
+  .hps-tools { grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr)); }
+  .hps-collapsed .hps-palette { max-height: none; overflow: visible; }
+  .hps-collapsed .hps-sec { display: none; }
+}
+
