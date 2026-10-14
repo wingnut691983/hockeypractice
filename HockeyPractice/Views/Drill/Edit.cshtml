@@ -576,16 +576,28 @@
         return titleInput.value.trim() !== '' && runInput.checkValidity();
     }
 
+    // Draw is only switched off when the drill has no room. Missing fields are handled on press
+    // instead (see drawPressed): disabling the button for them made it look working and do
+    // nothing, because .hp-btn has no disabled style, and a coach reported Draw as broken.
     function updateDrawState() {
         if (!drawRow || drawRow.hidden) return;
-        var room = roomLeft() > 0, ready = fieldsReady();
-        drawBtn.disabled = !room || !ready;
-        drawNote.textContent = !room
-            ? 'This drill has no room for another picture.'
-            : !ready
-                ? 'Fill in the name and run time first, so a drawing can\'t be lost if the save bounces.'
-                : '';
+        var room = roomLeft() > 0;
+        drawBtn.disabled = !room;
+        drawNote.textContent = !room ? 'This drill has no room for another picture.' : '';
         copyButtons.forEach(function (b) { b.disabled = !room; });
+    }
+
+    // Says which field is missing and takes the coach to it, with the browser's own bubble.
+    function drawPressed() {
+        if (!fieldsReady()) {
+            var missing = titleInput.value.trim() === '' ? titleInput : runInput;
+            drawNote.textContent = 'Fill in the drill name and run time first, so a drawing can\'t be lost if the save bounces.';
+            missing.focus();
+            if (missing.reportValidity) missing.reportValidity();
+            return;
+        }
+        drawNote.textContent = '';
+        openNew(null, 'Draw a diagram');
     }
 
     function loadEditor() {
@@ -678,7 +690,7 @@
         drawRow.hidden = false;
         copyButtons.forEach(function (b) { b.hidden = false; });
 
-        drawBtn.addEventListener('click', function () { openNew(null, 'Draw a diagram'); });
+        drawBtn.addEventListener('click', drawPressed);
         titleInput.addEventListener('input', updateDrawState);
         runInput.addEventListener('input', updateDrawState);
         copyButtons.forEach(function (b) {

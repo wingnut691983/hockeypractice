@@ -289,9 +289,12 @@ answer in September.
   drill, a save that bounces re-renders the form and the browser drops every staged file, and with
   a pasted picture that just means pasting again, but a drawing would be gone. So the editor keeps
   its JSON under `hp-sketch:<team>:<drill or new>` marked `staged`, the edit page clears staged
-  copies when it loads *without* an error, and offers them back when it loads *with* one. Draw is
-  also disabled until the name and run time are filled in on a new drill, which removes the common
-  cause. **Razor renders `data-*` attributes even when their value is null**, unlike ordinary
+  copies when it loads *without* an error, and offers them back when it loads *with* one. Draw also
+  refuses to open until the name and run time are filled in on a new drill, which removes the
+  common cause. It refuses **on press**, focusing the missing field with the browser's own
+  "fill in this field" bubble, not by disabling the button: `v46` disabled it, `.hp-btn` has no
+  disabled look, and the coach reported Draw as simply not working on a new drill. It is disabled
+  only when the drill has no room, and then it visibly greys out. **Razor renders `data-*` attributes even when their value is null**, unlike ordinary
   attributes, and that broke this the first time: the form's `data-failed="@(error ? "1" : null)"`
   came out as `data-failed=""` on every page, `hasAttribute` was always true, so every load counted
   as a failed save, staged copies were never cleared, and the "your drawing wasn't saved" hint

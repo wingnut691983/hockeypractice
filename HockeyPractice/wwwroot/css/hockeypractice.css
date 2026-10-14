@@ -567,6 +567,9 @@ a.hp-card:active { transform: scale(.99); }
    hidden and the staging script reveals them. */
 .hp-draw-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .5rem; }
 .hp-draw-note { font-size: .78rem; color: var(--hp-muted); }
+/* .hp-btn has no disabled look of its own, so a switched-off Draw read as a broken one. */
+.hp-draw-row .hp-btn:disabled,
+.hp-copy-drawing:disabled { opacity: .45; cursor: not-allowed; }
 .hp-diagram-actions { display: flex; flex-wrap: wrap; gap: .35rem; }
 
 /* A drill's pictures on the edit form: side by side on a desktop, stacking on a phone. */
