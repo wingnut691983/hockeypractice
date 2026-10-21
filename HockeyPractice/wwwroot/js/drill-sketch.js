@@ -490,9 +490,10 @@
                     'stroke-dasharray': sh.dash ? sh.dash.map(f2).join(' ') : null
                 }, g);
             });
-            // A wide invisible stroke, so a finger can pick up a thin line.
+            // An invisible stroke 1.6 ft wide, so a thin line is easy to pick up with a mouse or pen
+            // without reaching into its neighbours.
             if (!forExport)
-                el('path', { d: pd(poly), fill: 'none', stroke: 'transparent', 'stroke-width': f2(3 * k), 'stroke-linecap': 'round' }, g);
+                el('path', { d: pd(poly), fill: 'none', stroke: 'transparent', 'stroke-width': 1.6, 'stroke-linecap': 'round' }, g);
             return g;
         }
 
@@ -500,7 +501,7 @@
         if (item.t === 'text') {
             var tg = el('g', { transform: 'translate(' + f2(v[0]) + ' ' + f2(v[1]) + ')' }, g);
             if (!forExport)
-                el('rect', { x: f2(-0.7 * item.s.length), y: f2(-1.4 * k), width: f2(1.4 * item.s.length), height: f2(2.8 * k), fill: 'transparent' }, tg);
+                el('rect', { x: f2(-0.7 * item.s.length), y: -1.2, width: f2(1.4 * item.s.length), height: 2.4, fill: 'transparent' }, tg);
             var t = el('text', halo({
                 x: 0, y: 0.85, 'font-size': 2.4, 'font-weight': 650, 'font-family': FONT,
                 'text-anchor': 'middle', fill: ink
@@ -514,10 +515,14 @@
         // letters because the reference wraps each one in a 5 ft badge and these have none.
         var s = GLYPH_FT;
         var outer = el('g', { transform: 'translate(' + f2(v[0]) + ' ' + f2(v[1]) + ') scale(' + f2(s) + ')' }, g);
-        // The hit area keeps a finger's size in every view, however small the stamp is drawn.
-        if (!forExport) {
-            var hit = Math.max(5.5, 2.6 * k / s);
-            el('rect', { x: f2(-hit), y: f2(-hit), width: f2(2 * hit), height: f2(2 * hit), fill: 'transparent' }, outer);
+        // The hit area is the stamp's own size, about 3 ft square. It used to be sized for a
+        // finger (at least 5 ft, 12 ft on the sideways rink), and since the selection box is drawn
+        // round it, a small stamp got a box several times its size and stamps placed close
+        // together could not be picked apart. The editor is used on tablets and computers far more
+        // than phones, so the object's size wins. A blocker gets a strip along its own length
+        // instead, below, because a square here would make its box 3 ft tall around a 1 ft bar.
+        if (!forExport && !(MARKS[item.kind] && MARKS[item.kind].scaled)) {
+            el('rect', { x: -3.8, y: -3.8, width: 7.6, height: 7.6, fill: 'transparent' }, outer);
         }
 
         if (item.t === 'num') {
@@ -530,6 +535,12 @@
         }
 
         drawMarkGlyph(outer, item.kind, ink, item.rot + turnOf(view), item);
+        if (!forExport && item.kind === 'blocker') {
+            // 2 ft wide, so the 1 ft bar is easy to pick up without its box growing much.
+            var bu = item.len / GLYPH_FT, bw = 2 / GLYPH_FT;
+            el('rect', { x: f2(-bu / 2), y: f2(-bw / 2), width: f2(bu), height: f2(bw), fill: 'transparent' },
+               el('g', { transform: 'rotate(' + f2(item.rot + turnOf(view)) + ')' }, outer));
+        }
         if (item.label) {
             el('text', halo({
                 x: 3.6, y: 5.4, 'font-size': 5, 'font-weight': 700, 'font-family': FONT, fill: ink
@@ -1007,32 +1018,40 @@
             labelPop.style.left = Math.max(4, Math.min(box.width - w - 4, p.x - box.left + 4)) + 'px';
             labelPop.style.top = Math.max(4, Math.min(box.height - hgt - 4, p.y - box.top + 4)) + 'px';
         }
+        // n screen pixels in view units at the current size and zoom.
+        function px(n) {
+            var ctm = svg.getScreenCTM();
+            return ctm && ctm.a ? n / ctm.a : n * 0.25;
+        }
         function drawOverlay() {
             while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
             var sel = model.items[selected];
             if (!sel || sel.t !== 'mark') labelPop.hidden = true;
-            var k = scaleOf(model.rink), z = 1 / zoom.s;
+            // Selection chrome is sized in screen pixels, not rink feet, so it is the same snug size
+            // in every view and at every zoom. In feet it grew with the view: the sideways rink
+            // padded every selection by about 2 ft and drew handles three times the size.
+            var k = scaleOf(model.rink);
             var it = model.items[selected];
             if (it) {
                 var g = itemsLayer.querySelector('[data-i="' + selected + '"]');
                 if (g) {
-                    var b = g.getBBox(), pad = 0.8 * k;
+                    var b = g.getBBox(), pad = px(3);
                     el('rect', {
                         x: b.x - pad, y: b.y - pad, width: b.width + 2 * pad, height: b.height + 2 * pad,
-                        fill: 'none', stroke: '#1e88e5', 'stroke-width': f2(0.25 * k * z),
-                        'stroke-dasharray': f2(0.8 * k * z) + ' ' + f2(0.5 * k * z), 'pointer-events': 'none'
+                        fill: 'none', stroke: '#1e88e5', 'stroke-width': f2(px(1.25)),
+                        'stroke-dasharray': f2(px(4)) + ' ' + f2(px(3)), 'pointer-events': 'none'
                     }, overlay);
                     if (it.t === 'mark') placeLabelPop(b.x + b.width + pad, b.y + b.height + pad);
                     if (it.t === 'mark' && MARKS[it.kind].rot) {
-                        var v = toView(model.rink, [it.x, it.y]), hy = b.y - pad - 3 * k * z;
-                        el('line', { x1: v[0], y1: b.y - pad, x2: v[0], y2: hy, stroke: '#1e88e5', 'stroke-width': f2(0.25 * k * z), 'pointer-events': 'none' }, overlay);
-                        el('circle', { cx: v[0], cy: hy, r: f2(1.3 * k * z), fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(0.35 * k * z), 'data-h': 'rot', 'class': 'hps-rot' }, overlay);
+                        var v = toView(model.rink, [it.x, it.y]), hy = b.y - pad - px(16);
+                        el('line', { x1: v[0], y1: b.y - pad, x2: v[0], y2: hy, stroke: '#1e88e5', 'stroke-width': f2(px(1.25)), 'pointer-events': 'none' }, overlay);
+                        el('circle', { cx: v[0], cy: hy, r: f2(px(6)), fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(px(1.75)), 'data-h': 'rot', 'class': 'hps-rot' }, overlay);
                     }
                     if (it.t === 'mark' && it.kind === 'blocker') {
                         // A square, so it reads as a different handle from the round rotate one.
-                        var ax = blockerAxis(it), hs = 1.1 * k * z;
+                        var ax = blockerAxis(it), hs = px(5);
                         el('rect', { x: f2(ax.end[0] - hs), y: f2(ax.end[1] - hs), width: f2(2 * hs), height: f2(2 * hs),
-                                     fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(0.35 * k * z), 'data-h': 'len', 'class': 'hps-len-h' }, overlay);
+                                     fill: '#fff', stroke: '#1e88e5', 'stroke-width': f2(px(1.75)), 'data-h': 'len', 'class': 'hps-len-h' }, overlay);
                     }
                 }
             }
@@ -1053,7 +1072,7 @@
                     });
                 }
                 pending.pts.forEach(function (p) {
-                    el('circle', { cx: p[0], cy: p[1], r: f2(0.6 * k * z), fill: '#1e88e5', 'pointer-events': 'none' }, overlay);
+                    el('circle', { cx: p[0], cy: p[1], r: f2(px(3.5)), fill: '#1e88e5', 'pointer-events': 'none' }, overlay);
                 });
             }
         }

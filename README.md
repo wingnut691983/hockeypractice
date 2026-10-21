@@ -269,10 +269,20 @@ answer in September.
   nearly 5 ft long, letters as tall as a faceoff circle's hash marks. The coach compared it against
   a published drill and every object was about twice the size it should be. Now lines are 0.3 ft,
   arrowheads 1.7 ft, the puck wave 0.75 ft either side and letters about 2.7 ft, measured off that
-  reference (`docs/drill-legend.md`), in every view. `scaleOf(view)` still sizes the hit areas,
-  selection box and handles, because those are about a finger, not the picture. Don't put it back
-  on the drawing: a sideways rink on a phone is small, and the answer is the upright view, which
-  is the default for that reason.
+  reference (`docs/drill-legend.md`), in every view. Don't scale the drawing with the view again: a
+  sideways rink on a phone is small, and the answer is the upright view, which is the default for
+  that reason.
+
+- **Tap areas are the object's own size, and selection chrome is sized in screen pixels.** The
+  first version gave every stamp an invisible finger-sized tap square (at least 5 ft, about 12 ft
+  on the sideways rink) and drew the selection box round it, padded by up to 2 ft more. Small
+  stamps got boxes several times their size, and stamps placed a few feet apart could not be
+  picked separately. The coach asked for the box to fit the object, since the editor is used on
+  tablets and computers far more than phones. Now a stamp's tap area is about 3 ft square, a line's
+  is a 1.6 ft band, a blocker's a 2 ft strip along its length, and the box, its padding and the
+  rotate and length handles are a fixed few pixels (`px()` in `drawOverlay`) in every view and at
+  every zoom. Measured on the sideways rink: F2 between F1 and D1, 4 ft apart, gets a 28 x 31 px
+  box, and a click 1 px past an object's edge selects nothing rather than its neighbour.
 
 - **The stamp label box floats beside the selected stamp, not in the tool panel.** It started in
   the panel under the colour and line options, which put it below the bottom of the screen on most
